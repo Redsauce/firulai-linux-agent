@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Redsauce Inventory Agent - Recopilador de inventario de sistemas Linux
-Version: 0.2.3 (con modelo de disco para CVE, sin tamaño)
+Version: 0.2.3 (con modelo de firmware para CVE, sin tamaño)
 Requiere: Permisos de root/sudo
 """
 
@@ -143,7 +143,7 @@ def collect_system_info():
 
 def collect_hardware():
     """
-    Informacion de hardware (CPU y modelo de discos para CVE)
+    Informacion de hardware (CPU y modelo de firmware para CVE)
     """
     hardware = {}
     
@@ -155,18 +155,18 @@ def collect_hardware():
                 hardware["cpu_model"] = line.split(":", 1)[1].strip()
                 break
     
-    # Discos (solo modelo para CVE de firmware)
-    disks = []
+    # Firmware (solo modelo para CVE de firmware)
+    firmware = []
     disk_info = run_command("lsblk -d -o NAME,TYPE,MODEL -n")
     if disk_info:
         for line in disk_info.split('\n'):
             parts = line.split()
             if len(parts) >= 2 and parts[1] == "disk":
-                disks.append({
+                firmware.append({
                     "device": f"/dev/{parts[0]}",
                     "model": " ".join(parts[2:]) if len(parts) > 2 else "Unknown"
                 })
-    hardware["disks"] = disks
+    hardware["firmware"] = firmware
     
     return hardware
 
@@ -268,9 +268,9 @@ def collect_npm_packages():
     
     return packages
 
-def collect_critical_software():
+def collect_core_software():
     """
-    Detecta versiones de software critico comun
+    Detecta versiones de software core comun
     Retorna array de objetos con estructura: {name, version, raw_output}
     """
     software = []
@@ -386,17 +386,17 @@ def send_to_rsm(inventory):
     print(f"     - Sistema (dpkg/rpm): {dpkg_count + rpm_count}")
     print(f"     - Python (pip): {pip_count}")
     print(f"     - Node.js (npm): {npm_count}")
-    print(f"   - Critical software: {len(inventory.get('critical_software', []))}")
-    print(f"   - Discos detectados: {len(inventory.get('hardware', {}).get('disks', []))}")
+    print(f"   - Core software: {len(inventory.get('core_software', []))}")
+    print(f"   - Firmware detectados: {len(inventory.get('hardware', {}).get('firmware', []))}")
     
-    # Mostrar software critico detectado con versiones
-    critical_sw = inventory.get('critical_software', [])
-    if critical_sw:
+    # Mostrar software core detectado con versiones
+    core_sw = inventory.get('core_software', [])
+    if core_sw:
         print(f"     - Detectados:")
-        for sw in critical_sw[:5]:  # Mostrar solo los primeros 5
+        for sw in core_sw[:5]:  # Mostrar solo los primeros 5
             print(f"       - {sw['name']}: {sw['version']}")
-        if len(critical_sw) > 5:
-            print(f"       - ... y {len(critical_sw) - 5} mas")
+        if len(core_sw) > 5:
+            print(f"       - ... y {len(core_sw) - 5} mas")
     
     print(f"\nLongitud total del JSON: {len(rsm_json)} caracteres ({len(rsm_json)/1024:.2f} KB)")
     
@@ -562,10 +562,10 @@ def main():
     print("Recopilando informacion de hardware...")
     inventory["hardware"] = collect_hardware()
     
-    # Mostrar discos detectados
-    disks = inventory["hardware"].get("disks", [])
-    print(f"   -> {len(disks)} disco(s) detectado(s)")
-    for disk in disks:
+    # Mostrar firmware detectados
+    firmware = inventory["hardware"].get("firmware", [])
+    print(f"   -> {len(firmware)} firmware(s) detectado(s)")
+    for disk in firmware:
         print(f"      - {disk['device']}: {disk['model']}")
     
     print("Recopilando paquetes del sistema...")
@@ -585,15 +585,15 @@ def main():
     inventory["packages"] = all_packages
     print(f"   Total unificado: {len(all_packages)} paquetes")
     
-    print("Detectando software critico...")
-    inventory["critical_software"] = collect_critical_software()
-    critical_count = len(inventory['critical_software'])
-    print(f"   -> {critical_count} aplicaciones detectadas")
+    print("Detectando software core...")
+    inventory["core_software"] = collect_core_software()
+    core_count = len(inventory['core_software'])
+    print(f"   -> {core_count} aplicaciones detectadas")
     
     # Mostrar algunas versiones detectadas
-    if critical_count > 0:
-        parsed_count = sum(1 for sw in inventory['critical_software'] if sw['version'] != 'unknown')
-        print(f"   -> {parsed_count}/{critical_count} versiones parseadas correctamente")
+    if core_count > 0:
+        parsed_count = sum(1 for sw in inventory["core_software"] if sw['version'] != 'unknown')
+        print(f"   -> {parsed_count}/{core_count} versiones parseadas correctamente")
     
     output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
     
@@ -626,9 +626,9 @@ def main():
     print(f"   - Sistema: {inventory['system']['os']['name']} {inventory['system']['os']['version']}")
     print(f"   - Hostname: {inventory['system']['hostname']}")
     print(f"   - CPU: {inventory['hardware'].get('cpu_model', 'N/A')}")
-    print(f"   - Discos: {len(disks)}")
+    print(f"   - Firmware: {len(firmware)}")
     print(f"   - Total paquetes: {total_packages}")
-    print(f"   - Software critico: {len(inventory['critical_software'])}")
+    print(f"   - Software core: {len(inventory['core_software'])}")
     print(f"   - Archivo: {output_path}")
     print(f"   - Tamano: {os.path.getsize(output_path) / 1024:.2f} KB")
     print()

@@ -2,7 +2,7 @@
 """
 Herramienta de analisis de inventario - Redsauce Agent
 Muestra estadisticas y resumen del ultimo inventario recopilado
-Version: 0.2.3 - Enfocado en vulnerabilidades CVE (modelo de disco sin tamaño)
+Version: 0.2.3 - Enfocado en vulnerabilidades CVE (modelo de firmware sin tamaño)
 """
 
 import json
@@ -53,7 +53,7 @@ def analyze_system(inventory):
             print(f"Recopilado:         {collected_at}")
 
 def analyze_hardware(inventory):
-    """Analiza informacion de hardware (CPU y modelos de disco)"""
+    """Analiza informacion de hardware (CPU y modelos de firmware)"""
     print_section("HARDWARE")
     
     hardware = inventory.get('hardware', {})
@@ -66,18 +66,18 @@ def analyze_hardware(inventory):
     cpu_model = hardware.get('cpu_model', 'N/A')
     print(f"CPU Model:          {cpu_model}")
     
-    # Discos (solo modelo)
-    disks = hardware.get('disks', [])
-    print(f"\nDiscos:             {len(disks)} dispositivo(s)")
+    # Firmware (solo modelo)
+    firmware = hardware.get('firmware', [])
+    print(f"\nFirmware:           {len(firmware)} dispositivo(s)")
     
-    if disks:
-        for disk in disks:
+    if firmware:
+        for disk in firmware:
             model = disk.get('model', 'Unknown')
             device = disk.get('device', 'N/A')
             print(f"  - {device:15s} {model}")
     
     print(f"\nNOTA: Informacion relevante para CVE de CPU (Spectre/Meltdown)")
-    print(f"      y vulnerabilidades de firmware de disco (Samsung, WD, etc.)")
+    print(f"      y vulnerabilidades de firmware (Samsung, WD, etc.)")
 
 def analyze_packages(inventory):
     """Analiza paquetes instalados"""
@@ -111,14 +111,14 @@ def analyze_packages(inventory):
         for pkg in pip_packages[:10]:
             print(f"  - {pkg['name']:40s} {pkg['version']}")
 
-def analyze_critical_software(inventory):
-    """Analiza software critico detectado"""
-    print_section("SOFTWARE CRITICO DETECTADO")
+def analyze_core_software(inventory):
+    """Analiza software core detectado"""
+    print_section("SOFTWARE CORE DETECTADO")
     
-    software = inventory.get('critical_software', [])
+    software = inventory.get('core_software', [])
     
     if not software:
-        print("No se detecto software critico")
+        print("No se detecto software core")
         return
     
     print(f"Total: {len(software)} aplicaciones\n")
@@ -158,31 +158,31 @@ def generate_summary(inventory):
     print_section("RESUMEN EJECUTIVO")
     
     packages = len(inventory.get('packages', []))
-    critical = len(inventory.get('critical_software', []))
+    core = len(inventory.get("core_software"', []))
     
     # Info de hardware
     hardware = inventory.get('hardware', {})
     cpu_model = hardware.get('cpu_model', 'N/A')
-    disks = hardware.get('disks', [])
+    firmware = hardware.get('firmware', [])
     
     print(f"Este sistema tiene:")
     print(f"  - CPU: {cpu_model}")
-    print(f"  - {len(disks)} disco(s) fisico(s)")
+    print(f"  - {len(firmware)} firmware(s) fisico(s)")
     
-    # Mostrar modelos de discos
-    if disks:
-        disk_models = set(d.get('model', 'Unknown') for d in disks)
+    # Mostrar modelos de firmware
+    if firmware:
+        disk_models = set(d.get('model', 'Unknown') for d in firmware)
         for model in disk_models:
             if model != 'Unknown':
                 print(f"    * {model}")
     
     print(f"  - {packages} paquetes instalados en total")
-    print(f"  - {critical} aplicaciones criticas detectadas")
+    print(f"  - {core} aplicaciones core detectadas")
     
     # Contar versiones conocidas vs desconocidas
-    critical_sw = inventory.get('critical_software', [])
-    known_versions = sum(1 for sw in critical_sw if sw['version'] != 'unknown')
-    print(f"  - {known_versions}/{critical} versiones de software critico identificadas")
+    core_sw = inventory.get("core_software"', [])
+    known_versions = sum(1 for sw in core_sw if sw['version'] != 'unknown')
+    print(f"  - {known_versions}/{core} versiones de software core identificadas")
     
     # Calcular tamano del inventario
     try:
@@ -192,7 +192,7 @@ def generate_summary(inventory):
         pass
     
     print(f"\nNOTA: Este inventario esta optimizado para deteccion de vulnerabilidades CVE")
-    print(f"      Incluye: OS, kernel, CPU, modelo de discos, paquetes y software critico")
+    print(f"      Incluye: OS, kernel, CPU, modelo de firmware, paquetes y software core")
 
 def main():
     print("\n" + "="*70)
@@ -210,7 +210,7 @@ def main():
     analyze_system(inventory)
     analyze_hardware(inventory)
     analyze_packages(inventory)
-    analyze_critical_software(inventory)
+    analyze_core_software(inventory)
     generate_summary(inventory)
     
     print("\n" + "="*70)
