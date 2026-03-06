@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Redsauce Inventory Agent - Recopilador de inventario de sistemas Linux
-Version: 0.2.3 (con modelo de firmware para CVE, sin tamaño)
+Version: 0.2.0 (con modelo de firmware para CVE, sin tamaño)
 Requiere: Permisos de root/sudo
 """
 
@@ -24,7 +24,7 @@ except ImportError:
 # ============ CONFIGURACION ============
 
 # Version actual del agente
-AGENT_VERSION = "0.2.3"
+AGENT_VERSION = "0.2.0"
 
 # URLs de GitHub para auto-actualizacion
 GITHUB_API_URL = "https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
