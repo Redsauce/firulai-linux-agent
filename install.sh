@@ -175,12 +175,12 @@ download_analyzer() {
 setup_cron() {
     info "Configurando ejecucion automatica..."
     
-    CRON_JOB="*/5 * * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py >> $LOG_FILE 2>&1"
+    CRON_JOB="0 3 * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py >> $LOG_FILE 2>&1"
     
     # Anadir a crontab de root (evitar duplicados)
     ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.py" || true; echo "$CRON_JOB") | crontab -
     
-    log "Cron configurado (ejecucion cada 5 minutos)"
+    log "Cron configurado (ejecucion diaria a las 3:00 AM)"
 }
 
 test_agent() {
@@ -238,7 +238,7 @@ print_summary() {
     echo "   - Logs:        $LOG_FILE"
     echo ""
     echo "Ejecucion:"
-    echo "   - Automatica:  Cada 5 minutos"
+    echo "   - Automatica:  Diariamente a las 3:00 AM"
     echo "   - Manual:      sudo python3 $INSTALL_DIR/rs_agent.py"
     echo ""
     echo "Ver inventario:"
