@@ -38,7 +38,7 @@ OUTPUT_FILE = "inventory.json"
 
 # Configuracion RSM (modificar segun cliente)
 RSM_API_URL = "https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
-RSM_TOKEN = "429bd269e5c88dc73c14c69bf0e87717"  # CAMBIAR POR CLIENTE
+RSM_TOKEN = "0261858a14282481c2149d59ebefd7a0"  # CAMBIAR POR CLIENTE
 SERVER_ID = "1"  # CAMBIAR POR CLIENTE
 
 # ============ UTILIDADES ============
