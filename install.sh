@@ -5,10 +5,22 @@
 # ============================================================================
 #
 # Uso:
-#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID>
 #
 
 set -e
+
+# ============================================================================
+# PARAMETROS
+# ============================================================================
+
+AGENT_TOKEN=${1:-""}
+UUID=${2:-""}
+
+if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
+    echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <UUID>"
+    exit 1
+fi
 
 # ============================================================================
 # CONFIGURACION
@@ -175,10 +187,10 @@ download_analyzer() {
 setup_cron() {
     info "Configurando ejecucion automatica..."
     
-    CRON_JOB="0 3 * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py >> $LOG_FILE 2>&1"
+    CRON_JOB="0 3 * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py --token $AGENT_TOKEN --uuid $UUID >> $LOG_FILE 2>&1"
     
     # Anadir a crontab de root (evitar duplicados)
-    ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.py" || true; echo "$CRON_JOB") | crontab -
+    (crontab -l 2>/dev/null | grep -v "$INSTALL_DIR/rs_agent.py"; echo "$CRON_JOB") | crontab -
     
     log "Cron configurado (ejecucion diaria a las 3:00 AM)"
 }
@@ -186,7 +198,7 @@ setup_cron() {
 test_agent() {
     info "Ejecutando primera recopilacion..."
     
-    if /usr/bin/python3 "$INSTALL_DIR/rs_agent.py" >> "$LOG_FILE" 2>&1; then
+    if /usr/bin/python3 "$INSTALL_DIR/rs_agent.py" --token "$AGENT_TOKEN" --uuid "$UUID" >> "$LOG_FILE" 2>&1; then
         if [ -f "$DATA_DIR/inventory.json" ]; then
             INVENTORY_SIZE=$(stat -f%z "$DATA_DIR/inventory.json" 2>/dev/null || stat -c%s "$DATA_DIR/inventory.json" 2>/dev/null)
             log "Inventario generado correctamente (${INVENTORY_SIZE} bytes)"
@@ -239,7 +251,7 @@ print_summary() {
     echo ""
     echo "Ejecucion:"
     echo "   - Automatica:  Diariamente a las 3:00 AM"
-    echo "   - Manual:      sudo python3 $INSTALL_DIR/rs_agent.py"
+    echo "   - Manual:      sudo python3 $INSTALL_DIR/rs_agent.py --token <AGENT_TOKEN> --uuid <UUID>"
     echo ""
     echo "Ver inventario:"
     echo "   cat $DATA_DIR/inventory.json | python3 -m json.tool"

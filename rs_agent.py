@@ -13,6 +13,8 @@ import socket
 import os
 import sys
 import re
+import argparse
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -36,10 +38,12 @@ OUTPUT_DIR = "/var/lib/rs-agent"
 # Archivos de salida
 OUTPUT_FILE = "inventory.json"
 
-# Configuracion RSM (modificar segun cliente)
+# Configuracion RSM
 RSM_API_URL = "https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
-RSM_TOKEN = "0261858a14282481c2149d59ebefd7a0"  # CAMBIAR POR CLIENTE
-SERVER_ID = "1"  # CAMBIAR POR CLIENTE
+
+# Inicializadas via argparse en main()
+AGENT_TOKEN = ""
+UUID        = ""
 
 # ============ UTILIDADES ============
 
@@ -412,7 +416,7 @@ def send_to_rsm(inventory):
         '--location', RSM_API_URL,
         '--form', 'RStrigger=newServerData',
         '--form', f'RSdata={rsm_json}',
-        '--form', f'RStoken={RSM_TOKEN}',
+        '--form', f'RStoken={AGENT_TOKEN}',
         '--max-time', '30',
         '--show-error',
         '--verbose'
@@ -421,8 +425,8 @@ def send_to_rsm(inventory):
     # Configuracion RSM
     print(f"\nConfiguracion RSM:")
     print(f"   - URL: {RSM_API_URL}")
-    print(f"   - Token: {RSM_TOKEN}")
-    print(f"   - Server ID: {SERVER_ID}")
+    print(f"   - Token: {AGENT_TOKEN}")
+    print(f"   - UUID: {UUID}")
     print(f"   - Hostname: {inventory.get('system', {}).get('hostname', 'N/A')}")
     
     try:
@@ -523,6 +527,20 @@ def download_update():
 
 # ============ MAIN ============
 
+def parse_args():
+    def valid_uuid(value):
+        try:
+            uuid.UUID(value)
+            return value
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"'{value}' no es un UUID válido")
+
+    parser = argparse.ArgumentParser(description="Redsauce Inventory Agent")
+    parser.add_argument("--token",     required=True, help="Agent token (AGENT_TOKEN)")
+    parser.add_argument("--uuid", required=True, type=valid_uuid, help="RSM UUID (formato UUID)")
+    return parser.parse_args()
+
+
 def check_root():
     """
     Verifica que el script se ejecute como root
@@ -539,6 +557,11 @@ def ensure_output_dir():
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 def main():
+    global AGENT_TOKEN, UUID
+    args = parse_args()
+    AGENT_TOKEN = args.token
+    UUID        = args.uuid
+
     print("\n" + "="*60)
     print("Redsauce Inventory Agent - Recopilando informacion")
     print("="*60 + "\n")
@@ -609,8 +632,8 @@ def main():
         print("ERROR CRITICO: No se pudo enviar el inventario a RSM")
         print("="*60)
         print("\nVerifica:")
-        print(f"   - Token RSM: {RSM_TOKEN}")
-        print(f"   - Server ID: {SERVER_ID}")
+        print(f"   - Token: {AGENT_TOKEN}")
+        print(f"   - UUID: {UUID}")
         print(f"   - URL: {RSM_API_URL}")
         print(f"   - Conectividad de red")
         print()
