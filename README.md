@@ -3,8 +3,9 @@
 Agente de inventario automatico para sistemas Linux enfocado en deteccion de vulnerabilidades CVE con auto-actualizacion desde GitHub Releases.
 
 ## Instalacion
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID>
 ```
 
 ## Funcionalidades
@@ -18,6 +19,7 @@ curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/insta
 - Ejecucion diaria programada (3:00 AM)
 
 ## Uso basico
+
 ```bash
 # Ejecucion manual
 sudo python3 /opt/rs-agent/rs_agent.py
@@ -33,6 +35,7 @@ sudo bash /opt/rs-agent/uninstall.sh
 ```
 
 **Ubicaciones:**
+
 - Agente: `/opt/rs-agent/rs_agent.py`
 - Inventario: `/var/lib/rs-agent/inventory.json`
 - Logs: `/var/log/rs-agent.log`
@@ -46,6 +49,7 @@ El agente comprueba GitHub Releases cada vez que se ejecuta. Si detecta una vers
 ### Publicar nueva version
 
 1. **Editar version en el codigo:**
+
 ```bash
 # Cambiar linea 23 en rs_agent.py: AGENT_VERSION = "0.3.0"
 git add rs_agent.py
@@ -62,6 +66,7 @@ git push
 3. **Los clientes se actualizan automaticamente** en las proximas 24h.
 
 ### Versionado Semantico
+
 ```
 MAJOR.MINOR.PATCH
   0  .  2  .  0
@@ -71,6 +76,7 @@ MAJOR.MINOR.PATCH
 ```
 
 ### Ver version instalada
+
 ```bash
 grep "AGENT_VERSION" /opt/rs-agent/rs_agent.py
 ```
@@ -78,6 +84,7 @@ grep "AGENT_VERSION" /opt/rs-agent/rs_agent.py
 ---
 
 ## Estructura del Inventario JSON
+
 ```json
 {
   "system": {
