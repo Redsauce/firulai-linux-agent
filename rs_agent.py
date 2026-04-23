@@ -417,6 +417,7 @@ def send_to_rsm(inventory):
         '--form', 'RStrigger=newServerData',
         '--form', f'RSdata={rsm_json}',
         '--form', f'RStoken={AGENT_TOKEN}',
+        '--form', f'RSuuid={UUID}',
         '--max-time', '30',
         '--show-error',
         '--verbose'
