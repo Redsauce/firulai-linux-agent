@@ -409,12 +409,6 @@ def send_to_rsm(inventory):
     with open(debug_json_path, 'w') as f:
         f.write(rsm_json)
     print(f"JSON completo guardado en: {debug_json_path}")
-    
-    print(f"The following lines are just for testing purposes:")
-    print(f"Location: {RSM_API_URL}")
-    print(f"AgentToken: {AGENT_TOKEN}")
-    print(f"UUID: {UUID}")
-
 
     # Construir comando curl
     curl_cmd = [
@@ -423,7 +417,6 @@ def send_to_rsm(inventory):
         '--form', 'RStrigger=newServerData',
         '--form', f'RSdata={rsm_json}',
         '--form', f'AgentToken={AGENT_TOKEN}',
-        '--form', f'UUID={UUID}',
         '--max-time', '30',
         '--show-error',
         '--verbose'
@@ -433,7 +426,6 @@ def send_to_rsm(inventory):
     print(f"\nConfiguracion RSM:")
     print(f"   - URL: {RSM_API_URL}")
     print(f"   - Token: {AGENT_TOKEN}")
-    print(f"   - UUID: {UUID}")
     print(f"   - Hostname: {inventory.get('system', {}).get('hostname', 'N/A')}")
     
     try:
