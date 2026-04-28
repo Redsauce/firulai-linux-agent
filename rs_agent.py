@@ -410,7 +410,8 @@ def send_to_rsm(inventory):
         f.write(rsm_json)
     print(f"JSON completo guardado en: {debug_json_path}")
     
-    print(f"AAAAAAAAAHHHHH")
+    print(f"The following lines are just for testing purposes:")
+    print(f"Location: {RSM_API_URL}")
     print(f"AgentToken: {AGENT_TOKEN}")
     print(f"UUID: {UUID}")
 
