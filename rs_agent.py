@@ -580,7 +580,8 @@ def main():
     
     print("Recopilando informacion del sistema...")
     inventory["system"] = collect_system_info()
-    
+    inventory["system"]["uuid"] = UUID
+
     print("Recopilando informacion de hardware...")
     inventory["hardware"] = collect_hardware()
     

@@ -78,7 +78,8 @@ check_root() {
         error "Este script debe ejecutarse como root"
         echo ""
         echo "Ejecuta:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash"
+        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID>
+#"
         echo ""
         exit 1
     fi
