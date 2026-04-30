@@ -421,8 +421,6 @@ def send_to_rsm(inventory):
         '--show-error',
         '--verbose'
     ]
-
-    print(f"   - Token (repr): {repr(AGENT_TOKEN)}")
     
     # Configuracion RSM
     print(f"\nConfiguracion RSM:")
