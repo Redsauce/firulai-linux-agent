@@ -416,7 +416,7 @@ def send_to_rsm(inventory):
         '--location', RSM_API_URL,
         '--form', 'RStrigger=newServerData',
         '--form', f'RSdata={rsm_json}',
-        '--form', f'RStoken={AGENT_TOKEN}',
+        '--form', f'RSMtoken={AGENT_TOKEN}',
         '--max-time', '30',
         '--show-error',
         '--verbose'
