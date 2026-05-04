@@ -5,7 +5,7 @@
 # ============================================================================
 #
 # Uso:
-#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID>
+#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s <AGENT_TOKEN> <UUID>
 #
 
 set -e
@@ -18,7 +18,7 @@ AGENT_TOKEN=${1:-""}
 UUID=${2:-""}
 
 if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
-    echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <UUID>"
+    echo "[ERROR] Uso: curl ... | sudo bash -s <AGENT_TOKEN> <UUID>"
     exit 1
 fi
 
@@ -78,7 +78,7 @@ check_root() {
         error "Este script debe ejecutarse como root"
         echo ""
         echo "Ejecuta:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID>
+        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s <AGENT_TOKEN> <UUID>
 #"
         echo ""
         exit 1
@@ -189,7 +189,8 @@ setup_cron() {
     info "Configurando ejecucion automatica..."
     
     CRON_JOB="0 3 * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py --token $AGENT_TOKEN --uuid $UUID >> $LOG_FILE 2>&1"
-    
+    log "$AGENT_TOKEN $UUID"
+
     # Anadir a crontab de root (evitar duplicados)
     (crontab -l 2>/dev/null | grep -v "$INSTALL_DIR/rs_agent.py"; echo "$CRON_JOB") | crontab -
     
