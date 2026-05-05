@@ -191,7 +191,7 @@ setup_cron() {
     CRON_JOB="0 3 * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py --token $AGENT_TOKEN --uuid $UUID >> $LOG_FILE 2>&1"
 
     # Anadir a crontab de root (evitar duplicados)
-    (crontab -l 2>/dev/null | grep -v "$INSTALL_DIR/rs_agent.py"; echo "$CRON_JOB") | crontab -
+    ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.py"; echo "$CRON_JOB") | crontab -
     
     log "Cron configurado (ejecucion diaria a las 3:00 AM)"
 }
