@@ -192,6 +192,8 @@ setup_cron() {
     echo "DEBUG UUID: $UUID"
     echo "DEBUG INSTALL_DIR: $INSTALL_DIR"
     
+    echo "ESTE ECHO ES DE PRUEBA"
+
     CRON_JOB="0 3 * * * /usr/bin/python3 $INSTALL_DIR/rs_agent.py --token $AGENT_TOKEN --uuid $UUID >> $LOG_FILE 2>&1"
     echo "DEBUG CRON_JOB: $CRON_JOB"
         
