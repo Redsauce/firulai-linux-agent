@@ -581,7 +581,6 @@ def main():
     print("Recopilando informacion del sistema...")
     inventory["system"] = collect_system_info()
     inventory["system"]["uuid"] = UUID
-    inventory["system"]["agent_token"] = AGENT_TOKEN
 
     print("Recopilando informacion de hardware...")
     inventory["hardware"] = collect_hardware()
