@@ -81,7 +81,8 @@ parse_args() {
 # ============ RECOPILADORES ============
 
 collect_system_info() {
-    local timezone="$1"
+    local timezone=""
+    [ $# -gt 0 ] && timezone="$1"
     local hostname fqdn kernel arch
     local os_name="Unknown" os_version="Unknown" distro_id="unknown" distro_version="Unknown"
 
@@ -396,7 +397,11 @@ main() {
     # --- Sistema ---
     echo "Recopilando informacion del sistema..."
     local system_json
-    system_json=$(collect_system_info)
+    system_json=$(collect_system_info "$timezone")
+    if [ -z "$system_json" ]; then
+        echo "ERROR: No se pudo recopilar la informacion del sistema"
+        exit 1
+    fi
 
     # --- Hardware ---
     echo "Recopilando informacion de hardware..."
