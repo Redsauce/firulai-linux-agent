@@ -81,6 +81,7 @@ parse_args() {
 # ============ RECOPILADORES ============
 
 collect_system_info() {
+    local timezone="$1"
     local hostname fqdn kernel arch
     local os_name="Unknown" os_version="Unknown" distro_id="unknown" distro_version="Unknown"
 
@@ -109,7 +110,7 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
@@ -120,7 +121,24 @@ collect_system_info() {
         "$(json_escape "$kernel")" \
         "$(json_escape "$arch")" \
         "$(json_escape "$collected_at")" \
+        "$(json_escape "$timezone")" \
         "$(json_escape "$AGENT_VERSION")"
+}
+
+collect_timezone() {
+    local timezone_name=""
+
+    # Intentar con timedatectl
+    if command -v timedatectl &>/dev/null; then
+        timezone_name=$(timedatectl show -p Timezone --value 2>/dev/null) || true
+    fi
+
+    # Fallback: leer /etc/timezone
+    if [ -z "$timezone_name" ] && [ -f "/etc/timezone" ]; then
+        timezone_name=$(cat /etc/timezone 2>/dev/null) || true
+    fi
+
+    printf '%s' "$timezone_name"
 }
 
 collect_hardware() {
@@ -367,6 +385,13 @@ main() {
     check_root
     check_for_updates
     mkdir -p "$OUTPUT_DIR"
+
+    # --- Timezone ---
+    echo "Recopilando informacion de timezone..."
+    local timezone
+    timezone=$(collect_timezone)
+    [ -z "$timezone" ] && timezone=""
+    echo "   -> Timezone: ${timezone:-desconocido}"
 
     # --- Sistema ---
     echo "Recopilando informacion del sistema..."
