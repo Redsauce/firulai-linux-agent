@@ -1,144 +1,80 @@
 # Redsauce Inventory Agent
 
-Agente de inventario automatico para sistemas Linux enfocado en deteccion de vulnerabilidades CVE con auto-actualizacion desde GitHub Releases.
+Agente de inventario para sistemas Linux. Recopila información del sistema, paquetes instalados y software crítico, y la envía a Firulai para su análisis y detección de vulnerabilidades CVE.
 
-## Instalacion
+---
+
+## Instalación
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID>
+curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s <AGENT_TOKEN> <UUID>
 ```
 
-## Funcionalidades
+El instalador (`install.sh`) realiza los siguientes pasos:
 
-- Recopila informacion de sistema operativo (OS, kernel, arquitectura)
-- Recopila paquetes instalados (dpkg/rpm/pip/npm) con versiones
-- Detecta software critico (Apache, MySQL, PHP, Docker, etc.) con versiones exactas
-- **Optimizado para deteccion de CVE**: Solo recopila informacion relevante para vulnerabilidades
-- Envío completo del inventario en cada ejecucion: RSM detecta los cambios
-- Auto-actualizacion automatica desde GitHub Releases
-- Ejecucion diaria programada (3:00 AM)
+1. **Verifica dependencias** — comprueba que `curl` y bash 4+ estén disponibles.
+2. **Crea los directorios** — `/opt/rs-agent` (binario) y `/var/lib/rs-agent` (datos).
+3. **Descarga el agente** — obtiene `rs_agent.sh` desde GitHub y lo deja en `/opt/rs-agent/`.
+4. **Configura el cron** — añade una entrada en el crontab de root para ejecutar el agente diariamente a las 3:00 AM.
+5. **Primera ejecución** — lanza el agente inmediatamente para generar el inventario inicial.
+6. **Crea el desinstalador** — genera `/opt/rs-agent/uninstall.sh`.
 
-## Uso basico
+### Desinstalación
 
 ```bash
-# Ejecucion manual
-sudo python3 /opt/rs-agent/rs_agent.py
-
-# Ver inventario
-cat /var/lib/rs-agent/inventory.json | python3 -m json.tool
-
-# Analizar inventario
-sudo python3 /opt/rs-agent/analyze_inventory.py
-
-# Desinstalar
 sudo bash /opt/rs-agent/uninstall.sh
 ```
 
-**Ubicaciones:**
-
-- Agente: `/opt/rs-agent/rs_agent.py`
-- Inventario: `/var/lib/rs-agent/inventory.json`
-- Logs: `/var/log/rs-agent.log`
-
 ---
 
-## Sistema de Auto-actualizacion
-
-El agente comprueba GitHub Releases cada vez que se ejecuta. Si detecta una version nueva, se actualiza automaticamente.
-
-### Publicar nueva version
-
-1. **Editar version en el codigo:**
+## Uso manual
 
 ```bash
-# Cambiar linea 23 en rs_agent.py: AGENT_VERSION = "0.3.0"
-git add rs_agent.py
-git commit -m "Update to v0.3.0: [descripcion]"
-git push
-```
-
-2. **Crear Release en GitHub:**
-   - https://github.com/redsauce/inventory-agent/releases/new
-   - Tag: `0.3.0` (sin `v`)
-   - Title: `v0.3.0`
-   - Publish release
-
-3. **Los clientes se actualizan automaticamente** en las proximas 24h.
-
-### Versionado Semantico
-
-```
-MAJOR.MINOR.PATCH
-  0  .  2  .  0
-  |     |     |-- Bug fixes
-  |     |-------- Nuevas funcionalidades
-  |-------------- Cambios incompatibles
-```
-
-### Ver version instalada
-
-```bash
-grep "AGENT_VERSION" /opt/rs-agent/rs_agent.py
+sudo bash /opt/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
 ```
 
 ---
 
-## Estructura del Inventario JSON
+## Qué recopila el agente
 
-```json
-{
-  "system": {
-    "hostname": "servidor-web-01",
-    "fqdn": "servidor-web-01.ejemplo.com",
-    "os": {
-      "name": "Ubuntu",
-      "version": "22.04.3 LTS (Jammy Jellyfish)",
-      "distro_id": "ubuntu",
-      "distro_version": "22.04",
-      "kernel": "5.15.0-91-generic",
-      "architecture": "x86_64"
-    },
-    "collected_at": "2025-01-27T10:30:00.000000",
-    "agent_version": "0.2.0"
-  },
-  "packages": [
-    {
-      "name": "openssl",
-      "version": "3.0.2-0ubuntu1.12",
-      "manager": "dpkg"
-    },
-    {
-      "name": "requests",
-      "version": "2.28.1",
-      "manager": "pip"
-    }
-  ],
-  "critical_software": [
-    {
-      "name": "nginx",
-      "version": "1.18.0"
-    },
-    {
-      "name": "openssl",
-      "version": "3.0.2"
-    }
-  ]
-}
-```
+El agente (`rs_agent.sh`) genera un JSON con cuatro secciones:
+
+### `system`
+Información básica del host: hostname, FQDN, UUID, distribución Linux (nombre, versión, ID), versión del kernel y arquitectura.
+
+### `hardware`
+Modelo de CPU (vía `lscpu`) y lista de discos con su modelo de firmware (vía `lsblk`), útil para correlacionar CVEs de firmware.
+
+### `packages`
+Todos los paquetes instalados, unificados en un único array con el campo `manager` indicando el origen:
+
+| Manager | Fuente |
+|---------|--------|
+| `dpkg` | Sistemas Debian/Ubuntu (`dpkg-query`) |
+| `rpm` | Sistemas RHEL/CentOS/Fedora (`rpm -qa`) |
+| `pip` | Paquetes Python (`pip list`) |
+| `npm` | Paquetes Node.js globales (`npm list -g`) |
+
+### `core_software`
+Versiones de software crítico detectado en el sistema: Apache, nginx, MySQL, PostgreSQL, Docker, PHP, Node.js, Java, OpenSSH, OpenSSL y Git. Cada entrada incluye el nombre, la versión parseada y la salida raw del comando de versión.
+
+---
+
+## Archivos y rutas
+
+| Ruta | Descripción |
+|------|-------------|
+| `/opt/rs-agent/rs_agent.sh` | Agente principal |
+| `/var/lib/rs-agent/inventory.json` | Último inventario generado |
+| `/var/log/rs-agent.log` | Log de ejecuciones automáticas |
+| `/opt/rs-agent/uninstall.sh` | Script de desinstalación |
+| `/tmp/rsm_debug_payload.json` | Payload completo de la última llamada a RSM |
+
+---
 
 ## Requisitos
 
-- Linux (Ubuntu, Debian, RHEL, CentOS, Fedora)
-- Python 3.6+ con `requests`
-- Permisos root
-
-## Seguridad
-
-- Solo lectura (no modifica el sistema)
-- No recopila contraseñas ni claves
-- No recopila informacion de hardware sensible
-- Open source y auditable
-
----
-
-**Redsauce** - 2026 | [redsauce.net](https://redsauce.net)
+- Linux (Debian, Ubuntu, RHEL, CentOS, Fedora, Rocky, Alma u otras)
+- bash 4+
+- curl
+- Permisos de root
