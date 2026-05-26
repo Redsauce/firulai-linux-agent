@@ -152,20 +152,6 @@ download_agent() {
     fi
 }
 
-download_analyzer() {
-    # El analizador (analyze_inventory.py) es opcional; si el repo lo ofrece se descarga
-    info "Descargando herramienta de analisis (opcional)..."
-
-    ANALYZER_URL="${GITHUB_RAW_URL}/analyze_inventory.py"
-
-    if curl -fsSL "$ANALYZER_URL" -o "$INSTALL_DIR/analyze_inventory.py" 2>/dev/null; then
-        chmod +x "$INSTALL_DIR/analyze_inventory.py"
-        log "Analizador descargado: $INSTALL_DIR/analyze_inventory.py"
-    else
-        warn "No se encontro el analizador en el repositorio (omitido)"
-    fi
-}
-
 setup_cron() {
     info "Configurando ejecucion automatica..."
 
@@ -266,7 +252,6 @@ main() {
     # Instalacion
     create_directories
     download_agent
-    download_analyzer
     setup_cron
     create_uninstaller
     
