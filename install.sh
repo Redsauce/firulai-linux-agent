@@ -184,23 +184,164 @@ create_uninstaller() {
 #!/bin/bash
 echo "Desinstalando Redsauce Inventory Agent..."
 
+RSM_BASE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2"
+RSM_TOKEN="__AGENT_TOKEN__"
+SYSTEM_UUID="__UUID__"
+
+echo
+echo "[WARN] Esta accion desinstalara el agente y borrara todo lo relacionado"
+echo "       con este sistema en este servidor:"
+echo "       - Entrada de cron"
+echo "       - Directorio del agente: /opt/rs-agent"
+echo "       - Datos de inventario: /var/lib/rs-agent"
+echo "       - Log del agente: /var/log/rs-agent.log"
+echo "       - Datos RSM: System, Packages, Firmware, Core Software y Custom Software"
+echo
+read -p "Si estas de acuerdo, escribe 's' para continuar: " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+    echo "[OK] Desinstalacion cancelada"
+    exit 0
+fi
+
+rsm_request() {
+    local endpoint="$1"
+    local method="$2"
+    local payload="$3"
+
+    curl -fsS --location "${RSM_BASE_URL}/${endpoint}" \
+        --request "$method" \
+        --header "Authorization: ${RSM_TOKEN}" \
+        --header "Content-Type: application/json" \
+        --data "$payload"
+}
+
+json_ids() {
+    grep -oE '"ID"[[:space:]]*:[[:space:]]*"?[0-9]+"?' \
+        | grep -oE '[0-9]+' \
+        | paste -sd, -
+}
+
+json_first_item_type_id() {
+    grep -oE '"(itemTypeID|itemTypeId|ItemTypeID|item_type_id)"[[:space:]]*:[[:space:]]*"?[0-9]+"?' \
+        | head -1 \
+        | grep -oE '[0-9]+' || true
+}
+
+json_array_from_csv() {
+    local csv="$1"
+    local result="" id
+    IFS=',' read -ra ids <<< "$csv"
+    for id in "${ids[@]}"; do
+        [ -z "$id" ] && continue
+        if [ -n "$result" ]; then
+            result="${result},"
+        fi
+        result="${result}\"${id}\""
+    done
+    printf '[%s]' "$result"
+}
+
+rsm_get_by_filter() {
+    local property_ids="$1"
+    local filter_property="$2"
+    local filter_value="$3"
+    local payload
+    payload="{\"propertyIDs\":${property_ids},\"filterRules\":[{\"propertyID\":\"${filter_property}\",\"value\":\"${filter_value}\",\"operation\":\"=\"}]}"
+    rsm_request "items/get.php" "GET" "$payload"
+}
+
+rsm_delete_ids() {
+    local label="$1"
+    local item_type_id="$2"
+    local ids_csv="$3"
+    local ids_json payload
+
+    if [ -z "$ids_csv" ]; then
+        echo "[OK] RSM ${label}: sin registros"
+        return 0
+    fi
+
+    if [ -z "$item_type_id" ]; then
+        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID, no se borran ${ids_csv}"
+        return 1
+    fi
+
+    ids_json=$(json_array_from_csv "$ids_csv")
+    payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
+    if rsm_request "items/delete.php" "DELETE" "$payload" >/dev/null; then
+        echo "[OK] RSM ${label}: registros eliminados (${ids_csv})"
+        return 0
+    fi
+
+    echo "[WARN] RSM ${label}: fallo al borrar registros (${ids_csv})"
+    return 1
+}
+
+delete_rsm_inventory() {
+    local response system_id system_type ids type
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "[WARN] curl no esta disponible; no se pueden borrar datos en RSM"
+        return 1
+    fi
+
+    echo "Eliminando datos del sistema en RSM..."
+
+    response=$(rsm_get_by_filter '["1749"]' "1780" "$SYSTEM_UUID" 2>/dev/null) || {
+        echo "[WARN] No se pudo consultar el System en RSM"
+        return 1
+    }
+
+    system_id=$(printf '%s' "$response" | json_ids | cut -d, -f1)
+    system_type=$(printf '%s' "$response" | json_first_item_type_id)
+
+    if [ -z "$system_id" ]; then
+        echo "[OK] RSM System: no existe System para UUID ${SYSTEM_UUID}"
+        return 0
+    fi
+
+    echo "[OK] RSM System encontrado: ${system_id}"
+
+    response=$(rsm_get_by_filter '["1763"]' "1763" "$system_id" 2>/dev/null || true)
+    ids=$(printf '%s' "$response" | json_ids)
+    type=$(printf '%s' "$response" | json_first_item_type_id)
+    rsm_delete_ids "Packages" "$type" "$ids" || true
+
+    response=$(rsm_get_by_filter '["1767"]' "1767" "$system_id" 2>/dev/null || true)
+    ids=$(printf '%s' "$response" | json_ids)
+    type=$(printf '%s' "$response" | json_first_item_type_id)
+    rsm_delete_ids "Firmware" "$type" "$ids" || true
+
+    response=$(rsm_get_by_filter '["1771"]' "1771" "$system_id" 2>/dev/null || true)
+    ids=$(printf '%s' "$response" | json_ids)
+    type=$(printf '%s' "$response" | json_first_item_type_id)
+    rsm_delete_ids "Core Software" "$type" "$ids" || true
+
+    response=$(rsm_get_by_filter '["1793"]' "1793" "$system_id" 2>/dev/null || true)
+    ids=$(printf '%s' "$response" | json_ids)
+    type=$(printf '%s' "$response" | json_first_item_type_id)
+    rsm_delete_ids "Custom Software" "$type" "$ids" || true
+
+    rsm_delete_ids "System" "$system_type" "$system_id" || true
+}
+
+delete_rsm_inventory || true
+
 # Eliminar cron
 crontab -l 2>/dev/null | grep -v "/opt/rs-agent/rs_agent.sh" | crontab -
 echo "[OK] Entrada de cron eliminada"
 
-# Preguntar antes de borrar datos
-read -p "Eliminar datos de inventario? (s/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Ss]$ ]]; then
-    rm -rf /var/lib/rs-agent
-    echo "[OK] Datos eliminados"
-fi
-
+rm -rf /var/lib/rs-agent
+echo "[OK] Datos eliminados"
 rm -rf /opt/rs-agent
 rm -f /var/log/rs-agent.log
 
 echo "[OK] Agente desinstalado"
 UNINSTALL_EOF
+
+    sed -i "s|__AGENT_TOKEN__|$AGENT_TOKEN|g" "$INSTALL_DIR/uninstall.sh"
+    sed -i "s|__UUID__|$UUID|g" "$INSTALL_DIR/uninstall.sh"
     
     chmod +x "$INSTALL_DIR/uninstall.sh"
 }
