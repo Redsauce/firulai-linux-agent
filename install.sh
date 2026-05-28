@@ -188,6 +188,7 @@ RSM_BASE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2"
 RSM_TOKEN="__AGENT_TOKEN__"
 SYSTEM_UUID="__UUID__"
 RSM_SYSTEM_ITEM_TYPE_ID="${RSM_SYSTEM_ITEM_TYPE_ID:-}"
+RSM_ISSUE_ITEM_TYPE_ID="${RSM_ISSUE_ITEM_TYPE_ID:-}"
 RSM_PACKAGES_ITEM_TYPE_ID="${RSM_PACKAGES_ITEM_TYPE_ID:-}"
 RSM_FIRMWARE_ITEM_TYPE_ID="${RSM_FIRMWARE_ITEM_TYPE_ID:-}"
 RSM_CORE_SOFTWARE_ITEM_TYPE_ID="${RSM_CORE_SOFTWARE_ITEM_TYPE_ID:-}"
@@ -200,7 +201,7 @@ echo "       - Entrada de cron"
 echo "       - Directorio del agente: /opt/rs-agent"
 echo "       - Datos de inventario: /var/lib/rs-agent"
 echo "       - Log del agente: /var/log/rs-agent.log"
-echo "       - Datos RSM: System, Packages, Firmware, Core Software y Custom Software"
+echo "       - Datos RSM: System, Vulnerabilidades, Packages, Firmware, Core Software y Custom Software"
 echo
 read -p "Si estas de acuerdo, escribe 's' para continuar: " -n 1 -r
 echo
@@ -247,6 +248,28 @@ json_array_from_csv() {
     printf '[%s]' "$result"
 }
 
+csv_count() {
+    local csv="$1"
+    if [ -z "$csv" ]; then
+        printf '0'
+        return 0
+    fi
+    awk -F, '{print NF}' <<EOF
+$csv
+EOF
+}
+
+csv_preview() {
+    local csv="$1"
+    local count
+    count=$(csv_count "$csv")
+    if [ "$count" -le 10 ]; then
+        printf '%s' "$csv"
+    else
+        printf '%s... (%s registros)' "$(printf '%s' "$csv" | cut -d, -f1-10)" "$count"
+    fi
+}
+
 rsm_get_by_filter() {
     local property_ids="$1"
     local filter_property="$2"
@@ -260,29 +283,30 @@ rsm_delete_ids() {
     local label="$1"
     local item_type_id="$2"
     local ids_csv="$3"
-    local ids_json payload response
+    local ids_json payload response ids_label
 
     if [ -z "$ids_csv" ]; then
         echo "[OK] RSM ${label}: sin registros"
         return 0
     fi
 
+    ids_label=$(csv_preview "$ids_csv")
     ids_json=$(json_array_from_csv "$ids_csv")
 
     if [ -n "$item_type_id" ]; then
         payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
     else
-        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID; se intenta borrar solo por ID (${ids_csv})"
+        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID; se intenta borrar solo por ID (${ids_label})"
         payload="[{\"IDs\":${ids_json}}]"
     fi
 
     response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
     if [ $? -eq 0 ]; then
-        echo "[OK] RSM ${label}: registros eliminados (${ids_csv})"
+        echo "[OK] RSM ${label}: registros eliminados (${ids_label})"
         return 0
     fi
 
-    echo "[WARN] RSM ${label}: fallo al borrar registros (${ids_csv})"
+    echo "[WARN] RSM ${label}: fallo al borrar registros (${ids_label})"
     if [ -n "$response" ]; then
         echo "[WARN] RSM ${label}: respuesta: ${response}"
     fi
@@ -323,6 +347,12 @@ delete_rsm_inventory() {
     fi
 
     echo "[OK] RSM System encontrado: ${system_id}"
+
+    response=$(rsm_get_by_filter '["1776"]' "1776" "$system_id" 2>/dev/null || true)
+    ids=$(printf '%s' "$response" | json_ids)
+    type=$(printf '%s' "$response" | json_first_item_type_id)
+    [ -z "$type" ] && type="$RSM_ISSUE_ITEM_TYPE_ID"
+    rsm_delete_ids "Vulnerabilidades" "$type" "$ids" || had_errors=1
 
     response=$(rsm_get_by_filter '["1763"]' "1763" "$system_id" 2>/dev/null || true)
     ids=$(printf '%s' "$response" | json_ids)
