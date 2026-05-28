@@ -187,12 +187,13 @@ echo "Desinstalando Redsauce Inventory Agent..."
 RSM_BASE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2"
 RSM_TOKEN="__AGENT_TOKEN__"
 SYSTEM_UUID="__UUID__"
-RSM_SYSTEM_ITEM_TYPE_ID="${RSM_SYSTEM_ITEM_TYPE_ID:-}"
-RSM_ISSUE_ITEM_TYPE_ID="${RSM_ISSUE_ITEM_TYPE_ID:-}"
-RSM_PACKAGES_ITEM_TYPE_ID="${RSM_PACKAGES_ITEM_TYPE_ID:-}"
-RSM_FIRMWARE_ITEM_TYPE_ID="${RSM_FIRMWARE_ITEM_TYPE_ID:-}"
-RSM_CORE_SOFTWARE_ITEM_TYPE_ID="${RSM_CORE_SOFTWARE_ITEM_TYPE_ID:-}"
-RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID="${RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID:-}"
+RSM_SYSTEM_ITEM_TYPE_ID="${RSM_SYSTEM_ITEM_TYPE_ID:-191}"
+RSM_PACKAGES_ITEM_TYPE_ID="${RSM_PACKAGES_ITEM_TYPE_ID:-192}"
+RSM_FIRMWARE_ITEM_TYPE_ID="${RSM_FIRMWARE_ITEM_TYPE_ID:-193}"
+RSM_CORE_SOFTWARE_ITEM_TYPE_ID="${RSM_CORE_SOFTWARE_ITEM_TYPE_ID:-194}"
+RSM_ISSUE_ITEM_TYPE_ID="${RSM_ISSUE_ITEM_TYPE_ID:-195}"
+RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID="${RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID:-197}"
+RSM_DELETE_BATCH_SIZE="${RSM_DELETE_BATCH_SIZE:-100}"
 
 echo
 echo "[WARN] Esta accion desinstalara el agente y borrara todo lo relacionado"
@@ -283,7 +284,7 @@ rsm_delete_ids() {
     local label="$1"
     local item_type_id="$2"
     local ids_csv="$3"
-    local ids_json payload response ids_label
+    local ids_label batch="" batch_count=0 total_count=0 had_errors=0 id ids_json payload response
 
     if [ -z "$ids_csv" ]; then
         echo "[OK] RSM ${label}: sin registros"
@@ -291,25 +292,53 @@ rsm_delete_ids() {
     fi
 
     ids_label=$(csv_preview "$ids_csv")
-    ids_json=$(json_array_from_csv "$ids_csv")
-
-    if [ -n "$item_type_id" ]; then
-        payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
-    else
-        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID; se intenta borrar solo por ID (${ids_label})"
-        payload="[{\"IDs\":${ids_json}}]"
+    if [ -z "$item_type_id" ]; then
+        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID; no se puede borrar (${ids_label})"
+        return 1
     fi
 
-    response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
-    if [ $? -eq 0 ]; then
+    IFS=',' read -ra ids <<< "$ids_csv"
+    for id in "${ids[@]}"; do
+        [ -z "$id" ] && continue
+        if [ -n "$batch" ]; then
+            batch="${batch},${id}"
+        else
+            batch="$id"
+        fi
+        batch_count=$((batch_count + 1))
+        total_count=$((total_count + 1))
+
+        if [ "$batch_count" -ge "$RSM_DELETE_BATCH_SIZE" ]; then
+            ids_json=$(json_array_from_csv "$batch")
+            payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
+            response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
+            if [ $? -ne 0 ]; then
+                echo "[WARN] RSM ${label}: fallo al borrar lote (${batch_count} registros)"
+                [ -n "$response" ] && echo "[WARN] RSM ${label}: respuesta: ${response}"
+                had_errors=1
+            fi
+            batch=""
+            batch_count=0
+        fi
+    done
+
+    if [ -n "$batch" ]; then
+        ids_json=$(json_array_from_csv "$batch")
+        payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
+        response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
+        if [ $? -ne 0 ]; then
+            echo "[WARN] RSM ${label}: fallo al borrar lote (${batch_count} registros)"
+            [ -n "$response" ] && echo "[WARN] RSM ${label}: respuesta: ${response}"
+            had_errors=1
+        fi
+    fi
+
+    if [ "$had_errors" -eq 0 ]; then
         echo "[OK] RSM ${label}: registros eliminados (${ids_label})"
         return 0
     fi
 
-    echo "[WARN] RSM ${label}: fallo al borrar registros (${ids_label})"
-    if [ -n "$response" ]; then
-        echo "[WARN] RSM ${label}: respuesta: ${response}"
-    fi
+    echo "[WARN] RSM ${label}: fallo al borrar uno o mas lotes (${ids_label})"
     return 1
 }
 
