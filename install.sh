@@ -186,6 +186,7 @@ echo "Desinstalando Redsauce Inventory Agent..."
 
 RSM_BASE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2"
 RSM_TOKEN="__AGENT_TOKEN__"
+RSM_DELETE_TOKEN="${RSM_DELETE_TOKEN:-$RSM_TOKEN}"
 SYSTEM_UUID="__UUID__"
 RSM_SYSTEM_ITEM_TYPE_ID="${RSM_SYSTEM_ITEM_TYPE_ID:-191}"
 RSM_PACKAGES_ITEM_TYPE_ID="${RSM_PACKAGES_ITEM_TYPE_ID:-192}"
@@ -211,16 +212,44 @@ if [[ ! $REPLY =~ ^[Ss]$ ]]; then
     exit 0
 fi
 
+rsm_request_with_token() {
+    local token="$1"
+    local endpoint="$2"
+    local method="$3"
+    local payload="$4"
+    local response status body
+
+    response=$(curl -sS --location "${RSM_BASE_URL}/${endpoint}" \
+        --request "$method" \
+        --header "Authorization: ${token}" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --write-out "\n%{http_code}")
+
+    status=$(printf '%s' "$response" | tail -n 1)
+    body=$(printf '%s' "$response" | sed '$d')
+    [ -z "$body" ] && body="{}"
+
+    printf '%s\n' "$body"
+    case "$status" in
+        2*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 rsm_request() {
     local endpoint="$1"
     local method="$2"
     local payload="$3"
 
-    curl -fsS --location "${RSM_BASE_URL}/${endpoint}" \
-        --request "$method" \
-        --header "Authorization: ${RSM_TOKEN}" \
-        --header "Content-Type: application/json" \
-        --data "$payload"
+    rsm_request_with_token "$RSM_TOKEN" "$endpoint" "$method" "$payload"
+}
+
+rsm_delete_request() {
+    local endpoint="$1"
+    local payload="$2"
+
+    rsm_request_with_token "$RSM_DELETE_TOKEN" "$endpoint" "DELETE" "$payload"
 }
 
 json_ids() {
@@ -311,7 +340,7 @@ rsm_delete_ids() {
         if [ "$batch_count" -ge "$RSM_DELETE_BATCH_SIZE" ]; then
             ids_json=$(json_array_from_csv "$batch")
             payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
-            response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
+            response=$(rsm_delete_request "items/delete.php" "$payload" 2>&1)
             if [ $? -ne 0 ]; then
                 echo "[WARN] RSM ${label}: fallo al borrar lote (${batch_count} registros)"
                 [ -n "$response" ] && echo "[WARN] RSM ${label}: respuesta: ${response}"
@@ -325,7 +354,7 @@ rsm_delete_ids() {
     if [ -n "$batch" ]; then
         ids_json=$(json_array_from_csv "$batch")
         payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
-        response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
+        response=$(rsm_delete_request "items/delete.php" "$payload" 2>&1)
         if [ $? -ne 0 ]; then
             echo "[WARN] RSM ${label}: fallo al borrar lote (${batch_count} registros)"
             [ -n "$response" ] && echo "[WARN] RSM ${label}: respuesta: ${response}"

@@ -27,6 +27,10 @@ sudo bash /opt/rs-agent/uninstall.sh
 
 El desinstalador muestra un aviso de eliminacion completa. Si confirmas, busca en RSM el `System` por el UUID de instalacion, borra las `Vulnerabilidades` vinculadas a ese System, sus `Packages`, `Firmware`, `Core Software` y `Custom Software`, y despues borra el propio `System`. Si el `System` sigue existiendo en RSM, cancela la desinstalacion local para poder reintentar. Cuando RSM queda limpio, borra la entrada de cron, `/opt/rs-agent`, `/var/lib/rs-agent` y `/var/log/rs-agent.log`.
 
+El borrado en RSM requiere `itemTypeID` y permisos DELETE. El desinstalador usa estos valores por defecto: `System=191`, `Packages=192`, `Firmware=193`, `Core Software=194`, `Vulnerabilidades=195` y `Custom Software=197`. Si cambian en RSM, se pueden sobrescribir al ejecutar el desinstalador con variables de entorno como `RSM_PACKAGES_ITEM_TYPE_ID=...`. El borrado se hace por lotes de 100 registros por defecto; se puede ajustar con `RSM_DELETE_BATCH_SIZE`.
+
+Por defecto el desinstalador usa el Agent Token de instalacion para leer y borrar en RSM. Si ese token no tiene permisos DELETE, se puede ejecutar con `RSM_DELETE_TOKEN=<token-con-delete>` para usar otro token solo en las llamadas de borrado.
+
 ---
 
 ## Uso manual
