@@ -25,7 +25,7 @@ El instalador (`install.sh`) realiza los siguientes pasos:
 sudo bash /opt/rs-agent/uninstall.sh
 ```
 
-El desinstalador muestra un aviso de eliminacion completa. Si confirmas, intenta borrar en RSM el `System` identificado por el UUID de instalacion y sus `Packages`, `Firmware`, `Core Software` y `Custom Software`. Despues borra siempre la entrada de cron, `/opt/rs-agent`, `/var/lib/rs-agent` y `/var/log/rs-agent.log`.
+El desinstalador muestra un aviso de eliminacion completa. Si confirmas, busca en RSM el `System` por el UUID de instalacion, borra sus `Packages`, `Firmware`, `Core Software` y `Custom Software`, y despues borra el propio `System`. Si el `System` sigue existiendo en RSM, cancela la desinstalacion local para poder reintentar. Cuando RSM queda limpio, borra la entrada de cron, `/opt/rs-agent`, `/var/lib/rs-agent` y `/var/log/rs-agent.log`.
 
 ---
 

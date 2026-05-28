@@ -187,6 +187,11 @@ echo "Desinstalando Redsauce Inventory Agent..."
 RSM_BASE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2"
 RSM_TOKEN="__AGENT_TOKEN__"
 SYSTEM_UUID="__UUID__"
+RSM_SYSTEM_ITEM_TYPE_ID="${RSM_SYSTEM_ITEM_TYPE_ID:-}"
+RSM_PACKAGES_ITEM_TYPE_ID="${RSM_PACKAGES_ITEM_TYPE_ID:-}"
+RSM_FIRMWARE_ITEM_TYPE_ID="${RSM_FIRMWARE_ITEM_TYPE_ID:-}"
+RSM_CORE_SOFTWARE_ITEM_TYPE_ID="${RSM_CORE_SOFTWARE_ITEM_TYPE_ID:-}"
+RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID="${RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID:-}"
 
 echo
 echo "[WARN] Esta accion desinstalara el agente y borrara todo lo relacionado"
@@ -255,31 +260,46 @@ rsm_delete_ids() {
     local label="$1"
     local item_type_id="$2"
     local ids_csv="$3"
-    local ids_json payload
+    local ids_json payload response
 
     if [ -z "$ids_csv" ]; then
         echo "[OK] RSM ${label}: sin registros"
         return 0
     fi
 
-    if [ -z "$item_type_id" ]; then
-        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID, no se borran ${ids_csv}"
-        return 1
+    ids_json=$(json_array_from_csv "$ids_csv")
+
+    if [ -n "$item_type_id" ]; then
+        payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
+    else
+        echo "[WARN] RSM ${label}: no se pudo determinar itemTypeID; se intenta borrar solo por ID (${ids_csv})"
+        payload="[{\"IDs\":${ids_json}}]"
     fi
 
-    ids_json=$(json_array_from_csv "$ids_csv")
-    payload="[{\"itemTypeID\":\"${item_type_id}\",\"IDs\":${ids_json}}]"
-    if rsm_request "items/delete.php" "DELETE" "$payload" >/dev/null; then
+    response=$(rsm_request "items/delete.php" "DELETE" "$payload" 2>&1)
+    if [ $? -eq 0 ]; then
         echo "[OK] RSM ${label}: registros eliminados (${ids_csv})"
         return 0
     fi
 
     echo "[WARN] RSM ${label}: fallo al borrar registros (${ids_csv})"
+    if [ -n "$response" ]; then
+        echo "[WARN] RSM ${label}: respuesta: ${response}"
+    fi
     return 1
 }
 
+rsm_system_exists() {
+    local system_id="$1"
+    local response ids
+
+    response=$(rsm_request "items/get.php" "GET" "{\"IDs\":[\"${system_id}\"],\"propertyIDs\":[\"1749\"]}" 2>/dev/null) || return 0
+    ids=$(printf '%s' "$response" | json_ids)
+    [ -n "$ids" ]
+}
+
 delete_rsm_inventory() {
-    local response system_id system_type ids type
+    local response system_id system_type ids type had_errors=0
 
     if ! command -v curl >/dev/null 2>&1; then
         echo "[WARN] curl no esta disponible; no se pueden borrar datos en RSM"
@@ -295,6 +315,7 @@ delete_rsm_inventory() {
 
     system_id=$(printf '%s' "$response" | json_ids | cut -d, -f1)
     system_type=$(printf '%s' "$response" | json_first_item_type_id)
+    [ -z "$system_type" ] && system_type="$RSM_SYSTEM_ITEM_TYPE_ID"
 
     if [ -z "$system_id" ]; then
         echo "[OK] RSM System: no existe System para UUID ${SYSTEM_UUID}"
@@ -306,27 +327,45 @@ delete_rsm_inventory() {
     response=$(rsm_get_by_filter '["1763"]' "1763" "$system_id" 2>/dev/null || true)
     ids=$(printf '%s' "$response" | json_ids)
     type=$(printf '%s' "$response" | json_first_item_type_id)
-    rsm_delete_ids "Packages" "$type" "$ids" || true
+    [ -z "$type" ] && type="$RSM_PACKAGES_ITEM_TYPE_ID"
+    rsm_delete_ids "Packages" "$type" "$ids" || had_errors=1
 
     response=$(rsm_get_by_filter '["1767"]' "1767" "$system_id" 2>/dev/null || true)
     ids=$(printf '%s' "$response" | json_ids)
     type=$(printf '%s' "$response" | json_first_item_type_id)
-    rsm_delete_ids "Firmware" "$type" "$ids" || true
+    [ -z "$type" ] && type="$RSM_FIRMWARE_ITEM_TYPE_ID"
+    rsm_delete_ids "Firmware" "$type" "$ids" || had_errors=1
 
     response=$(rsm_get_by_filter '["1771"]' "1771" "$system_id" 2>/dev/null || true)
     ids=$(printf '%s' "$response" | json_ids)
     type=$(printf '%s' "$response" | json_first_item_type_id)
-    rsm_delete_ids "Core Software" "$type" "$ids" || true
+    [ -z "$type" ] && type="$RSM_CORE_SOFTWARE_ITEM_TYPE_ID"
+    rsm_delete_ids "Core Software" "$type" "$ids" || had_errors=1
 
     response=$(rsm_get_by_filter '["1793"]' "1793" "$system_id" 2>/dev/null || true)
     ids=$(printf '%s' "$response" | json_ids)
     type=$(printf '%s' "$response" | json_first_item_type_id)
-    rsm_delete_ids "Custom Software" "$type" "$ids" || true
+    [ -z "$type" ] && type="$RSM_CUSTOM_SOFTWARE_ITEM_TYPE_ID"
+    rsm_delete_ids "Custom Software" "$type" "$ids" || had_errors=1
 
-    rsm_delete_ids "System" "$system_type" "$system_id" || true
+    rsm_delete_ids "System" "$system_type" "$system_id" || had_errors=1
+
+    if rsm_system_exists "$system_id"; then
+        echo "[ERROR] RSM System ${system_id} sigue existiendo; se cancela la desinstalacion local"
+        return 1
+    fi
+
+    if [ "$had_errors" -ne 0 ]; then
+        echo "[WARN] Hubo errores borrando registros relacionados, pero el System ya no existe en RSM"
+    fi
+
+    return 0
 }
 
-delete_rsm_inventory || true
+if ! delete_rsm_inventory; then
+    echo "[ERROR] No se completo el borrado en RSM. No se eliminan archivos locales para poder reintentar."
+    exit 1
+fi
 
 # Eliminar cron
 crontab -l 2>/dev/null | grep -v "/opt/rs-agent/rs_agent.sh" | crontab -
