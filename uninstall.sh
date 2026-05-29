@@ -96,6 +96,9 @@ confirm_uninstall() {
 }
 
 send_delete_request_to_rsm() {
+    local delete_payload
+    delete_payload="{\"uuid\":\"$UUID_VAL\"}"
+
     info "Solicitando a RSM el borrado de datos del sistema..."
     printf 'UUID: %s\n' "$UUID_VAL"
     printf 'URL: %s\n' "$RSM_API_URL"
@@ -103,7 +106,7 @@ send_delete_request_to_rsm() {
     curl \
         --location "$RSM_API_URL" \
         --form "RStrigger=deleteSystemData" \
-        --form "RSdata=$UUID_VAL" \
+        --form "RSdata=$delete_payload" \
         --form "RStoken=$AGENT_TOKEN" \
         --max-time 30 \
         --show-error

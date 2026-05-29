@@ -25,7 +25,7 @@ El instalador (`install.sh`) realiza los siguientes pasos:
 sudo bash /opt/rs-agent/uninstall.sh
 ```
 
-El desinstalador avisa de que se borrarán todos los datos relacionados con el sistema. Si se confirma, envía a RSM el UUID del sistema como `RSdata` con `RStrigger=deleteSystemData` y después elimina cron, configuración, inventario, logs y archivos locales del agente.
+El desinstalador avisa de que se borrarán todos los datos relacionados con el sistema. Si se confirma, envía a RSM `RStrigger=deleteSystemData` y `RSdata={"uuid":"<UUID>"}` y después elimina cron, configuración, inventario, logs y archivos locales del agente.
 
 ---
 
