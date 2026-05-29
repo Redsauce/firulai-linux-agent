@@ -33,6 +33,7 @@ GITHUB_RAW_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main"
 INSTALL_DIR="/opt/rs-agent"
 DATA_DIR="/var/lib/rs-agent"
 LOG_FILE="/var/log/rs-agent.log"
+CONFIG_FILE="$DATA_DIR/config.env"
 
 # ============================================================================
 # COLORES
@@ -152,6 +153,38 @@ download_agent() {
     fi
 }
 
+download_uninstaller() {
+    info "Descargando desinstalador desde GitHub..."
+
+    UNINSTALLER_URL="${GITHUB_RAW_URL}/uninstall.sh"
+
+    if curl -fsSL "$UNINSTALLER_URL" -o "$INSTALL_DIR/uninstall.sh"; then
+        chmod +x "$INSTALL_DIR/uninstall.sh"
+        log "Desinstalador descargado: $INSTALL_DIR/uninstall.sh"
+    else
+        error "No se pudo descargar el desinstalador desde GitHub"
+        error ""
+        error "URL intentada: $UNINSTALLER_URL"
+        error ""
+        error "Verifica que:"
+        error "  - Tienes conexion a internet"
+        error "  - GitHub es accesible desde este servidor"
+        exit 1
+    fi
+}
+
+write_agent_config() {
+    info "Guardando configuracion local del agente..."
+
+    cat > "$CONFIG_FILE" << CONFIG_EOF
+AGENT_TOKEN='${AGENT_TOKEN}'
+UUID='${UUID}'
+CONFIG_EOF
+    chmod 600 "$CONFIG_FILE"
+
+    log "Configuracion guardada: $CONFIG_FILE"
+}
+
 setup_cron() {
     info "Configurando ejecucion automatica..."
 
@@ -177,32 +210,6 @@ test_agent() {
     warn "No se pudo generar el inventario en la primera ejecucion"
     info "Revisa el log: tail -f $LOG_FILE"
     return 1
-}
-
-create_uninstaller() {
-    cat > "$INSTALL_DIR/uninstall.sh" << 'UNINSTALL_EOF'
-#!/bin/bash
-echo "Desinstalando Redsauce Inventory Agent..."
-
-# Eliminar cron
-crontab -l 2>/dev/null | grep -v "/opt/rs-agent/rs_agent.sh" | crontab -
-echo "[OK] Entrada de cron eliminada"
-
-# Preguntar antes de borrar datos
-read -p "Eliminar datos de inventario? (s/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Ss]$ ]]; then
-    rm -rf /var/lib/rs-agent
-    echo "[OK] Datos eliminados"
-fi
-
-rm -rf /opt/rs-agent
-rm -f /var/log/rs-agent.log
-
-echo "[OK] Agente desinstalado"
-UNINSTALL_EOF
-    
-    chmod +x "$INSTALL_DIR/uninstall.sh"
 }
 
 print_summary() {
@@ -252,8 +259,9 @@ main() {
     # Instalacion
     create_directories
     download_agent
+    download_uninstaller
+    write_agent_config
     setup_cron
-    create_uninstaller
     
     # Prueba
     echo ""

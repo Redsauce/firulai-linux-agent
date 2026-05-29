@@ -17,13 +17,15 @@ El instalador (`install.sh`) realiza los siguientes pasos:
 3. **Descarga el agente** — obtiene `rs_agent.sh` desde GitHub y lo deja en `/opt/rs-agent/`.
 4. **Configura el cron** — añade una entrada en el crontab de root para ejecutar el agente diariamente a las 3:00 AM.
 5. **Primera ejecución** — lanza el agente inmediatamente para generar el inventario inicial.
-6. **Crea el desinstalador** — genera `/opt/rs-agent/uninstall.sh`.
+6. **Instala el desinstalador** — descarga `uninstall.sh`, guarda la configuración local y deja `/opt/rs-agent/uninstall.sh` listo para ejecutar.
 
 ### Desinstalación
 
 ```bash
 sudo bash /opt/rs-agent/uninstall.sh
 ```
+
+El desinstalador avisa de que se borrarán todos los datos relacionados con el sistema. Si se confirma, envía a RSM el UUID del sistema como `RSdata` con `RStrigger=deleteSystemData` y después elimina cron, configuración, inventario, logs y archivos locales del agente.
 
 ---
 
@@ -66,6 +68,7 @@ Versiones de software crítico detectado en el sistema: Apache, nginx, MySQL, Po
 |------|-------------|
 | `/opt/rs-agent/rs_agent.sh` | Agente principal |
 | `/var/lib/rs-agent/inventory.json` | Último inventario generado |
+| `/var/lib/rs-agent/config.env` | Configuración local usada por el desinstalador |
 | `/var/log/rs-agent.log` | Log de ejecuciones automáticas |
 | `/opt/rs-agent/uninstall.sh` | Script de desinstalación |
 | `/tmp/rsm_debug_payload.json` | Payload completo de la última llamada a RSM |
