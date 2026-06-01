@@ -122,6 +122,15 @@ check_dependencies() {
     log "bash ${bash_major} encontrado"
 }
 
+check_existing_installation() {
+    if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
+        warn "Ya existe una instalación previa del agente en este sistema."
+        warn "Si deseas instalar un nuevo agente, desinstala el actual primero:"
+        warn "  sudo bash $INSTALL_DIR/uninstall.sh"
+        exit 1
+    fi
+}
+
 create_directories() {
     info "Creando directorios..."
     
@@ -255,6 +264,7 @@ main() {
     check_root
     detect_distro
     check_dependencies
+    check_existing_installation
     
     # Instalacion
     create_directories
