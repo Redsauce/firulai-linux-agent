@@ -162,6 +162,31 @@ json_extract_rsm_property() {
     json_extract_first_string_key "$json" "${property_id}trs"
 }
 
+local_system_hostname() {
+    hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown"
+}
+
+local_system_fqdn() {
+    hostname -f 2>/dev/null || hostname 2>/dev/null || echo "unknown"
+}
+
+identity_matches_local_system() {
+    local existing_hostname="$1"
+    local existing_fqdn="$2"
+    local current_hostname
+    local current_fqdn
+
+    current_hostname=$(local_system_hostname)
+    current_fqdn=$(local_system_fqdn)
+
+    [ -n "$existing_hostname" ] && [ "$existing_hostname" = "$current_hostname" ] && return 0
+    [ -n "$existing_fqdn" ] && [ "$existing_fqdn" = "$current_fqdn" ] && return 0
+    [ -n "$existing_hostname" ] && [ "$existing_hostname" = "$current_fqdn" ] && return 0
+    [ -n "$existing_fqdn" ] && [ "$existing_fqdn" = "$current_hostname" ] && return 0
+
+    return 1
+}
+
 check_uuid_available() {
     local payload response_file http_code exit_code response_body
     response_file="/tmp/rsm_install_uuid_check_response.txt"
@@ -215,6 +240,23 @@ check_uuid_available() {
     if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
         log "UUID reservado en RSM y disponible para instalacion"
         return 0
+    fi
+
+    if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
+        echo ""
+        error "Este sistema ya tiene un agente instalado en RSM con este UUID."
+        error "No se puede realizar una nueva instalacion con el mismo UUID."
+        echo ""
+        echo "UUID: $UUID"
+        echo "Sistema en RSM:"
+        echo "   - Hostname: ${existing_hostname:-desconocido}"
+        echo "   - FQDN:     ${existing_fqdn:-desconocido}"
+        echo "Equipo local:"
+        echo "   - Hostname: $(local_system_hostname)"
+        echo "   - FQDN:     $(local_system_fqdn)"
+        echo ""
+        echo "Si necesitas reinstalar el agente, desinstala primero el agente actual."
+        exit 1
     fi
 
     echo ""
