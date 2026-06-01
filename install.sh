@@ -260,13 +260,6 @@ check_uuid_available() {
     echo ""
     error "Este UUID ya pertenece a otro sistema en RSM."
     error "No se puede instalar este agente en el equipo local con ese UUID."
-    echo ""
-    echo "UUID: $UUID"
-    echo "Sistema en RSM:"
-    echo "   - Hostname: ${existing_hostname:-desconocido}"
-    echo "   - FQDN:     ${existing_fqdn:-desconocido}"
-    echo ""
-    echo "Genera un UUID nuevo desde Add New System."
     exit 1
 }
 

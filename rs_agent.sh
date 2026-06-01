@@ -191,16 +191,6 @@ validate_uuid_ownership() {
     echo ""
     echo "ERROR: Este UUID ya pertenece a otro sistema en RSM."
     echo "No se puede instalar este agente en el equipo local con ese UUID."
-    echo ""
-    echo "UUID: $UUID_VAL"
-    echo "Sistema en RSM:"
-    echo "   - Hostname: ${existing_hostname:-desconocido}"
-    echo "   - FQDN:     ${existing_fqdn:-desconocido}"
-    echo "Equipo local:"
-    echo "   - Hostname: $(local_system_hostname)"
-    echo "   - FQDN:     $(local_system_fqdn)"
-    echo ""
-    echo "Genera un UUID nuevo desde Add New System o desinstala primero el sistema anterior."
     return 1
 }
 
