@@ -351,25 +351,46 @@ send_to_rsm() {
     echo ""
     echo "Ejecutando peticion a RSM..."
 
-    curl \
+    local response_file="/tmp/rsm_response.txt"
+    local http_code
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
         --location "$RSM_API_URL" \
         --form "RStrigger=newServerData" \
         --form "RSdata=$inventory_json" \
         --form "RStoken=$AGENT_TOKEN" \
         --max-time 30 \
-        --show-error \
-        --verbose
+        --verbose)
     local exit_code=$?
+    local response_body
+    response_body=$(cat "$response_file" 2>/dev/null || true)
 
-    if [ "$exit_code" -eq 0 ]; then
-        echo ""
-        printf 'Inventario enviado correctamente (%d KB)\n' "$(( ${#inventory_json} / 1024 ))"
-        return 0
-    else
+    if [ "$exit_code" -ne 0 ]; then
         echo ""
         echo "ERROR: Fallo al enviar inventario a RSM (curl exit: $exit_code)"
+        echo "Respuesta: $response_body"
         return 1
     fi
+
+    if [ "$http_code" = "409" ] || echo "$response_body" | grep -iqE 'uuid.*(exists|ya existe)|already exists|duplicate'; then
+        echo ""
+        echo "AVISO: UUID ya existe en RSM, ignorando duplicado."
+        return 0
+    fi
+
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        echo ""
+        echo "ERROR: RSM devolvio HTTP $http_code"
+        echo "Respuesta: $response_body"
+        return 1
+    fi
+
+    echo ""
+    printf 'Inventario enviado correctamente (%d KB)\n' "$(( ${#inventory_json} / 1024 ))"
+    return 0
 }
 
 # ============ MAIN ============
