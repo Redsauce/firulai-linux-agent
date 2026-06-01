@@ -16,6 +16,11 @@ GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/mai
 OUTPUT_DIR="/var/lib/rs-agent"
 OUTPUT_FILE="inventory.json"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
+RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
+RSM_SYSTEM_ITEM_TYPE_ID="191"
+RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
+RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
+RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 AGENT_TOKEN=""
 UUID_VAL=""
 
@@ -36,6 +41,16 @@ json_escape() {
 # Extrae el primer patron semver o X.Y de un string.
 extract_version() {
     printf '%s' "$1" | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_-]+)?' | head -1
+}
+
+json_extract_first_string_key() {
+    local json="$1"
+    local key="$2"
+
+    printf '%s' "$json" \
+        | tr -d '\n' \
+        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+        | head -1
 }
 
 # ============ VALIDACION Y ARGUMENTOS ============
@@ -76,6 +91,99 @@ parse_args() {
     fi
 
     validate_uuid "$UUID_VAL"
+}
+
+local_system_hostname() {
+    hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown"
+}
+
+local_system_fqdn() {
+    hostname -f 2>/dev/null || hostname 2>/dev/null || echo "unknown"
+}
+
+identity_matches_local_system() {
+    local existing_hostname="$1"
+    local existing_fqdn="$2"
+    local current_hostname
+    local current_fqdn
+
+    current_hostname=$(local_system_hostname)
+    current_fqdn=$(local_system_fqdn)
+
+    [ -n "$existing_hostname" ] && [ "$existing_hostname" = "$current_hostname" ] && return 0
+    [ -n "$existing_fqdn" ] && [ "$existing_fqdn" = "$current_fqdn" ] && return 0
+    [ -n "$existing_hostname" ] && [ "$existing_hostname" = "$current_fqdn" ] && return 0
+    [ -n "$existing_fqdn" ] && [ "$existing_fqdn" = "$current_hostname" ] && return 0
+
+    return 1
+}
+
+validate_uuid_ownership() {
+    local payload response_file http_code exit_code response_body
+    response_file="/tmp/rsm_uuid_check_response.txt"
+    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
+
+    echo "Validando que el UUID no pertenece a otro sistema..."
+
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location "$RSM_ITEMS_GET_URL" \
+        --header "Authorization: $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+
+    if [ "$exit_code" -ne 0 ]; then
+        echo "ERROR: No se pudo validar el UUID antes de enviar inventario (curl exit: $exit_code)."
+        echo "Por seguridad, la instalacion no continuara sin confirmar que el UUID no pertenece a otro sistema."
+        return 1
+    fi
+
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        echo "ERROR: RSM no permitio validar el UUID antes de enviar inventario (HTTP $http_code)."
+        echo "Por seguridad, la instalacion no continuara sin confirmar que el UUID no pertenece a otro sistema."
+        echo "Respuesta: $response_body"
+        return 1
+    fi
+
+    if ! printf '%s' "$response_body" | grep -q "\"$RSM_SYSTEM_UUID_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"$UUID_VAL\""; then
+        echo "   -> UUID disponible"
+        return 0
+    fi
+
+    local existing_hostname existing_fqdn
+    existing_hostname=$(json_extract_first_string_key "$response_body" "$RSM_SYSTEM_HOSTNAME_PROPERTY_ID")
+    existing_fqdn=$(json_extract_first_string_key "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
+
+    if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
+        echo "   -> UUID reservado en RSM y listo para instalar"
+        return 0
+    fi
+
+    if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
+        echo "   -> UUID ya asociado a este sistema, se actualizara su inventario"
+        return 0
+    fi
+
+    echo ""
+    echo "ERROR: Este UUID ya pertenece a otro sistema en RSM."
+    echo "No se puede instalar este agente en el equipo local con ese UUID."
+    echo ""
+    echo "UUID: $UUID_VAL"
+    echo "Sistema en RSM:"
+    echo "   - Hostname: ${existing_hostname:-desconocido}"
+    echo "   - FQDN:     ${existing_fqdn:-desconocido}"
+    echo "Equipo local:"
+    echo "   - Hostname: $(local_system_hostname)"
+    echo "   - FQDN:     $(local_system_fqdn)"
+    echo ""
+    echo "Genera un UUID nuevo desde Add New System o desinstala primero el sistema anterior."
+    return 1
 }
 
 # ============ RECOPILADORES ============
@@ -375,10 +483,12 @@ send_to_rsm() {
         return 1
     fi
 
-    if [ "$http_code" = "409" ] || echo "$response_body" | grep -iqE 'uuid.*(exists|ya existe)|already exists|duplicate'; then
+    if [ "$http_code" = "409" ] || echo "$response_body" | grep -iqE 'uuid.*(exists|ya existe)|already exists|duplicate|pertenece a otro sistema'; then
         echo ""
-        echo "AVISO: UUID ya existe en RSM, ignorando duplicado."
-        return 0
+        echo "ERROR: RSM indica que el UUID ya existe o pertenece a otro sistema."
+        echo "No se puede instalar este agente en el equipo local con ese UUID."
+        echo "Respuesta: $response_body"
+        return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
@@ -406,6 +516,7 @@ main() {
 
     check_root
     check_for_updates
+    validate_uuid_ownership
     mkdir -p "$OUTPUT_DIR"
 
     # --- Timezone ---

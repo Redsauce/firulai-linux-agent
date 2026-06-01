@@ -131,6 +131,17 @@ check_existing_installation() {
     fi
 }
 
+cleanup_partial_installation() {
+    warn "Limpiando instalacion parcial..."
+    if command -v crontab &> /dev/null; then
+        ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true) | crontab - || true
+    fi
+    rm -rf "$INSTALL_DIR"
+    rm -rf "$DATA_DIR"
+    rm -f "$LOG_FILE"
+    log "Instalacion parcial eliminada"
+}
+
 create_directories() {
     info "Creando directorios..."
     
@@ -208,7 +219,12 @@ setup_cron() {
 test_agent() {
     info "Ejecutando primera recopilacion..."
 
-    if /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" >> "$LOG_FILE" 2>&1; then
+    set +e
+    /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" 2>&1 | tee -a "$LOG_FILE"
+    local agent_status=${PIPESTATUS[0]}
+    set -e
+
+    if [ "$agent_status" -eq 0 ]; then
         if [ -f "$DATA_DIR/inventory.json" ]; then
             INVENTORY_SIZE=$(stat -c%s "$DATA_DIR/inventory.json" 2>/dev/null || stat -f%z "$DATA_DIR/inventory.json" 2>/dev/null)
             log "Inventario generado correctamente (${INVENTORY_SIZE} bytes)"
@@ -216,8 +232,8 @@ test_agent() {
         fi
     fi
 
-    warn "No se pudo generar el inventario en la primera ejecucion"
-    info "Revisa el log: tail -f $LOG_FILE"
+    error "No se pudo generar y enviar el inventario en la primera ejecucion"
+    info "El detalle del fallo se ha mostrado arriba."
     return 1
 }
 
@@ -271,11 +287,18 @@ main() {
     download_agent
     download_uninstaller
     write_agent_config
-    setup_cron
     
     # Prueba
     echo ""
-    test_agent
+    if ! test_agent; then
+        echo ""
+        error "Instalacion cancelada porque la primera ejecucion del agente ha fallado."
+        error "Si el UUID ya pertenece a otro sistema, genera un UUID nuevo desde Add New System."
+        cleanup_partial_installation
+        exit 1
+    fi
+
+    setup_cron
     
     # Resumen
     print_summary
