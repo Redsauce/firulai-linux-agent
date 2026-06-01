@@ -17,7 +17,6 @@ OUTPUT_DIR="/var/lib/rs-agent"
 OUTPUT_FILE="inventory.json"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
-RSM_SYSTEM_ITEM_TYPE_ID="191"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
@@ -136,7 +135,7 @@ identity_matches_local_system() {
 validate_uuid_ownership() {
     local payload response_file http_code exit_code response_body
     response_file="/tmp/rsm_uuid_check_response.txt"
-    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
+    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
 
     echo "Validando que el UUID no pertenece a otro sistema..."
 

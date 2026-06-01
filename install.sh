@@ -37,7 +37,6 @@ CONFIG_FILE="$DATA_DIR/config.env"
 
 # RSM System lookup
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
-RSM_SYSTEM_ITEM_TYPE_ID="191"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
@@ -190,7 +189,7 @@ identity_matches_local_system() {
 check_uuid_available() {
     local payload response_file http_code exit_code response_body
     response_file="/tmp/rsm_install_uuid_check_response.txt"
-    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
+    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
 
     info "Validando UUID en RSM..."
 
