@@ -85,9 +85,10 @@ confirm_uninstall() {
     echo ""
     echo "UUID del sistema: $UUID_VAL"
     echo ""
-    read -r -p "Estas de acuerdo con borrar todos los datos relacionados con este sistema? (s/N): " reply
+    read -rn 1 -p "Estas de acuerdo con borrar todos los datos relacionados con este sistema? (s/N): " reply
+    echo
     case "$reply" in
-        s|S|si|SI|Si|yes|YES|Yes) ;;
+        s|S|y|Y) ;;
         *)
             warn "Desinstalacion cancelada por el usuario"
             exit 0
@@ -100,8 +101,6 @@ send_delete_request_to_rsm() {
     delete_payload="{\"uuid\":\"$UUID_VAL\"}"
 
     info "Solicitando a RSM el borrado de datos del sistema..."
-    printf 'UUID: %s\n' "$UUID_VAL"
-    printf 'URL: %s\n' "$RSM_API_URL"
 
     curl \
         --location "$RSM_API_URL" \
