@@ -225,7 +225,11 @@ check_uuid_available() {
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID"; then
-        return 0
+        error "UUID invalido: no existe en RSM."
+        error "No se puede instalar el agente con un UUID que no haya sido generado desde Add New System."
+        echo ""
+        echo "UUID: $UUID"
+        exit 1
     fi
 
     local existing_hostname existing_fqdn

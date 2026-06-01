@@ -168,8 +168,11 @@ validate_uuid_ownership() {
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID_VAL"; then
-        echo "   -> UUID disponible"
-        return 0
+        echo "ERROR: UUID invalido: no existe en RSM."
+        echo "No se puede enviar inventario con un UUID que no haya sido generado desde Add New System."
+        echo ""
+        echo "UUID: $UUID_VAL"
+        return 1
     fi
 
     local existing_hostname existing_fqdn
