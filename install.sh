@@ -225,12 +225,7 @@ check_uuid_available() {
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID"; then
-        error "No se encontro este UUID en RSM o no se pudo validar con el token recibido."
-        error "Por seguridad, la instalacion no continuara."
-        echo ""
-        echo "UUID: $UUID"
-        echo "Genera un UUID nuevo desde Add New System y usa el comando que muestra Firulai."
-        exit 1
+        return 0
     fi
 
     local existing_hostname existing_fqdn
@@ -277,6 +272,30 @@ check_existing_installation() {
         warn "Ya existe una instalación previa del agente en este sistema."
         warn "Si deseas instalar un nuevo agente, desinstala el actual primero:"
         warn "  sudo bash $INSTALL_DIR/uninstall.sh"
+        exit 1
+    fi
+}
+
+check_local_agent_installation() {
+    if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
+        local installed_uuid=""
+        if [ -f "$CONFIG_FILE" ]; then
+            installed_uuid=$(sed -n "s/^UUID='\([^']*\)'.*/\1/p" "$CONFIG_FILE" | head -1)
+        fi
+
+        if [ -n "$installed_uuid" ] && [ "$installed_uuid" = "$UUID" ]; then
+            error "Este sistema ya tiene un agente instalado con este UUID."
+        else
+            error "Ya existe un agente instalado en este sistema."
+            if [ -n "$installed_uuid" ]; then
+                echo "UUID instalado actualmente: $installed_uuid"
+            fi
+            echo "UUID solicitado: $UUID"
+        fi
+
+        echo ""
+        echo "Si necesitas reinstalar el agente, desinstala primero el agente actual:"
+        echo "  sudo bash $INSTALL_DIR/uninstall.sh"
         exit 1
     fi
 }
@@ -431,8 +450,8 @@ main() {
     detect_distro
     check_dependencies
     validate_uuid_format "$UUID"
+    check_local_agent_installation
     check_uuid_available
-    check_existing_installation
     
     # Instalacion
     create_directories
