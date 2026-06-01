@@ -143,8 +143,23 @@ json_extract_first_string_key() {
 
     printf '%s' "$json" \
         | tr -d '\n' \
-        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+        | sed 's/,"/\n"/g' \
+        | sed -n "s/^.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*$/\1/p" \
         | head -1
+}
+
+json_extract_rsm_property() {
+    local json="$1"
+    local property_id="$2"
+    local value
+
+    value=$(json_extract_first_string_key "$json" "$property_id")
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
+        return 0
+    fi
+
+    json_extract_first_string_key "$json" "${property_id}trs"
 }
 
 check_uuid_available() {
@@ -184,14 +199,18 @@ check_uuid_available() {
         exit 1
     fi
 
-    if ! printf '%s' "$response_body" | grep -q "\"$RSM_SYSTEM_UUID_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"$UUID\""; then
-        log "UUID disponible en RSM"
-        return 0
+    if ! printf '%s' "$response_body" | grep -Fq "$UUID"; then
+        error "No se encontro este UUID en RSM o no se pudo validar con el token recibido."
+        error "Por seguridad, la instalacion no continuara."
+        echo ""
+        echo "UUID: $UUID"
+        echo "Genera un UUID nuevo desde Add New System y usa el comando que muestra Firulai."
+        exit 1
     fi
 
     local existing_hostname existing_fqdn
-    existing_hostname=$(json_extract_first_string_key "$response_body" "$RSM_SYSTEM_HOSTNAME_PROPERTY_ID")
-    existing_fqdn=$(json_extract_first_string_key "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
+    existing_hostname=$(json_extract_rsm_property "$response_body" "$RSM_SYSTEM_HOSTNAME_PROPERTY_ID")
+    existing_fqdn=$(json_extract_rsm_property "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
 
     if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
         log "UUID reservado en RSM y disponible para instalacion"
