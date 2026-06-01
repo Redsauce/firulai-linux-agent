@@ -35,6 +35,13 @@ DATA_DIR="/var/lib/rs-agent"
 LOG_FILE="/var/log/rs-agent.log"
 CONFIG_FILE="$DATA_DIR/config.env"
 
+# RSM System lookup
+RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
+RSM_SYSTEM_ITEM_TYPE_ID="191"
+RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
+RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
+RSM_SYSTEM_UUID_PROPERTY_ID="1780"
+
 # ============================================================================
 # COLORES
 # ============================================================================
@@ -120,6 +127,88 @@ check_dependencies() {
         exit 1
     fi
     log "bash ${bash_major} encontrado"
+}
+
+validate_uuid_format() {
+    local uuid="$1"
+    if [[ ! "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+        error "'$uuid' no es un UUID valido"
+        exit 1
+    fi
+}
+
+json_extract_first_string_key() {
+    local json="$1"
+    local key="$2"
+
+    printf '%s' "$json" \
+        | tr -d '\n' \
+        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+        | head -1
+}
+
+check_uuid_available() {
+    local payload response_file http_code exit_code response_body
+    response_file="/tmp/rsm_install_uuid_check_response.txt"
+    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
+
+    info "Validando UUID en RSM..."
+
+    set +e
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location \
+        --request GET \
+        "$RSM_ITEMS_GET_URL" \
+        --header "Authorization: $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    set -e
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+
+    if [ "$exit_code" -ne 0 ]; then
+        error "No se pudo validar el UUID en RSM (curl exit: $exit_code)."
+        error "Por seguridad, la instalacion no continuara sin confirmar que el UUID esta disponible."
+        exit 1
+    fi
+
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        error "RSM no permitio validar el UUID (HTTP $http_code)."
+        error "Por seguridad, la instalacion no continuara sin confirmar que el UUID esta disponible."
+        echo "Respuesta: $response_body"
+        exit 1
+    fi
+
+    if ! printf '%s' "$response_body" | grep -q "\"$RSM_SYSTEM_UUID_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"$UUID\""; then
+        log "UUID disponible en RSM"
+        return 0
+    fi
+
+    local existing_hostname existing_fqdn
+    existing_hostname=$(json_extract_first_string_key "$response_body" "$RSM_SYSTEM_HOSTNAME_PROPERTY_ID")
+    existing_fqdn=$(json_extract_first_string_key "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
+
+    if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
+        log "UUID reservado en RSM y disponible para instalacion"
+        return 0
+    fi
+
+    echo ""
+    error "Este UUID ya pertenece a otro sistema en RSM."
+    error "No se puede instalar este agente en el equipo local con ese UUID."
+    echo ""
+    echo "UUID: $UUID"
+    echo "Sistema en RSM:"
+    echo "   - Hostname: ${existing_hostname:-desconocido}"
+    echo "   - FQDN:     ${existing_fqdn:-desconocido}"
+    echo ""
+    echo "Genera un UUID nuevo desde Add New System."
+    exit 1
 }
 
 check_existing_installation() {
@@ -280,6 +369,8 @@ main() {
     check_root
     detect_distro
     check_dependencies
+    validate_uuid_format "$UUID"
+    check_uuid_available
     check_existing_installation
     
     # Instalacion

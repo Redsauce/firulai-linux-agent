@@ -131,6 +131,7 @@ validate_uuid_ownership() {
         --output "$response_file" \
         --write-out '%{http_code}' \
         --location "$RSM_ITEMS_GET_URL" \
+        --request GET \
         --header "Authorization: $AGENT_TOKEN" \
         --header "Content-Type: application/json" \
         --data "$payload" \
