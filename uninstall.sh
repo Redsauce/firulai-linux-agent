@@ -12,6 +12,8 @@ DATA_DIR="/var/lib/rs-agent"
 CONFIG_FILE="$DATA_DIR/config.env"
 LOG_FILE="/var/log/rs-agent.log"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
+RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
+RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 AGENT_TOKEN=""
 UUID_VAL=""
 
@@ -97,26 +99,107 @@ confirm_uninstall() {
 }
 
 send_delete_request_to_rsm() {
-    local delete_payload
+    local delete_payload response_file http_code exit_code response_body
     delete_payload="{\"uuid\":\"$UUID_VAL\"}"
+    response_file=$(mktemp)
 
     info "Solicitando a RSM el borrado de datos del sistema..."
 
-    curl \
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
         --location "$RSM_API_URL" \
         --form "RStrigger=deleteSystemData" \
         --form "RSdata=$delete_payload" \
         --form "RStoken=$AGENT_TOKEN" \
-        --max-time 30 \
-        --show-error
-    local exit_code=$?
+        --max-time 30)
+    exit_code=$?
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
 
-    if [ "$exit_code" -eq 0 ]; then
-        log "Solicitud de borrado enviada correctamente a RSM"
-        return 0
+    if [ "$exit_code" -ne 0 ]; then
+        error "No se pudo solicitar el borrado en RSM (curl exit: $exit_code)"
+        return 1
     fi
 
-    error "No se pudo solicitar el borrado en RSM (curl exit: $exit_code)"
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        error "RSM no confirmo la solicitud de borrado (HTTP $http_code)"
+        echo "Respuesta: $response_body"
+        return 1
+    fi
+
+    if printf '%s' "$response_body" | grep -iqE '\[ERROR\]|Borrado incompleto|System eliminado:[[:space:]]*NO'; then
+        error "RSM respondio con errores durante el borrado"
+        echo "$response_body"
+        return 1
+    fi
+
+    log "Solicitud de borrado procesada por RSM"
+    return 0
+}
+
+verify_system_deleted_in_rsm() {
+    local payload response_file http_code exit_code response_body
+    response_file=$(mktemp)
+    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
+
+    info "Verificando que el System ya no existe en RSM..."
+
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location "$RSM_ITEMS_GET_URL" \
+        --request GET \
+        --header "Authorization: $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
+
+    if [ "$exit_code" -ne 0 ]; then
+        error "No se pudo verificar el borrado en RSM (curl exit: $exit_code)"
+        return 1
+    fi
+
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        error "RSM no permitio verificar el borrado (HTTP $http_code)"
+        echo "Respuesta: $response_body"
+        return 1
+    fi
+
+    if printf '%s' "$response_body" | grep -Fq "$UUID_VAL"; then
+        error "El System sigue existiendo en RSM despues de la solicitud de borrado"
+        echo "UUID: $UUID_VAL"
+        return 1
+    fi
+
+    log "System eliminado en RSM"
+    return 0
+}
+
+verify_remote_deletion_with_retries() {
+    local attempt=1 max_attempts=3 delay=5
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if verify_system_deleted_in_rsm; then
+            return 0
+        fi
+
+        if [ "$attempt" -lt "$max_attempts" ]; then
+            warn "Verificación remota fallida. Reintentando en $delay segundos..."
+            sleep "$delay"
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    error "No se pudo confirmar el borrado en RSM tras varios intentos."
     return 1
 }
 
@@ -148,6 +231,11 @@ main() {
 
     if ! send_delete_request_to_rsm; then
         error "Desinstalacion detenida: RSM no confirmo la solicitud de borrado"
+        exit 1
+    fi
+
+    if ! verify_remote_deletion_with_retries; then
+        error "Desinstalacion detenida: no se obtuvo confirmacion de borrado en RSM"
         exit 1
     fi
 
