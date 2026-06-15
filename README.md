@@ -34,9 +34,6 @@ El desinstalador avisa de que se borrarán todos los datos relacionados con el s
 ```bash
 sudo bash /opt/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
 ```
-
----
-
 ## Qué recopila el agente
 
 El agente (`rs_agent.sh`) genera un JSON con cuatro secciones:

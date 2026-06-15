@@ -36,7 +36,7 @@ LOG_FILE="/var/log/rs-agent.log"
 CONFIG_FILE="$DATA_DIR/config.env"
 
 # RSM System lookup
-RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
+RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/v2/items/get.php"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
