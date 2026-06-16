@@ -20,8 +20,10 @@ RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
+RSM_SYSTEM_ALIAS_PROPERTY_ID="1827"
 AGENT_TOKEN=""
 UUID_VAL=""
+SYSTEM_ALIAS=""
 
 # ============ UTILIDADES ============
 
@@ -72,7 +74,7 @@ json_extract_rsm_property() {
 check_root() {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
         echo "ERROR: Este script requiere permisos de root"
-        echo "   Ejecuta con: sudo bash rs_agent.sh --token TOKEN --uuid UUID"
+        echo "   Ejecuta con: sudo bash rs_agent.sh --token TOKEN --uuid UUID --alias ALIAS"
         exit 1
     fi
 }
@@ -87,20 +89,33 @@ validate_uuid() {
 
 parse_args() {
     if [ $# -eq 0 ]; then
-        echo "Uso: sudo bash rs_agent.sh --token <TOKEN> --uuid <UUID>"
+        echo "Uso: sudo bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS>"
         exit 1
     fi
 
     while [ $# -gt 0 ]; do
         case "$1" in
-            --token) AGENT_TOKEN="$2"; shift 2 ;;
-            --uuid)  UUID_VAL="$2";    shift 2 ;;
+            --token)
+                [ $# -ge 2 ] || { echo "ERROR: --token requiere un valor"; exit 1; }
+                AGENT_TOKEN="$2"
+                shift 2
+                ;;
+            --uuid)
+                [ $# -ge 2 ] || { echo "ERROR: --uuid requiere un valor"; exit 1; }
+                UUID_VAL="$2"
+                shift 2
+                ;;
+            --alias)
+                [ $# -ge 2 ] || { echo "ERROR: --alias requiere un valor"; exit 1; }
+                SYSTEM_ALIAS="$2"
+                shift 2
+                ;;
             *) echo "Argumento desconocido: $1"; exit 1 ;;
         esac
     done
 
-    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
-        echo "ERROR: --token y --uuid son obligatorios"
+    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ] || [ -z "$SYSTEM_ALIAS" ]; then
+        echo "ERROR: --token, --uuid y --alias son obligatorios"
         exit 1
     fi
 
@@ -227,10 +242,13 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","properties":{"%s":"%s"},"os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
+        "$(json_escape "$SYSTEM_ALIAS")" \
+        "$(json_escape "$RSM_SYSTEM_ALIAS_PROPERTY_ID")" \
+        "$(json_escape "$SYSTEM_ALIAS")" \
         "$(json_escape "$os_name")" \
         "$(json_escape "$os_version")" \
         "$(json_escape "$distro_id")" \
@@ -440,7 +458,7 @@ download_update() {
     if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
         chmod +x "$script_path"
         echo "Actualizacion completada. Reiniciando agente..."
-        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL"
+        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
     else
         echo "Error descargando actualizacion"
         [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
@@ -464,6 +482,7 @@ send_to_rsm() {
     echo "Configuracion RSM:"
     echo "   - URL:   $RSM_API_URL"
     echo "   - Token: $AGENT_TOKEN"
+    echo "   - Alias: $SYSTEM_ALIAS"
     echo ""
     echo "Ejecutando peticion a RSM..."
 
@@ -609,6 +628,7 @@ main() {
         echo "Verifica:"
         echo "   - Token: $AGENT_TOKEN"
         echo "   - UUID:  $UUID_VAL"
+        echo "   - Alias: $SYSTEM_ALIAS"
         echo "   - URL:   $RSM_API_URL"
         echo "   - Conectividad de red"
         exit 1
