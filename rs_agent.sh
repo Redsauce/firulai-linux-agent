@@ -20,7 +20,6 @@ RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
-RSM_SYSTEM_ALIAS_PROPERTY_ID="1827"
 AGENT_TOKEN=""
 UUID_VAL=""
 SYSTEM_ALIAS=""
@@ -242,12 +241,10 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","properties":{"%s":"%s"},"os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
-        "$(json_escape "$SYSTEM_ALIAS")" \
-        "$(json_escape "$RSM_SYSTEM_ALIAS_PROPERTY_ID")" \
         "$(json_escape "$SYSTEM_ALIAS")" \
         "$(json_escape "$os_name")" \
         "$(json_escape "$os_version")" \

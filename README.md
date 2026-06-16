@@ -29,7 +29,7 @@ El desinstalador avisa de que se borrarán todos los datos relacionados con el s
 
 ---
 
-El alias es obligatorio. Si no se pasa con la opcion `--alias`, el instalador intentara pedirlo por terminal; si no hay terminal interactiva disponible, la instalacion se detendra indicando que debe incluirse en el comando. El alias se envia a Firulai/RSM para guardarlo en la propiedad `Alias:1827` del sistema asociado al UUID, y podra modificarse posteriormente desde Firulai.
+El alias es obligatorio. Si no se pasa con la opcion `--alias`, el instalador intentara pedirlo por terminal; si no hay terminal interactiva disponible, la instalacion se detendra indicando que debe incluirse en el comando. El alias se envia a Firulai/RSM como parte de los datos del sistema asociado al UUID, y podra modificarse posteriormente desde Firulai.
 
 ## Uso manual
 
