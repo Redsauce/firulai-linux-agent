@@ -7,7 +7,7 @@ Agente de inventario para sistemas Linux. Recopila información del sistema, paq
 ## Instalación
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s <AGENT_TOKEN> <UUID>
+curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
 ```
 
 El instalador (`install.sh`) realiza los siguientes pasos:
@@ -29,10 +29,12 @@ El desinstalador avisa de que se borrarán todos los datos relacionados con el s
 
 ---
 
+El alias es obligatorio. Si no se pasa con la opcion `--alias`, el instalador intentara pedirlo por terminal; si no hay terminal interactiva disponible, la instalacion se detendra indicando que debe incluirse en el comando. El alias se envia a Firulai/RSM para guardarlo en la propiedad `Alias:1827` del sistema asociado al UUID, y podra modificarse posteriormente desde Firulai.
+
 ## Uso manual
 
 ```bash
-sudo bash /opt/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
+sudo bash /opt/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>
 ```
 ## Qué recopila el agente
 
