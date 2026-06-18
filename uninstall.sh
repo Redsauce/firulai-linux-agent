@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Redsauce Inventory Agent - Uninstaller
-# Notifica a RSM que debe borrar los datos del sistema y elimina la instalacion local.
+# Marca el sistema como inactivo en RSM y elimina la instalacion local.
 #
 
 set -uo pipefail
@@ -11,9 +11,11 @@ INSTALL_DIR="/opt/rs-agent"
 DATA_DIR="/var/lib/rs-agent"
 CONFIG_FILE="$DATA_DIR/config.env"
 LOG_FILE="/var/log/rs-agent.log"
-RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/v2/items/get.php"
+RSM_ITEMS_UPDATE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/v2/items/update.php"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
+RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID="1751"
+RSM_SYSTEM_HOSTNAME_STATUS_DISCONNECTED_VALUE="Disconnected"
 AGENT_TOKEN=""
 UUID_VAL=""
 
@@ -49,6 +51,17 @@ validate_uuid() {
     fi
 }
 
+json_extract_first_scalar_key() {
+    local json="$1"
+    local key="$2"
+
+    printf '%s' "$json" \
+        | tr -d '\n' \
+        | sed 's/,"/\n"/g' \
+        | sed -n "s/^.*\"$key\"[[:space:]]*:[[:space:]]*\"\\{0,1\\}\\([^\",}\\]]*\\)\"\\{0,1\\}.*$/\\1/p" \
+        | head -1
+}
+
 load_config() {
     if [ -f "$CONFIG_FILE" ]; then
         # shellcheck source=/dev/null
@@ -68,7 +81,7 @@ parse_args() {
     done
 
     if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
-        error "No se encontro token o UUID para notificar a RSM"
+        error "No se encontrÓ token o UUID para notificar a RSM"
         echo "Uso manual: sudo bash uninstall.sh --token <TOKEN> --uuid <UUID>"
         exit 1
     fi
@@ -79,73 +92,33 @@ parse_args() {
 confirm_uninstall() {
     echo ""
     echo "============================================================"
-    echo "Redsauce Inventory Agent - Desinstalacion"
+    echo "Redsauce Inventory Agent - DesinstalaciÓn"
     echo "============================================================"
     echo ""
-    echo "Esta accion borrara la instalacion local del agente y solicitara"
-    echo "a RSM el borrado de todos los datos relacionados con este sistema."
+    echo "Esta acción solo borrará la instalación local del agente."
+    echo "No se borrarán los datos de RSM."
+    echo ""
+    echo "El sistema quedará como inactivo en Firulai. Desde Firulai podrás"
+    echo "eliminar definitivamente sus datos o volver a instalar el agente"
+    echo "más adelante enlazándolo al System y al inventario ya guardados."
     echo ""
     echo "UUID del sistema: $UUID_VAL"
     echo ""
-    read -rn 1 -p "Estas de acuerdo con borrar todos los datos relacionados con este sistema? (s/N): " reply
+    read -rn 1 -p "Estas de acuerdo con desinstalar el agente local? (s/N): " reply
     echo
     case "$reply" in
         s|S|y|Y) ;;
         *)
-            warn "Desinstalacion cancelada por el usuario"
+            warn "Desinstalación cancelada por el usuario"
             exit 0
             ;;
     esac
 }
 
-send_delete_request_to_rsm() {
-    local delete_payload response_file http_code exit_code response_body
-    delete_payload="{\"uuid\":\"$UUID_VAL\"}"
+find_system_id_by_uuid() {
+    local payload response_file http_code exit_code response_body system_id
     response_file=$(mktemp)
-
-    info "Solicitando a RSM el borrado de datos del sistema..."
-
-    http_code=$(curl \
-        --silent \
-        --show-error \
-        --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location "$RSM_API_URL" \
-        --form "RStrigger=deleteSystemData" \
-        --form "RSdata=$delete_payload" \
-        --form "RStoken=$AGENT_TOKEN" \
-        --max-time 30)
-    exit_code=$?
-    response_body=$(cat "$response_file" 2>/dev/null || true)
-    rm -f "$response_file"
-
-    if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo solicitar el borrado en RSM (curl exit: $exit_code)"
-        return 1
-    fi
-
-    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no confirmo la solicitud de borrado (HTTP $http_code)"
-        echo "Respuesta: $response_body"
-        return 1
-    fi
-
-    if printf '%s' "$response_body" | grep -iqE '\[ERROR\]|Borrado incompleto|System eliminado:[[:space:]]*NO'; then
-        error "RSM respondio con errores durante el borrado"
-        echo "$response_body"
-        return 1
-    fi
-
-    log "Solicitud de borrado procesada por RSM"
-    return 0
-}
-
-verify_system_deleted_in_rsm() {
-    local payload response_file http_code exit_code response_body
-    response_file=$(mktemp)
-    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
-
-    info "Verificando que el System ya no existe en RSM..."
+    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
 
     http_code=$(curl \
         --silent \
@@ -163,52 +136,77 @@ verify_system_deleted_in_rsm() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo verificar el borrado en RSM (curl exit: $exit_code)"
+        error "No se pudo consultar el sistema en RSM (curl exit: $exit_code)"
         return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitio verificar el borrado (HTTP $http_code)"
+        error "RSM no permitió consultar el sistema (HTTP $http_code)"
         echo "Respuesta: $response_body"
         return 1
     fi
 
-    if printf '%s' "$response_body" | grep -Fq "$UUID_VAL"; then
-        error "El System sigue existiendo en RSM despues de la solicitud de borrado"
-        echo "UUID: $UUID_VAL"
+    if ! printf '%s' "$response_body" | grep -Fq "$UUID_VAL"; then
+        printf ''
+        return 0
+    fi
+
+    system_id=$(json_extract_first_scalar_key "$response_body" "ID")
+    [ -z "$system_id" ] && system_id=$(json_extract_first_scalar_key "$response_body" "id")
+    printf '%s' "$system_id"
+}
+
+mark_system_disconnected_in_rsm() {
+    local system_id payload response_file http_code exit_code response_body
+
+    info "Marcando sistema como inactivo en Firulai..."
+    system_id=$(find_system_id_by_uuid) || return 1
+
+    if [ -z "$system_id" ]; then
+        info "No hay ningun System enlazado a este UUID en Firulai. Se continuará con la desinstalación local."
+        return 0
+    fi
+
+    response_file=$(mktemp)
+    payload="[{\"ID\":\"$system_id\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_DISCONNECTED_VALUE\"}]"
+
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location \
+        --request PATCH \
+        "$RSM_ITEMS_UPDATE_URL" \
+        --header "Authorization: $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
+
+    if [ "$exit_code" -ne 0 ]; then
+        error "No se pudo marcar el sistema como inactivo en RSM (curl exit: $exit_code)"
         return 1
     fi
 
-    log "System eliminado en RSM"
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        error "RSM no permitió marcar el sistema como inactivo (HTTP $http_code)"
+        echo "Respuesta: $response_body"
+        return 1
+    fi
+
+    log "Sistema marcado como inactivo en Firulai"
     return 0
 }
 
-verify_remote_deletion_with_retries() {
-    local attempt=1 max_attempts=3 delay=5
-
-    while [ "$attempt" -le "$max_attempts" ]; do
-        if verify_system_deleted_in_rsm; then
-            return 0
-        fi
-
-        if [ "$attempt" -lt "$max_attempts" ]; then
-            warn "Verificación remota fallida. Reintentando en $delay segundos..."
-            sleep "$delay"
-        fi
-
-        attempt=$((attempt + 1))
-    done
-
-    error "No se pudo confirmar el borrado en RSM tras varios intentos."
-    return 1
-}
-
 remove_cron() {
-    info "Eliminando ejecucion automatica..."
+    info "Eliminando ejecución automática..."
     if ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true) | crontab -; then
         log "Entrada de cron eliminada"
     else
-        warn "No se pudo actualizar el crontab o no habia entrada configurada"
+        warn "No se pudo actualizar el crontab o no había entrada configurada"
     fi
 }
 
@@ -229,13 +227,8 @@ main() {
     parse_args "$@"
     confirm_uninstall
 
-    if ! send_delete_request_to_rsm; then
-        error "Desinstalacion detenida: RSM no confirmo la solicitud de borrado"
-        exit 1
-    fi
-
-    if ! verify_remote_deletion_with_retries; then
-        error "Desinstalacion detenida: no se obtuvo confirmacion de borrado en RSM"
+    if ! mark_system_disconnected_in_rsm; then
+        error "Desinstalación detenida: no se pudo actualizar el estado en RSM"
         exit 1
     fi
 

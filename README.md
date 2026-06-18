@@ -25,7 +25,9 @@ El instalador (`install.sh`) realiza los siguientes pasos:
 sudo bash /opt/rs-agent/uninstall.sh
 ```
 
-El desinstalador avisa de que se borrarán todos los datos relacionados con el sistema. Si se confirma, envía a RSM `RStrigger=deleteSystemData` y `RSdata={"uuid":"<UUID>"}`, espera la confirmación remota y sólo después elimina cron, configuración, inventario, logs y archivos locales del agente. Si la verificación remota falla, el desinstalador no borra los archivos locales para que la operación pueda reintentarse de forma segura.
+El desinstalador avisa de que solo se borrará la instalación local del agente. No borra datos de RSM. Si se confirma, busca el System por UUID (`1780`) y, si existe, actualiza `Hostnamestatus` (`1751`) a `Disconnected`; después elimina cron, configuración, inventario, logs y archivos locales del agente. Si el UUID ya no existe en Firulai, la desinstalación local continúa igualmente.
+
+Si se instala de nuevo con un UUID que ya existe y corresponde al mismo equipo, el instalador reutiliza ese System, actualiza el alias y cambia `Hostnamestatus` (`1751`) a `Activo` antes de ejecutar el inventario inicial. Si el UUID pertenece a otro equipo, la instalación se bloquea.
 
 ---
 
