@@ -169,19 +169,19 @@ validate_uuid_ownership() {
 
     if [ "$exit_code" -ne 0 ]; then
         echo "ERROR: No se pudo validar el UUID antes de enviar inventario (curl exit: $exit_code)."
-        echo "Por seguridad, la instalacion no continuara sin confirmar que el UUID no pertenece a otro sistema."
+        echo "Por seguridad, la instalación no continuará sin confirmar que el UUID no pertenece a otro sistema."
         return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        echo "ERROR: RSM no permitio validar el UUID antes de enviar inventario (HTTP $http_code)."
-        echo "Por seguridad, la instalacion no continuara sin confirmar que el UUID no pertenece a otro sistema."
+        echo "ERROR: RSM no permitió validar el UUID antes de enviar inventario (HTTP $http_code)."
+        echo "Por seguridad, la instalación no continuará sin confirmar que el UUID no pertenece a otro sistema."
         echo "Respuesta: $response_body"
         return 1
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID_VAL"; then
-        echo "ERROR: UUID invalido: no existe en RSM."
+        echo "ERROR: UUID inválido: no existe en RSM."
         echo "No se puede enviar inventario con un UUID que no haya sido generado desde Add New System."
         echo ""
         echo "UUID: $UUID_VAL"
@@ -198,7 +198,7 @@ validate_uuid_ownership() {
     fi
 
     if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
-        echo "   -> UUID ya asociado a este sistema, se actualizara su inventario"
+        echo "   -> UUID ya asociado a este sistema, se actualizará su inventario"
         return 0
     fi
 
@@ -449,15 +449,15 @@ download_update() {
     local script_path="/opt/rs-agent/rs_agent.sh"
     local backup_path="${script_path}.backup"
 
-    echo "Descargando actualizacion..."
+    echo "Descargando actualización..."
     [ -f "$script_path" ] && cp "$script_path" "$backup_path"
 
     if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
         chmod +x "$script_path"
-        echo "Actualizacion completada. Reiniciando agente..."
+        echo "Actualización completada. Reiniciando agente..."
         exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
     else
-        echo "Error descargando actualizacion"
+        echo "Error descargando actualización"
         [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
     fi
 }
@@ -476,12 +476,12 @@ send_to_rsm() {
     printf 'Longitud: %d caracteres (%d KB aprox)\n' "${#inventory_json}" "$(( ${#inventory_json} / 1024 ))"
 
     echo ""
-    echo "Configuracion RSM:"
+    echo "Configuración RSM:"
     echo "   - URL:   $RSM_API_URL"
     echo "   - Token: $AGENT_TOKEN"
     echo "   - Alias: $SYSTEM_ALIAS"
     echo ""
-    echo "Ejecutando peticion a RSM..."
+    echo "Ejecutando petición a RSM..."
 
     local response_file="/tmp/rsm_response.txt"
     local http_code
@@ -517,7 +517,7 @@ send_to_rsm() {
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
         echo ""
-        echo "ERROR: RSM devolvio HTTP $http_code"
+        echo "ERROR: RSM devolvió HTTP $http_code"
         echo "Respuesta: $response_body"
         return 1
     fi
@@ -544,23 +544,23 @@ main() {
     mkdir -p "$OUTPUT_DIR"
 
     # --- Timezone ---
-    echo "Recopilando informacion de timezone..."
+    echo "Recopilando información de timezone..."
     local timezone
     timezone=$(collect_timezone)
     [ -z "$timezone" ] && timezone=""
     echo "   -> Timezone: ${timezone:-desconocido}"
 
     # --- Sistema ---
-    echo "Recopilando informacion del sistema..."
+    echo "Recopilando información del sistema..."
     local system_json
     system_json=$(collect_system_info "$timezone")
     if [ -z "$system_json" ]; then
-        echo "ERROR: No se pudo recopilar la informacion del sistema"
+        echo "ERROR: No se pudo recopilar la información del sistema"
         exit 1
     fi
 
     # --- Hardware ---
-    echo "Recopilando informacion de hardware..."
+    echo "Recopilando información de hardware..."
     local hardware_json
     hardware_json=$(collect_hardware)
     local firmware_count
@@ -619,7 +619,7 @@ main() {
     if ! send_to_rsm "$inventory_json"; then
         echo ""
         echo "============================================================"
-        echo "ERROR CRITICO: No se pudo enviar el inventario a RSM"
+        echo "ERROR CRÍTICO: No se pudo enviar el inventario a RSM"
         echo "============================================================"
         echo ""
         echo "Verifica:"

@@ -57,9 +57,14 @@ CONFIG_FILE="$DATA_DIR/config.env"
 
 # RSM System lookup
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/v2/items/get.php"
+RSM_ITEMS_UPDATE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api.new/v2/items/update.php"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
+RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID="1751"
+RSM_SYSTEM_ALIAS_PROPERTY_ID="1827"
+RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE="Activo"
+RSM_SYSTEM_ITEM_ID=""
 
 # ============================================================================
 # COLORES
@@ -95,7 +100,7 @@ banner() {
     echo ""
     echo "============================================================================"
     echo "  Redsauce Inventory Agent - Instalador v0.2.3"
-    echo "  Optimizado para deteccion de vulnerabilidades CVE"
+    echo "  Optimizado para detección de vulnerabilidades CVE"
     echo "============================================================================"
     echo ""
 }
@@ -122,6 +127,16 @@ shell_single_quote() {
     printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
 require_system_alias() {
     SYSTEM_ALIAS=$(trim_string "$SYSTEM_ALIAS")
 
@@ -141,7 +156,7 @@ require_system_alias() {
         echo "Ejecuta el instalador indicando el alias con la opcion --alias:"
         echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
         echo ""
-        echo "Si el alias contiene espacios, envuelvelo entre comillas."
+        echo "Si el alias contiene espacios, envuélvelo entre comillas."
         exit 1
     fi
 }
@@ -201,6 +216,17 @@ json_extract_first_string_key() {
         | head -1
 }
 
+json_extract_first_scalar_key() {
+    local json="$1"
+    local key="$2"
+
+    printf '%s' "$json" \
+        | tr -d '\n' \
+        | sed 's/,"/\n"/g' \
+        | sed -n "s/^.*\"$key\"[[:space:]]*:[[:space:]]*\"\\{0,1\\}\\([^\",}\\]]*\\)\"\\{0,1\\}.*$/\\1/p" \
+        | head -1
+}
+
 json_extract_rsm_property() {
     local json="$1"
     local property_id="$2"
@@ -243,7 +269,7 @@ identity_matches_local_system() {
 check_uuid_available() {
     local payload response_file http_code exit_code response_body
     response_file="/tmp/rsm_install_uuid_check_response.txt"
-    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
+    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
 
     info "Validando UUID en RSM..."
 
@@ -266,22 +292,30 @@ check_uuid_available() {
 
     if [ "$exit_code" -ne 0 ]; then
         error "No se pudo validar el UUID en RSM (curl exit: $exit_code)."
-        error "Por seguridad, la instalacion no continuara sin confirmar que el UUID esta disponible."
+        error "Por seguridad, la instalación no continuará sin confirmar que el UUID está disponible."
         exit 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitio validar el UUID (HTTP $http_code)."
-        error "Por seguridad, la instalacion no continuara sin confirmar que el UUID esta disponible."
+        error "RSM no permitió validar el UUID (HTTP $http_code)."
+        error "Por seguridad, la instalación no continuará sin confirmar que el UUID está disponible."
         echo "Respuesta: $response_body"
         exit 1
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID"; then
-        error "UUID invalido: no existe en RSM."
+        error "UUID inválido: no existe en RSM."
         error "No se puede instalar el agente con un UUID que no haya sido generado desde Add New System."
         echo ""
         echo "UUID: $UUID"
+        exit 1
+    fi
+
+    RSM_SYSTEM_ITEM_ID=$(json_extract_first_scalar_key "$response_body" "ID")
+    [ -z "$RSM_SYSTEM_ITEM_ID" ] && RSM_SYSTEM_ITEM_ID=$(json_extract_first_scalar_key "$response_body" "id")
+    if [ -z "$RSM_SYSTEM_ITEM_ID" ]; then
+        error "No se pudo localizar el item de RSM asociado al UUID."
+        error "Por seguridad, la instalación no continuará sin poder actualizar el estado."
         exit 1
     fi
 
@@ -290,25 +324,13 @@ check_uuid_available() {
     existing_fqdn=$(json_extract_rsm_property "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
 
     if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
-        log "UUID reservado en RSM y disponible para instalacion"
+        log "UUID reservado en RSM y disponible para instalación"
         return 0
     fi
 
     if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
-        echo ""
-        error "Este sistema ya tiene un agente instalado en RSM con este UUID."
-        error "No se puede realizar una nueva instalacion con el mismo UUID."
-        echo ""
-        echo "UUID: $UUID"
-        echo "Sistema en RSM:"
-        echo "   - Hostname: ${existing_hostname:-desconocido}"
-        echo "   - FQDN:     ${existing_fqdn:-desconocido}"
-        echo "Equipo local:"
-        echo "   - Hostname: $(local_system_hostname)"
-        echo "   - FQDN:     $(local_system_fqdn)"
-        echo ""
-        echo "Si necesitas reinstalar el agente, desinstala primero el agente actual."
-        exit 1
+        log "UUID ya asociado a este sistema en RSM; se reactivará el agente y se actualizará el inventario"
+        return 0
     fi
 
     echo ""
@@ -350,15 +372,60 @@ check_local_agent_installation() {
     fi
 }
 
+update_rsm_system_on_install() {
+    local payload response_file http_code exit_code response_body
+
+    if [ -z "$RSM_SYSTEM_ITEM_ID" ]; then
+        error "No se pudo actualizar RSM porque no se encontro el item del UUID."
+        exit 1
+    fi
+
+    response_file="/tmp/rsm_install_system_update_response.txt"
+    payload="[{\"ID\":\"$RSM_SYSTEM_ITEM_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\":\"$(json_escape "$SYSTEM_ALIAS")\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE\"}]"
+
+    info "Marcando sistema como activo en Firulai..."
+
+    set +e
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location \
+        --request PATCH \
+        "$RSM_ITEMS_UPDATE_URL" \
+        --header "Authorization: $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    set -e
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
+
+    if [ "$exit_code" -ne 0 ]; then
+        error "No se pudo activar el sistema en RSM (curl exit: $exit_code)."
+        exit 1
+    fi
+
+    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+        error "RSM no permitió activar el sistema (HTTP $http_code)."
+        echo "Respuesta: $response_body"
+        exit 1
+    fi
+
+    log "Sistema marcado como activo en Firulai"
+}
+
 cleanup_partial_installation() {
-    warn "Limpiando instalacion parcial..."
+    warn "Limpiando instalación parcial..."
     if command -v crontab &> /dev/null; then
         ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true) | crontab - || true
     fi
     rm -rf "$INSTALL_DIR"
     rm -rf "$DATA_DIR"
     rm -f "$LOG_FILE"
-    log "Instalacion parcial eliminada"
+    log "Instalación parcial eliminada"
 }
 
 create_directories() {
@@ -386,7 +453,7 @@ download_agent() {
         error "URL intentada: $AGENT_URL"
         error ""
         error "Verifica que:"
-        error "  - Tienes conexion a internet"
+        error "  - Tienes conexión a internet"
         error "  - GitHub es accesible desde este servidor"
         exit 1
     fi
@@ -406,14 +473,14 @@ download_uninstaller() {
         error "URL intentada: $UNINSTALLER_URL"
         error ""
         error "Verifica que:"
-        error "  - Tienes conexion a internet"
+        error "  - Tienes conexión a internet"
         error "  - GitHub es accesible desde este servidor"
         exit 1
     fi
 }
 
 write_agent_config() {
-    info "Guardando configuracion local del agente..."
+    info "Guardando configuración local del agente..."
 
     cat > "$CONFIG_FILE" << CONFIG_EOF
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
@@ -422,22 +489,22 @@ SYSTEM_ALIAS=$(shell_single_quote "$SYSTEM_ALIAS")
 CONFIG_EOF
     chmod 600 "$CONFIG_FILE"
 
-    log "Configuracion guardada: $CONFIG_FILE"
+    log "Configuración guardada: $CONFIG_FILE"
 }
 
 setup_cron() {
-    info "Configurando ejecucion automatica..."
+    info "Configurando ejecución automática..."
 
     CRON_JOB="0 3 * * * /bin/bash $INSTALL_DIR/rs_agent.sh --token $(shell_single_quote "$AGENT_TOKEN") --uuid $(shell_single_quote "$UUID") --alias $(shell_single_quote "$SYSTEM_ALIAS") >> $LOG_FILE 2>&1"
 
     # Anadir a crontab de root evitando duplicados
     ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true; echo "$CRON_JOB") | crontab -
 
-    log "Cron configurado (ejecucion diaria a las 3:00 AM)"
+    log "Cron configurado (ejecución diaria a las 3:00 AM)"
 }
 
 test_agent() {
-    info "Ejecutando primera recopilacion..."
+    info "Ejecutando primera recopilación..."
 
     set +e
     /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
@@ -452,7 +519,7 @@ test_agent() {
         fi
     fi
 
-    error "No se pudo generar y enviar el inventario en la primera ejecucion"
+    error "No se pudo generar y enviar el inventario en la primera ejecución"
     info "El detalle del fallo se ha mostrado arriba."
     return 1
 }
@@ -460,7 +527,7 @@ test_agent() {
 print_summary() {
     echo ""
     echo "============================================================================"
-    echo "  INSTALACION COMPLETADA"
+    echo "  INSTALACIÓN COMPLETADA"
     echo "============================================================================"
     echo ""
     echo "Ubicaciones:"
@@ -468,23 +535,23 @@ print_summary() {
     echo "   - Inventario:  $DATA_DIR/inventory.json"
     echo "   - Logs:        $LOG_FILE"
     echo ""
-    echo "Ejecucion:"
-    echo "   - Automatica:  Diariamente a las 3:00 AM"
+    echo "Ejecución:"
+    echo "   - Automática:  Diariamente a las 3:00 AM"
     echo "   - Manual:      sudo bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
     echo ""
     echo "Alias:"
     echo "   - Valor actual: $SYSTEM_ALIAS"
-    echo "   - Este alias se guarda en Firulai y podra modificarse desde la interfaz."
+    echo "   - Este alias se guarda en Firulai y podrá modificarse desde la interfaz."
     echo ""
     echo "Ver inventario:"
     echo "   cat $DATA_DIR/inventory.json"
     echo ""
     echo "Funcionamiento:"
     echo "   - Sin dependencia de Python ni jq (bash puro)"
-    echo "   - Envia inventario completo en cada ejecucion a RSM"
+    echo "   - Envia inventario completo en cada ejecución a RSM"
     echo "   - RSM detecta y gestiona los cambios"
-    echo "   - Optimizado para deteccion de vulnerabilidades CVE"
-    echo "   - Incluye: OS, kernel, CPU, modelo de discos, paquetes, software critico"
+    echo "   - Optimizado para detección de vulnerabilidades CVE"
+    echo "   - Incluye: OS, kernel, CPU, modelo de discos, paquetes, software crítico"
     echo ""
     echo "Desinstalar:"
     echo "   sudo bash $INSTALL_DIR/uninstall.sh"
@@ -508,6 +575,7 @@ main() {
     validate_uuid_format "$UUID"
     check_local_agent_installation
     check_uuid_available
+    update_rsm_system_on_install
     
     # Instalacion
     create_directories
@@ -519,7 +587,7 @@ main() {
     echo ""
     if ! test_agent; then
         echo ""
-        error "Instalacion cancelada porque la primera ejecucion del agente ha fallado."
+        error "Instalación cancelada porque la primera ejecución del agente ha fallado."
         error "Si el UUID ya pertenece a otro sistema, genera un UUID nuevo desde Add New System."
         cleanup_partial_installation
         exit 1
@@ -530,7 +598,7 @@ main() {
     # Resumen
     print_summary
     
-    log "Instalacion exitosa"
+    log "Instalación exitosa"
 }
 
 # Ejecutar
