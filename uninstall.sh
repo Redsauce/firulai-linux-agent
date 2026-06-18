@@ -57,8 +57,8 @@ json_extract_first_scalar_key() {
 
     printf '%s' "$json" \
         | tr -d '\n' \
-        | sed 's/,"/\n"/g' \
-        | sed -n "s/^.*\"$key\"[[:space:]]*:[[:space:]]*\"\\{0,1\\}\\([^\",}\\]]*\\)\"\\{0,1\\}.*$/\\1/p" \
+        | sed "s/\"$key\"[[:space:]]*:/\\n&/g" \
+        | sed -n "s/^\"$key\"[[:space:]]*:[[:space:]]*\"\\{0,1\\}\\([^\",}]*\\).*$/\\1/p" \
         | head -1
 }
 
