@@ -17,6 +17,7 @@ RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID="1751"
 RSM_SYSTEM_HOSTNAME_STATUS_DISCONNECTED_VALUE="Disconnected"
 AGENT_TOKEN=""
+RSTOKEN=""
 UUID_VAL=""
 
 log() {
@@ -67,6 +68,7 @@ load_config() {
         # shellcheck source=/dev/null
         . "$CONFIG_FILE"
         AGENT_TOKEN="${AGENT_TOKEN:-}"
+        RSTOKEN="${RSTOKEN:-}"
         UUID_VAL="${UUID_VAL:-${UUID:-}}"
     fi
 }
@@ -75,14 +77,15 @@ parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --token) AGENT_TOKEN="${2:-}"; shift 2 ;;
+            --rstoken) RSTOKEN="${2:-}"; shift 2 ;;
             --uuid) UUID_VAL="${2:-}"; shift 2 ;;
             *) error "Argumento desconocido: $1"; exit 1 ;;
         esac
     done
 
-    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
+    if [ -z "$AGENT_TOKEN" ] || [ -z "$RSTOKEN" ] || [ -z "$UUID_VAL" ]; then
         error "No se encontrÓ token o UUID para notificar a RSM"
-        echo "Uso manual: sudo bash uninstall.sh --token <TOKEN> --uuid <UUID>"
+        echo "Uso manual: sudo bash uninstall.sh --token <TOKEN> --rstoken <RSTOKEN> --uuid <UUID>"
         exit 1
     fi
 
@@ -127,7 +130,7 @@ find_system_id_by_uuid() {
         --write-out '%{http_code}' \
         --location "$RSM_ITEMS_GET_URL" \
         --request GET \
-        --header "Authorization: $AGENT_TOKEN" \
+        --header "Authorization: $RSTOKEN" \
         --header "Content-Type: application/json" \
         --data "$payload" \
         --max-time 20)
@@ -178,7 +181,7 @@ mark_system_disconnected_in_rsm() {
         --location \
         --request PATCH \
         "$RSM_ITEMS_UPDATE_URL" \
-        --header "Authorization: $AGENT_TOKEN" \
+        --header "Authorization: $RSTOKEN" \
         --header "Content-Type: application/json" \
         --data "$payload" \
         --max-time 20)

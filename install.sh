@@ -5,7 +5,7 @@
 # ============================================================================
 #
 # Uso:
-#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
+#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <RSTOKEN> <UUID> --alias <ALIAS>
 #
 
 set -e
@@ -15,15 +15,16 @@ set -e
 # ============================================================================
 
 AGENT_TOKEN=${1:-""}
-UUID=${2:-""}
+RSTOKEN=${2:-""}
+UUID=${3:-""}
 SYSTEM_ALIAS=""
 
-if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
-    echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+if [ -z "$AGENT_TOKEN" ] || [ -z "$RSTOKEN" ] || [ -z "$UUID" ]; then
+    echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <RSTOKEN> <UUID> --alias <ALIAS>"
     exit 1
 fi
 
-shift 2
+shift 3
 while [ $# -gt 0 ]; do
     case "$1" in
         --alias)
@@ -36,7 +37,7 @@ while [ $# -gt 0 ]; do
             ;;
         *)
             echo "[ERROR] Argumento desconocido: $1"
-            echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+            echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <RSTOKEN> <UUID> --alias <ALIAS>"
             exit 1
             ;;
     esac
@@ -110,7 +111,7 @@ check_root() {
         error "Este script debe ejecutarse como root"
         echo ""
         echo "Ejecuta:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <RSTOKEN> <UUID> --alias <ALIAS>"
         echo ""
         exit 1
     fi
@@ -154,7 +155,7 @@ require_system_alias() {
         error "El alias del sistema es obligatorio."
         echo ""
         echo "Ejecuta el instalador indicando el alias con la opcion --alias:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <RSTOKEN> <UUID> --alias <ALIAS>"
         echo ""
         echo "Si el alias contiene espacios, envuélvelo entre comillas."
         exit 1
@@ -282,7 +283,7 @@ check_uuid_available() {
         --location \
         --request GET \
         "$RSM_ITEMS_GET_URL" \
-        --header "Authorization: $AGENT_TOKEN" \
+        --header "Authorization: $RSTOKEN" \
         --header "Content-Type: application/json" \
         --data "$payload" \
         --max-time 20)
@@ -394,7 +395,7 @@ update_rsm_system_on_install() {
         --location \
         --request PATCH \
         "$RSM_ITEMS_UPDATE_URL" \
-        --header "Authorization: $AGENT_TOKEN" \
+        --header "Authorization: $RSTOKEN" \
         --header "Content-Type: application/json" \
         --data "$payload" \
         --max-time 20)
@@ -484,6 +485,7 @@ write_agent_config() {
 
     cat > "$CONFIG_FILE" << CONFIG_EOF
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
+RSTOKEN=$(shell_single_quote "$RSTOKEN")
 UUID=$(shell_single_quote "$UUID")
 SYSTEM_ALIAS=$(shell_single_quote "$SYSTEM_ALIAS")
 CONFIG_EOF
@@ -495,7 +497,7 @@ CONFIG_EOF
 setup_cron() {
     info "Configurando ejecución automática..."
 
-    CRON_JOB="0 3 * * * /bin/bash $INSTALL_DIR/rs_agent.sh --token $(shell_single_quote "$AGENT_TOKEN") --uuid $(shell_single_quote "$UUID") --alias $(shell_single_quote "$SYSTEM_ALIAS") >> $LOG_FILE 2>&1"
+    CRON_JOB="0 3 * * * /bin/bash $INSTALL_DIR/rs_agent.sh --token $(shell_single_quote "$AGENT_TOKEN") --rstoken $(shell_single_quote "$RSTOKEN") --uuid $(shell_single_quote "$UUID") --alias $(shell_single_quote "$SYSTEM_ALIAS") >> $LOG_FILE 2>&1"
 
     # Anadir a crontab de root evitando duplicados
     ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true; echo "$CRON_JOB") | crontab -
@@ -507,7 +509,7 @@ test_agent() {
     info "Ejecutando primera recopilación..."
 
     set +e
-    /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
+    /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --rstoken "$RSTOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
     local agent_status=${PIPESTATUS[0]}
     set -e
 
@@ -537,7 +539,7 @@ print_summary() {
     echo ""
     echo "Ejecución:"
     echo "   - Automática:  Diariamente a las 3:00 AM"
-    echo "   - Manual:      sudo bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
+    echo "   - Manual:      sudo bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --rstoken <RSTOKEN> --uuid <UUID> --alias <ALIAS>"
     echo ""
     echo "Alias:"
     echo "   - Valor actual: $SYSTEM_ALIAS"

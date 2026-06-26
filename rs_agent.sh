@@ -21,6 +21,7 @@ RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 AGENT_TOKEN=""
+RSTOKEN=""
 UUID_VAL=""
 SYSTEM_ALIAS=""
 
@@ -73,7 +74,7 @@ json_extract_rsm_property() {
 check_root() {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
         echo "ERROR: Este script requiere permisos de root"
-        echo "   Ejecuta con: sudo bash rs_agent.sh --token TOKEN --uuid UUID --alias ALIAS"
+        echo "   Ejecuta con: sudo bash rs_agent.sh --token TOKEN --rstoken RSTOKEN --uuid UUID --alias ALIAS"
         exit 1
     fi
 }
@@ -88,7 +89,7 @@ validate_uuid() {
 
 parse_args() {
     if [ $# -eq 0 ]; then
-        echo "Uso: sudo bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS>"
+        echo "Uso: sudo bash rs_agent.sh --token <TOKEN> --rstoken <RSTOKEN> --uuid <UUID> --alias <ALIAS>"
         exit 1
     fi
 
@@ -97,6 +98,11 @@ parse_args() {
             --token)
                 [ $# -ge 2 ] || { echo "ERROR: --token requiere un valor"; exit 1; }
                 AGENT_TOKEN="$2"
+                shift 2
+                ;;
+            --rstoken)
+                [ $# -ge 2 ] || { echo "ERROR: --rstoken requiere un valor"; exit 1; }
+                RSTOKEN="$2"
                 shift 2
                 ;;
             --uuid)
@@ -113,8 +119,8 @@ parse_args() {
         esac
     done
 
-    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ] || [ -z "$SYSTEM_ALIAS" ]; then
-        echo "ERROR: --token, --uuid y --alias son obligatorios"
+    if [ -z "$AGENT_TOKEN" ] || [ -z "$RSTOKEN" ] || [ -z "$UUID_VAL" ] || [ -z "$SYSTEM_ALIAS" ]; then
+        echo "ERROR: --token, --rstoken, --uuid y --alias son obligatorios"
         exit 1
     fi
 
@@ -160,7 +166,7 @@ validate_uuid_ownership() {
         --write-out '%{http_code}' \
         --location "$RSM_ITEMS_GET_URL" \
         --request GET \
-        --header "Authorization: $AGENT_TOKEN" \
+        --header "Authorization: $RSTOKEN" \
         --header "Content-Type: application/json" \
         --data "$payload" \
         --max-time 20)
@@ -455,7 +461,7 @@ download_update() {
     if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
         chmod +x "$script_path"
         echo "Actualización completada. Reiniciando agente..."
-        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
+        exec bash "$script_path" --token "$AGENT_TOKEN" --rstoken "$RSTOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
     else
         echo "Error descargando actualización"
         [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
@@ -607,7 +613,7 @@ main() {
 
     # --- Construir JSON final ---
     local inventory_json
-    inventory_json="{\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
+    inventory_json="{\"RSToken\":\"$(json_escape "$RSTOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
 
     # --- Guardar localmente ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"
