@@ -492,6 +492,7 @@ send_to_rsm() {
         --output "$response_file" \
         --write-out '%{http_code}' \
         --location "$RSM_API_URL" \
+        --header "Authorization: $AGENT_TOKEN" \
         --form "RStrigger=newServerData" \
         --form "RSdata=$inventory_json" \
         --form "RStoken=$AGENT_TOKEN" \
