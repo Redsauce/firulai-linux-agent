@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURACION ============
 
-AGENT_VERSION="0.3.0"
+AGENT_VERSION="0.3.1"
 GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
 GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
 OUTPUT_DIR="/var/lib/rs-agent"

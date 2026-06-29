@@ -443,7 +443,7 @@ create_directories() {
 download_agent() {
     info "Descargando agente desde GitHub..."
 
-    AGENT_URL="${GITHUB_RAW_URL}/rs_agent.sh"
+    AGENT_URL="${GITHUB_RAW_URL}/rs_agent.sh?ts=$(date +%s)"
 
     if curl -fsSL "$AGENT_URL" -o "$INSTALL_DIR/rs_agent.sh"; then
         chmod +x "$INSTALL_DIR/rs_agent.sh"
@@ -463,7 +463,7 @@ download_agent() {
 download_uninstaller() {
     info "Descargando desinstalador desde GitHub..."
 
-    UNINSTALLER_URL="${GITHUB_RAW_URL}/uninstall.sh"
+    UNINSTALLER_URL="${GITHUB_RAW_URL}/uninstall.sh?ts=$(date +%s)"
 
     if curl -fsSL "$UNINSTALLER_URL" -o "$INSTALL_DIR/uninstall.sh"; then
         chmod +x "$INSTALL_DIR/uninstall.sh"
