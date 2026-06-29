@@ -472,6 +472,7 @@ send_to_rsm() {
     echo "Enviando inventario a RSM..."
 
     printf '%s' "$inventory_json" > "$debug_json_path"
+    chmod 600 "$debug_json_path" 2>/dev/null || true
     printf 'JSON guardado en: %s\n' "$debug_json_path"
     printf 'Longitud: %d caracteres (%d KB aprox)\n' "${#inventory_json}" "$(( ${#inventory_json} / 1024 ))"
 
@@ -606,13 +607,14 @@ main() {
 
     # --- Construir JSON final ---
     local inventory_json
-    inventory_json="{\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
+    inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
 
     # --- Guardar localmente ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"
     echo ""
     echo "Guardando inventario en ${output_path}..."
     printf '%s' "$inventory_json" > "$output_path"
+    chmod 600 "$output_path" 2>/dev/null || true
 
     # --- Enviar a RSM ---
     if ! send_to_rsm "$inventory_json"; then
