@@ -484,7 +484,7 @@ send_to_rsm() {
     echo ""
     echo "Configuración RSM:"
     echo "   - URL:   $RSM_API_URL"
-    echo "   - Token: $AGENT_TOKEN"
+    echo "   - Token RSM: ${RSTOKEN:0:10}..."
     echo "   - Alias: $SYSTEM_ALIAS"
     echo ""
     echo "Ejecutando petición a RSM..."
@@ -499,9 +499,8 @@ send_to_rsm() {
         --location "$RSM_API_URL" \
         --form "RStrigger=newServerData" \
         --form "RSdata=$inventory_json" \
-        --form "RStoken=$AGENT_TOKEN" \
-        --max-time 30 \
-        --verbose)
+        --form "RStoken=$RSTOKEN" \
+        --max-time 30)
     local exit_code=$?
     local response_body
     response_body=$(cat "$response_file" 2>/dev/null || true)
@@ -629,7 +628,7 @@ main() {
         echo "============================================================"
         echo ""
         echo "Verifica:"
-        echo "   - Token: $AGENT_TOKEN"
+        echo "   - Token RSM: ${RSTOKEN:0:10}..."
         echo "   - UUID:  $UUID_VAL"
         echo "   - Alias: $SYSTEM_ALIAS"
         echo "   - URL:   $RSM_API_URL"
