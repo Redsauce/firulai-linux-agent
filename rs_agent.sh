@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURACION ============
 
-AGENT_VERSION="0.3.2"
+AGENT_VERSION="0.3.3"
 GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
 GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
 OUTPUT_DIR="/var/lib/rs-agent"
@@ -467,6 +467,10 @@ download_update() {
 send_to_rsm() {
     local inventory_json="$1"
     local debug_json_path="/tmp/rsm_debug_payload.json"
+    local response_file="/tmp/rsm_response.txt"
+    local response_headers_file="/tmp/rsm_response_headers.txt"
+    local curl_trace_file="/tmp/rsm_curl_verbose.log"
+    local inventory_hash="unavailable"
 
     echo ""
     echo "Enviando inventario a RSM..."
@@ -475,31 +479,79 @@ send_to_rsm() {
     chmod 600 "$debug_json_path" 2>/dev/null || true
     printf 'JSON guardado en: %s\n' "$debug_json_path"
     printf 'Longitud: %d caracteres (%d KB aprox)\n' "${#inventory_json}" "$(( ${#inventory_json} / 1024 ))"
+    if command -v sha256sum >/dev/null 2>&1; then
+        inventory_hash=$(printf '%s' "$inventory_json" | sha256sum | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        inventory_hash=$(printf '%s' "$inventory_json" | shasum -a 256 | awk '{print $1}')
+    fi
+    printf 'SHA256 RSdata: %s\n' "$inventory_hash"
 
     echo ""
     echo "Configuración RSM:"
     echo "   - URL:   $RSM_API_URL"
     echo "   - Token agente: ${AGENT_TOKEN:0:10}..."
     echo "   - Alias: $SYSTEM_ALIAS"
+    echo "   - Debug: ${RS_AGENT_DEBUG:-0}"
+    echo ""
+    echo "Peticion que se va a enviar:"
+    echo "   - Metodo: POST multipart/form-data"
+    echo "   - Endpoint: $RSM_API_URL"
+    echo "   - Flujo: api.php recibe newServerData y RSM crea/encola jobs y eventos"
+    echo "   - Header Authorization: ${AGENT_TOKEN:0:10}..."
+    echo "   - Form RStrigger: newServerData"
+    echo "   - Form RStoken: ${AGENT_TOKEN:0:10}..."
+    echo "   - Form RSdata: $debug_json_path (${#inventory_json} chars)"
+    echo "   - Response body: $response_file"
+    echo "   - Response headers: $response_headers_file"
+    if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
+        echo "   - Curl verbose: $curl_trace_file"
+    fi
     echo ""
     echo "Ejecutando petición a RSM..."
 
-    local response_file="/tmp/rsm_response.txt"
+    rm -f "$response_file" "$response_headers_file" "$curl_trace_file"
+
+    local curl_args=(
+        --silent
+        --show-error
+        --output "$response_file"
+        --dump-header "$response_headers_file"
+        --write-out "%{http_code}"
+        --location "$RSM_API_URL"
+        --header "Authorization: $AGENT_TOKEN"
+        --form "RStrigger=newServerData"
+        --form "RSdata=$inventory_json"
+        --form "RStoken=$AGENT_TOKEN"
+        --max-time 30
+    )
+
+    if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
+        curl_args=(--verbose "${curl_args[@]}")
+    fi
+
     local http_code
-    http_code=$(curl \
-        --silent \
-        --show-error \
-        --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location "$RSM_API_URL" \
-        --header "Authorization: $AGENT_TOKEN" \
-        --form "RStrigger=newServerData" \
-        --form "RSdata=$inventory_json" \
-        --form "RStoken=$AGENT_TOKEN" \
-        --max-time 30)
+    if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
+        http_code=$(curl "${curl_args[@]}" 2>"$curl_trace_file")
+        sed -i "s/$AGENT_TOKEN/<AGENT_TOKEN>/g" "$curl_trace_file" 2>/dev/null || true
+        chmod 600 "$curl_trace_file" 2>/dev/null || true
+    else
+        http_code=$(curl "${curl_args[@]}")
+    fi
     local exit_code=$?
     local response_body
     response_body=$(cat "$response_file" 2>/dev/null || true)
+    chmod 600 "$response_file" "$response_headers_file" 2>/dev/null || true
+
+    echo ""
+    echo "Resultado HTTP:"
+    echo "   - curl exit: $exit_code"
+    echo "   - HTTP code: $http_code"
+    echo "   - Response body bytes: $(wc -c < "$response_file" 2>/dev/null || echo 0)"
+    echo "   - Response body: $response_file"
+    echo "   - Response headers: $response_headers_file"
+    if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
+        echo "   - Curl verbose: $curl_trace_file"
+    fi
 
     if [ "$exit_code" -ne 0 ]; then
         echo ""
