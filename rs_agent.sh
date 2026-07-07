@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Redsauce Inventory Agent
-# Version: 0.3.0 - Reescrito en bash puro (sin Python, sin jq)
+# Version: 0.3.4 - Reescrito en bash puro (sin Python, sin jq)
 # Requiere: root, bash 4+, curl, lscpu, lsblk, uname
 #
 
@@ -10,10 +10,11 @@ set -uo pipefail
 
 # ============ CONFIGURACION ============
 
-AGENT_VERSION="0.3.3"
+AGENT_VERSION="0.3.4"
 GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
 GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
 OUTPUT_DIR="/var/lib/rs-agent"
+DEFAULT_TIMEZONE_NAME="Europe/Madrid"
 OUTPUT_FILE="inventory.json"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
@@ -211,8 +212,8 @@ validate_uuid_ownership() {
 # ============ RECOPILADORES ============
 
 collect_system_info() {
-    local timezone=""
-    [ $# -gt 0 ] && timezone="$1"
+    local timezone_name=""
+    [ $# -gt 0 ] && timezone_name="$1"
     local hostname fqdn kernel arch
     local os_name="Unknown" os_version="Unknown" distro_id="unknown" distro_version="Unknown"
 
@@ -241,7 +242,7 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone_name":"%s","agent_version":"%s"}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
@@ -253,7 +254,7 @@ collect_system_info() {
         "$(json_escape "$kernel")" \
         "$(json_escape "$arch")" \
         "$(json_escape "$collected_at")" \
-        "$(json_escape "$timezone")" \
+        "$(json_escape "$timezone_name")" \
         "$(json_escape "$AGENT_VERSION")"
 }
 
@@ -269,6 +270,9 @@ collect_timezone() {
     if [ -z "$timezone_name" ] && [ -f "/etc/timezone" ]; then
         timezone_name=$(cat /etc/timezone 2>/dev/null) || true
     fi
+
+    timezone_name=$(printf '%s' "$timezone_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    [ -z "$timezone_name" ] && timezone_name="$DEFAULT_TIMEZONE_NAME"
 
     printf '%s' "$timezone_name"
 }
@@ -598,15 +602,15 @@ main() {
 
     # --- Timezone ---
     echo "Recopilando información de timezone..."
-    local timezone
-    timezone=$(collect_timezone)
-    [ -z "$timezone" ] && timezone=""
-    echo "   -> Timezone: ${timezone:-desconocido}"
+    local timezone_name
+    timezone_name=$(collect_timezone)
+    [ -z "$timezone_name" ] && timezone_name=""
+    echo "   -> Timezone: ${timezone_name:-desconocido}"
 
     # --- Sistema ---
     echo "Recopilando información del sistema..."
     local system_json
-    system_json=$(collect_system_info "$timezone")
+    system_json=$(collect_system_info "$timezone_name")
     if [ -z "$system_json" ]; then
         echo "ERROR: No se pudo recopilar la información del sistema"
         exit 1

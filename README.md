@@ -44,6 +44,7 @@ El agente (`rs_agent.sh`) genera un JSON con cuatro secciones:
 
 ### `system`
 Información básica del host: hostname, FQDN, UUID, distribución Linux (nombre, versión, ID), versión del kernel y arquitectura.
+Incluye `timezone_name` como texto con el identificador de zona horaria del sistema, por ejemplo `Europe/Madrid`. Si el sistema no expone una zona horaria, el agente usa `Europe/Madrid`.
 
 ### `hardware`
 Modelo de CPU (vía `lscpu`) y lista de discos con su modelo de firmware (vía `lsblk`), útil para correlacionar CVEs de firmware.
