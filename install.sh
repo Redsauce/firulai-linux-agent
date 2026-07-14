@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # Redsauce Inventory Agent - Instalador One-Liner
-# Version 0.2.3 - Optimizado para deteccion CVE (modelo de disco sin tamaño)
+# Version 0.2.4 - Recuperación de ejecuciones perdidas con systemd/cron
 # ============================================================================
 #
 # Uso:
@@ -54,6 +54,10 @@ INSTALL_DIR="/opt/rs-agent"
 DATA_DIR="/var/lib/rs-agent"
 LOG_FILE="/var/log/rs-agent.log"
 CONFIG_FILE="$DATA_DIR/config.env"
+RUNNER_FILE="$INSTALL_DIR/rs_agent_runner.sh"
+SYSTEMD_SERVICE_FILE="/etc/systemd/system/rs-agent.service"
+SYSTEMD_TIMER_FILE="/etc/systemd/system/rs-agent.timer"
+SCHEDULER_TYPE=""
 
 # RSM System lookup
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
@@ -99,7 +103,7 @@ warn() {
 banner() {
     echo ""
     echo "============================================================================"
-    echo "  Redsauce Inventory Agent - Instalador v0.2.3"
+    echo "  Redsauce Inventory Agent - Instalador v0.2.4"
     echo "  Optimizado para detección de vulnerabilidades CVE"
     echo "============================================================================"
     echo ""
@@ -195,6 +199,12 @@ check_dependencies() {
         exit 1
     fi
     log "bash ${bash_major} encontrado"
+
+    if ! command -v flock &> /dev/null; then
+        error "flock no está instalado (normalmente forma parte del paquete util-linux)"
+        exit 1
+    fi
+    log "flock encontrado: $(command -v flock)"
 }
 
 validate_uuid_format() {
@@ -419,8 +429,16 @@ update_rsm_system_on_install() {
 
 cleanup_partial_installation() {
     warn "Limpiando instalación parcial..."
+    if command -v systemctl &> /dev/null; then
+        systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
+        systemctl stop rs-agent.service >/dev/null 2>&1 || true
+    fi
+    rm -f "$SYSTEMD_SERVICE_FILE" "$SYSTEMD_TIMER_FILE"
+    if command -v systemctl &> /dev/null; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
     if command -v crontab &> /dev/null; then
-        ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true) | crontab - || true
+        ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent" || true) | crontab - || true
     fi
     rm -rf "$INSTALL_DIR"
     rm -rf "$DATA_DIR"
@@ -459,6 +477,19 @@ download_agent() {
     fi
 }
 
+download_runner() {
+    info "Descargando runner de ejecución automática..."
+
+    RUNNER_URL="${GITHUB_RAW_URL}/rs_agent_runner.sh?ts=$(date +%s)"
+    if curl -fsSL "$RUNNER_URL" -o "$RUNNER_FILE"; then
+        chmod +x "$RUNNER_FILE"
+        log "Runner descargado: $RUNNER_FILE"
+    else
+        error "No se pudo descargar $RUNNER_URL"
+        exit 1
+    fi
+}
+
 download_uninstaller() {
     info "Descargando desinstalador desde GitHub..."
 
@@ -492,22 +523,79 @@ CONFIG_EOF
     log "Configuración guardada: $CONFIG_FILE"
 }
 
-setup_cron() {
+setup_automatic_execution() {
     info "Configurando ejecución automática..."
 
-    CRON_JOB="0 3 * * * /bin/bash $INSTALL_DIR/rs_agent.sh --token $(shell_single_quote "$AGENT_TOKEN") --uuid $(shell_single_quote "$UUID") --alias $(shell_single_quote "$SYSTEM_ALIAS") >> $LOG_FILE 2>&1"
+    if command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
+        cat > "$SYSTEMD_SERVICE_FILE" << SERVICE_EOF
+[Unit]
+Description=Firulai Inventory Agent execution
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=$RUNNER_FILE
 
-    # Anadir a crontab de root evitando duplicados
-    ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true; echo "$CRON_JOB") | crontab -
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $RUNNER_FILE --if-due --trigger systemd-timer
+Restart=on-failure
+RestartSec=30min
+TimeoutStartSec=30min
+SyslogIdentifier=rs-agent
+SERVICE_EOF
 
-    log "Cron configurado (ejecución diaria a las 3:00 AM)"
+        cat > "$SYSTEMD_TIMER_FILE" << TIMER_EOF
+[Unit]
+Description=Firulai Inventory Agent daily schedule
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+AccuracySec=1min
+Unit=rs-agent.service
+
+[Install]
+WantedBy=timers.target
+TIMER_EOF
+
+        chmod 644 "$SYSTEMD_SERVICE_FILE" "$SYSTEMD_TIMER_FILE"
+        if ! systemctl daemon-reload; then
+            error "systemd no pudo recargar las unidades"
+            return 1
+        fi
+        if ! systemctl enable --now rs-agent.timer; then
+            error "systemd no pudo habilitar rs-agent.timer"
+            return 1
+        fi
+        SCHEDULER_TYPE="systemd.timer persistente"
+        log "Timer systemd configurado a las 03:00 con recuperación al arrancar"
+        return 0
+    fi
+
+    if ! command -v crontab &> /dev/null; then
+        error "El sistema no dispone de systemd activo ni del comando crontab"
+        return 1
+    fi
+
+    local cron_watchdog cron_reboot
+    cron_watchdog="*/30 * * * * /bin/bash $RUNNER_FILE --if-due --trigger cron-comprobacion >/dev/null 2>&1"
+    cron_reboot="@reboot sleep 60; /bin/bash $RUNNER_FILE --if-due --trigger cron-arranque >/dev/null 2>&1"
+
+    # Comprobar cada 30 minutos permite ejecutar a las 03:00 y reintentar una
+    # ejecución perdida sin duplicarla gracias a state.env y flock.
+    if ! ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent" || true; echo "$cron_watchdog"; echo "$cron_reboot") | crontab -; then
+        error "No se pudo actualizar el crontab de root"
+        return 1
+    fi
+
+    SCHEDULER_TYPE="cron con recuperación al arrancar y comprobación cada 30 minutos"
+    log "Cron configurado con ejecución diaria y recuperación automática"
 }
 
 test_agent() {
     info "Ejecutando primera recopilación..."
 
     set +e
-    /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
+    RS_AGENT_TRIGGER="instalacion-inicial" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
     local agent_status=${PIPESTATUS[0]}
     set -e
 
@@ -533,10 +621,12 @@ print_summary() {
     echo "Ubicaciones:"
     echo "   - Agente:      $INSTALL_DIR/rs_agent.sh"
     echo "   - Inventario:  $DATA_DIR/inventory.json"
+    echo "   - Estado:      $DATA_DIR/state.env"
     echo "   - Logs:        $LOG_FILE"
     echo ""
     echo "Ejecución:"
-    echo "   - Automática:  Diariamente a las 3:00 AM"
+    echo "   - Automática:  Diariamente a las 3:00 AM ($SCHEDULER_TYPE)"
+    echo "   - Recuperación: una ejecución pendiente al volver a estar operativo"
     echo "   - Manual:      sudo bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
     echo ""
     echo "Alias:"
@@ -580,6 +670,7 @@ main() {
     # Instalacion
     create_directories
     download_agent
+    download_runner
     download_uninstaller
     write_agent_config
     
@@ -593,7 +684,11 @@ main() {
         exit 1
     fi
 
-    setup_cron
+    if ! setup_automatic_execution; then
+        error "No se pudo configurar la ejecución automática"
+        cleanup_partial_installation
+        exit 1
+    fi
     
     # Resumen
     print_summary

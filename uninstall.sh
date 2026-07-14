@@ -201,13 +201,27 @@ mark_system_disconnected_in_rsm() {
     return 0
 }
 
-remove_cron() {
+remove_automatic_execution() {
     info "Eliminando ejecución automática..."
-    if ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent.sh" || true) | crontab -; then
-        log "Entrada de cron eliminada"
-    else
-        warn "No se pudo actualizar el crontab o no había entrada configurada"
+
+    if command -v systemctl &>/dev/null; then
+        systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
+        systemctl stop rs-agent.service >/dev/null 2>&1 || true
     fi
+    rm -f /etc/systemd/system/rs-agent.timer /etc/systemd/system/rs-agent.service
+    if command -v systemctl &>/dev/null; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+
+    if command -v crontab &>/dev/null; then
+        if ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent" || true) | crontab -; then
+            log "Entradas de cron eliminadas"
+        else
+            warn "No se pudo actualizar el crontab o no había entradas configuradas"
+        fi
+    fi
+
+    log "Programación automática eliminada"
 }
 
 remove_local_files() {
@@ -232,7 +246,7 @@ main() {
         exit 1
     fi
 
-    remove_cron
+    remove_automatic_execution
     remove_local_files
 
     echo ""

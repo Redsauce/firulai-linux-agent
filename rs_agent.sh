@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Redsauce Inventory Agent
-# Version: 0.3.4 - Reescrito en bash puro (sin Python, sin jq)
+# Version: 0.3.4 - Estado persistente y recuperación de ejecuciones perdidas
 # Requiere: root, bash 4+, curl, lscpu, lsblk, uname
 #
 
@@ -14,8 +14,9 @@ AGENT_VERSION="0.3.4"
 GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
 GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
 OUTPUT_DIR="/var/lib/rs-agent"
-DEFAULT_TIMEZONE_NAME="Europe/Madrid"
 OUTPUT_FILE="inventory.json"
+STATE_FILE="$OUTPUT_DIR/state.env"
+LOCK_FILE="/run/lock/rs-agent.lock"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
@@ -24,8 +25,44 @@ RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 AGENT_TOKEN=""
 UUID_VAL=""
 SYSTEM_ALIAS=""
+EXECUTION_TRIGGER="${RS_AGENT_TRIGGER:-manual}"
 
 # ============ UTILIDADES ============
+
+acquire_execution_lock() {
+    if ! command -v flock >/dev/null 2>&1; then
+        echo "ERROR: flock no está disponible; instala el paquete util-linux."
+        exit 1
+    fi
+    mkdir -p "$(dirname "$LOCK_FILE")"
+    exec 9>"$LOCK_FILE"
+    if ! flock -n 9; then
+        echo "INFO: Ya hay otra ejecución del agente en curso; esta solicitud se omite. Origen=$EXECUTION_TRIGGER"
+        # EX_TEMPFAIL permite que systemd reprograme la solicitud automática.
+        exit 75
+    fi
+}
+
+record_success_state() {
+    local completed_epoch completed_utc temporary_file
+    completed_epoch=$(date +%s)
+    completed_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    temporary_file="${STATE_FILE}.tmp.$$"
+
+    if ! printf 'LAST_SUCCESS_EPOCH=%s\nLAST_SUCCESS_UTC=%s\n' "$completed_epoch" "$completed_utc" > "$temporary_file"; then
+        echo "ERROR: No se pudo escribir el estado temporal $temporary_file"
+        rm -f "$temporary_file"
+        return 1
+    fi
+    chmod 600 "$temporary_file" 2>/dev/null || true
+    if ! mv -f "$temporary_file" "$STATE_FILE"; then
+        echo "ERROR: No se pudo actualizar el estado persistente $STATE_FILE"
+        rm -f "$temporary_file"
+        return 1
+    fi
+
+    echo "Estado actualizado: última ejecución correcta=$completed_utc ($completed_epoch)"
+}
 
 # Escapa un string para incrustarlo como valor JSON (sin jq).
 # Orden de sustituciones: primero la barra invertida para no doble-escapar.
@@ -212,8 +249,8 @@ validate_uuid_ownership() {
 # ============ RECOPILADORES ============
 
 collect_system_info() {
-    local timezone_name=""
-    [ $# -gt 0 ] && timezone_name="$1"
+    local timezone=""
+    [ $# -gt 0 ] && timezone="$1"
     local hostname fqdn kernel arch
     local os_name="Unknown" os_version="Unknown" distro_id="unknown" distro_version="Unknown"
 
@@ -242,7 +279,7 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone_name":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
@@ -254,7 +291,7 @@ collect_system_info() {
         "$(json_escape "$kernel")" \
         "$(json_escape "$arch")" \
         "$(json_escape "$collected_at")" \
-        "$(json_escape "$timezone_name")" \
+        "$(json_escape "$timezone")" \
         "$(json_escape "$AGENT_VERSION")"
 }
 
@@ -270,9 +307,6 @@ collect_timezone() {
     if [ -z "$timezone_name" ] && [ -f "/etc/timezone" ]; then
         timezone_name=$(cat /etc/timezone 2>/dev/null) || true
     fi
-
-    timezone_name=$(printf '%s' "$timezone_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    [ -z "$timezone_name" ] && timezone_name="$DEFAULT_TIMEZONE_NAME"
 
     printf '%s' "$timezone_name"
 }
@@ -493,7 +527,7 @@ send_to_rsm() {
     echo ""
     echo "Configuración RSM:"
     echo "   - URL:   $RSM_API_URL"
-    echo "   - Token agente: ${AGENT_TOKEN:0:10}..."
+    echo "   - Token agente: <configurado; valor oculto>"
     echo "   - Alias: $SYSTEM_ALIAS"
     echo "   - Debug: ${RS_AGENT_DEBUG:-0}"
     echo ""
@@ -501,9 +535,9 @@ send_to_rsm() {
     echo "   - Metodo: POST multipart/form-data"
     echo "   - Endpoint: $RSM_API_URL"
     echo "   - Flujo: api.php recibe newServerData y RSM crea/encola jobs y eventos"
-    echo "   - Header Authorization: ${AGENT_TOKEN:0:10}..."
+    echo "   - Header Authorization: <oculto>"
     echo "   - Form RStrigger: newServerData"
-    echo "   - Form RStoken: ${AGENT_TOKEN:0:10}..."
+    echo "   - Form RStoken: <oculto>"
     echo "   - Form RSdata: $debug_json_path (${#inventory_json} chars)"
     echo "   - Response body: $response_file"
     echo "   - Response headers: $response_headers_file"
@@ -596,21 +630,23 @@ main() {
     echo ""
 
     check_root
+    acquire_execution_lock
+    echo "Origen de ejecución: $EXECUTION_TRIGGER"
     check_for_updates
     validate_uuid_ownership
     mkdir -p "$OUTPUT_DIR"
 
     # --- Timezone ---
     echo "Recopilando información de timezone..."
-    local timezone_name
-    timezone_name=$(collect_timezone)
-    [ -z "$timezone_name" ] && timezone_name=""
-    echo "   -> Timezone: ${timezone_name:-desconocido}"
+    local timezone
+    timezone=$(collect_timezone)
+    [ -z "$timezone" ] && timezone=""
+    echo "   -> Timezone: ${timezone:-desconocido}"
 
     # --- Sistema ---
     echo "Recopilando información del sistema..."
     local system_json
-    system_json=$(collect_system_info "$timezone_name")
+    system_json=$(collect_system_info "$timezone")
     if [ -z "$system_json" ]; then
         echo "ERROR: No se pudo recopilar la información del sistema"
         exit 1
@@ -681,11 +717,16 @@ main() {
         echo "============================================================"
         echo ""
         echo "Verifica:"
-        echo "   - Token agente: ${AGENT_TOKEN:0:10}..."
+        echo "   - Token agente: <configurado; valor oculto>"
         echo "   - UUID:  $UUID_VAL"
         echo "   - Alias: $SYSTEM_ALIAS"
         echo "   - URL:   $RSM_API_URL"
         echo "   - Conectividad de red"
+        exit 1
+    fi
+
+    if ! record_success_state; then
+        echo "ERROR CRÍTICO: El inventario se envió, pero no se pudo guardar el estado de ejecución."
         exit 1
     fi
 
