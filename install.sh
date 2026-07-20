@@ -69,11 +69,6 @@ RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID="1751"
 RSM_SYSTEM_ALIAS_PROPERTY_ID="1827"
 RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE="Activo"
 RSM_SYSTEM_ITEM_ID=""
-RSM_ACCOUNT_ITEM_TYPE_ID="62"
-RSM_ACCOUNT_RSM_TOKEN_PROPERTY_ID="1858"
-RSM_ACCOUNT_AGENT_TOKEN_PROPERTY_ID="1790"
-RSM_ACCOUNT_ITEM_ID=""
-RSM_TOKEN=""
 
 # ============================================================================
 # COLORES
@@ -432,55 +427,6 @@ update_rsm_system_on_install() {
     log "Sistema marcado como activo en Firulai"
 }
 
-find_account_tokens_in_account() {
-    local payload response_file http_code exit_code response_body
-
-    response_file="/tmp/rsm_install_account_lookup_response.txt"
-    payload="{\"itemTypeID\":\"$RSM_ACCOUNT_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_ACCOUNT_RSM_TOKEN_PROPERTY_ID\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"$RSM_ACCOUNT_AGENT_TOKEN_PROPERTY_ID\",\"value\":\"$(json_escape "$AGENT_TOKEN")\",\"operation\":\"=\"}]}"
-
-    info "Buscando tokens directamente en Cuenta..."
-
-    set +e
-    http_code=$(curl \
-        --silent \
-        --show-error \
-        --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location \
-        --request GET \
-        "$RSM_ITEMS_GET_URL" \
-        --header "Authorization: $AGENT_TOKEN" \
-        --header "Content-Type: application/json" \
-        --data "$payload" \
-        --max-time 20)
-    exit_code=$?
-    set -e
-    response_body=$(cat "$response_file" 2>/dev/null || true)
-    rm -f "$response_file"
-
-    if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo consultar Cuenta por token de agente (curl exit: $exit_code)."
-        exit 1
-    fi
-
-    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitio consultar Cuenta por token de agente (HTTP $http_code)."
-        echo "Respuesta: $response_body"
-        exit 1
-    fi
-
-    RSM_ACCOUNT_ITEM_ID=$(json_extract_first_scalar_key "$response_body" "ID")
-    [ -z "$RSM_ACCOUNT_ITEM_ID" ] && RSM_ACCOUNT_ITEM_ID=$(json_extract_first_scalar_key "$response_body" "id")
-    RSM_TOKEN=$(json_extract_rsm_property "$response_body" "$RSM_ACCOUNT_RSM_TOKEN_PROPERTY_ID")
-    if [ -z "$RSM_ACCOUNT_ITEM_ID" ] || [ -z "$RSM_TOKEN" ]; then
-        error "No se encontro una Cuenta con RSM token accesible para este Agent Token."
-        exit 1
-    fi
-
-    log "Tokens localizados directamente en Cuenta"
-    return 0
-}
-
 cleanup_partial_installation() {
     warn "Limpiando instalación parcial..."
     if command -v systemctl &> /dev/null; then
@@ -569,7 +515,6 @@ write_agent_config() {
 
     cat > "$CONFIG_FILE" << CONFIG_EOF
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
-RSM_TOKEN=$(shell_single_quote "$RSM_TOKEN")
 UUID=$(shell_single_quote "$UUID")
 SYSTEM_ALIAS=$(shell_single_quote "$SYSTEM_ALIAS")
 CONFIG_EOF
@@ -720,7 +665,6 @@ main() {
     validate_uuid_format "$UUID"
     check_local_agent_installation
     check_uuid_available
-    find_account_tokens_in_account
     update_rsm_system_on_install
     
     # Instalacion

@@ -14,11 +14,10 @@ El instalador (`install.sh`) realiza los siguientes pasos:
 
 1. **Verifica dependencias** — comprueba que `curl` y bash 4+ estén disponibles.
 2. **Crea los directorios** — `/opt/rs-agent` (binario) y `/var/lib/rs-agent` (datos).
-3. **Resuelve los tokens de la cuenta** - lee `Agent Token` (`1790`) y `RSM token` (`1858`) desde `Cuenta` y guarda la configuracion local para que el agente use ambos sin pedir el RSM token al usuario.
-4. **Descarga el agente** — obtiene `rs_agent.sh` y `rs_agent_runner.sh` desde GitHub y los deja en `/opt/rs-agent/`.
-5. **Configura la ejecución automática** — usa un timer persistente de systemd cuando está disponible; en otros sistemas instala un cron con recuperación al arrancar y comprobación cada 30 minutos.
-6. **Primera ejecución** — lanza el agente inmediatamente para generar el inventario inicial.
-7. **Instala el desinstalador** — descarga `uninstall.sh`, guarda la configuración local y deja `/opt/rs-agent/uninstall.sh` listo para ejecutar.
+3. **Descarga el agente** — obtiene `rs_agent.sh` y `rs_agent_runner.sh` desde GitHub y los deja en `/opt/rs-agent/`.
+4. **Configura la ejecución automática** — usa un timer persistente de systemd cuando está disponible; en otros sistemas instala un cron con recuperación al arrancar y comprobación cada 30 minutos.
+5. **Primera ejecución** — lanza el agente inmediatamente para generar el inventario inicial.
+6. **Instala el desinstalador** — descarga `uninstall.sh`, guarda la configuración local y deja `/opt/rs-agent/uninstall.sh` listo para ejecutar.
 
 ### Desinstalación
 
