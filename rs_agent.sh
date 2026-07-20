@@ -15,6 +15,7 @@ GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/l
 GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
 OUTPUT_DIR="/var/lib/rs-agent"
 OUTPUT_FILE="inventory.json"
+CONFIG_FILE="$OUTPUT_DIR/config.env"
 STATE_FILE="$OUTPUT_DIR/state.env"
 LOCK_FILE="/run/lock/rs-agent.lock"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
@@ -23,6 +24,7 @@ RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 AGENT_TOKEN=""
+RSM_TOKEN=""
 UUID_VAL=""
 SYSTEM_ALIAS=""
 EXECUTION_TRIGGER="${RS_AGENT_TRIGGER:-manual}"
@@ -137,6 +139,11 @@ parse_args() {
                 AGENT_TOKEN="$2"
                 shift 2
                 ;;
+            --rsm-token)
+                [ $# -ge 2 ] || { echo "ERROR: --rsm-token requiere un valor"; exit 1; }
+                RSM_TOKEN="$2"
+                shift 2
+                ;;
             --uuid)
                 [ $# -ge 2 ] || { echo "ERROR: --uuid requiere un valor"; exit 1; }
                 UUID_VAL="$2"
@@ -156,7 +163,29 @@ parse_args() {
         exit 1
     fi
 
+    load_rsm_token_from_config
+    if [ -z "$RSM_TOKEN" ]; then
+        echo "ERROR: No se encontro RSM_TOKEN en $CONFIG_FILE"
+        exit 1
+    fi
     validate_uuid "$UUID_VAL"
+}
+
+load_rsm_token_from_config() {
+    local configured_rsm_token
+
+    [ -z "$RSM_TOKEN" ] || return 0
+    [ -r "$CONFIG_FILE" ] || return 0
+
+    configured_rsm_token=$(
+        (
+            # shellcheck source=/dev/null
+            . "$CONFIG_FILE"
+            printf '%s' "${RSM_TOKEN:-}"
+        ) 2>/dev/null
+    ) || configured_rsm_token=""
+
+    [ -n "$configured_rsm_token" ] && RSM_TOKEN="$configured_rsm_token"
 }
 
 local_system_hostname() {
@@ -493,7 +522,7 @@ download_update() {
     if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
         chmod +x "$script_path"
         echo "Actualización completada. Reiniciando agente..."
-        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
+        exec bash "$script_path" --token "$AGENT_TOKEN" --rsm-token "$RSM_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
     else
         echo "Error descargando actualización"
         [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
@@ -559,7 +588,7 @@ send_to_rsm() {
         --header "Authorization: $AGENT_TOKEN"
         --form "RStrigger=newServerData"
         --form "RSdata=$inventory_json"
-        --form "RStoken=$AGENT_TOKEN"
+        --form "RStoken=$RSM_TOKEN"
         --max-time 30
     )
 
@@ -571,6 +600,7 @@ send_to_rsm() {
     if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
         http_code=$(curl "${curl_args[@]}" 2>"$curl_trace_file")
         sed -i "s/$AGENT_TOKEN/<AGENT_TOKEN>/g" "$curl_trace_file" 2>/dev/null || true
+        sed -i "s/$RSM_TOKEN/<RSM_TOKEN>/g" "$curl_trace_file" 2>/dev/null || true
         chmod 600 "$curl_trace_file" 2>/dev/null || true
     else
         http_code=$(curl "${curl_args[@]}")
@@ -700,7 +730,7 @@ main() {
 
     # --- Construir JSON final ---
     local inventory_json
-    inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
+    inventory_json="{\"RSToken\":\"$(json_escape "$RSM_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
 
     # --- Guardar localmente ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"

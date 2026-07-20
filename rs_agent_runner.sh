@@ -45,10 +45,11 @@ fi
 # shellcheck source=/dev/null
 . "$CONFIG_FILE"
 AGENT_TOKEN="${AGENT_TOKEN:-}"
+RSM_TOKEN="${RSM_TOKEN:-}"
 UUID="${UUID:-}"
 SYSTEM_ALIAS="${SYSTEM_ALIAS:-}"
-if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ] || [ -z "$SYSTEM_ALIAS" ]; then
-    error_line "config.env no contiene token, UUID y alias válidos."
+if [ -z "$AGENT_TOKEN" ] || [ -z "$RSM_TOKEN" ] || [ -z "$UUID" ] || [ -z "$SYSTEM_ALIAS" ]; then
+    error_line "config.env no contiene token, RSM token, UUID y alias válidos."
     exit 1
 fi
 
@@ -75,6 +76,7 @@ log_line "Ejecución pendiente detectada. Origen=$TRIGGER, prevista=$(date -d "@
 set +e
 RS_AGENT_TRIGGER="$TRIGGER" /bin/bash "$AGENT_SCRIPT" \
     --token "$AGENT_TOKEN" \
+    --rsm-token "$RSM_TOKEN" \
     --uuid "$UUID" \
     --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
 agent_status=${PIPESTATUS[0]}
