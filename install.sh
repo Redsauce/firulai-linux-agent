@@ -415,6 +415,18 @@ check_existing_installation() {
     fi
 }
 
+warn_about_parallel_root_installation() {
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        return 0
+    fi
+
+    if [ -f "/opt/rs-agent/rs_agent.sh" ] || [ -f "/var/lib/rs-agent/config.env" ]; then
+        warn "Se ha detectado una instalacion root existente en /opt/rs-agent o /var/lib/rs-agent."
+        warn "La instalacion no-root experimental convivira con ella usando rutas del usuario actual."
+        warn "Esto permite comparar el inventario root y no-root en la misma maquina."
+    fi
+}
+
 check_local_agent_installation() {
     if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
         local installed_uuid=""
@@ -749,6 +761,7 @@ main() {
     require_system_alias
     validate_uuid_format "$UUID"
     check_local_agent_installation
+    warn_about_parallel_root_installation
     check_uuid_available
     update_rsm_system_on_install
     

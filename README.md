@@ -16,6 +16,10 @@ La rama `experiment/non-root-agent` permite instalar y ejecutar el agente sin
 `sudo` para comparar resultados. No es equivalente al modo root: usa rutas del
 usuario, cron de usuario y el inventario puede ser menos completo.
 
+Puede convivir con una instalación root existente en la misma máquina. En ese
+caso no toca `/opt/rs-agent` ni `/var/lib/rs-agent`; instala una segunda copia
+en rutas del usuario para comparar ambos inventarios.
+
 Rutas usadas en modo no-root:
 
 | Ruta | Descripción |
