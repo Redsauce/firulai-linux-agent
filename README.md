@@ -115,7 +115,7 @@ Versiones de software crítico detectado en el sistema: Apache, nginx, MySQL, Po
 | `/var/lib/rs-agent/state.env` | Instante UTC y epoch de la última ejecución confirmada |
 | `/var/log/rs-agent.log` | Log de ejecuciones automáticas |
 | `/opt/rs-agent/uninstall.sh` | Script de desinstalación |
-| `/tmp/rsm_debug_payload.json` | Payload completo de la última llamada a RSM |
+| `/run/rs-agent/tmp/` | Ficheros temporales privados de root, creados con nombres aleatorios mediante `mktemp` |
 
 ---
 
@@ -124,6 +124,7 @@ Versiones de software crítico detectado en el sistema: Apache, nginx, MySQL, Po
 - Linux (Debian, Ubuntu, RHEL, CentOS, Fedora, Rocky, Alma u otras)
 - bash 4+
 - curl
+- `mktemp`
 - `flock` (paquete `util-linux`)
 - systemd o cron para la ejecución automática
 - Permisos de root

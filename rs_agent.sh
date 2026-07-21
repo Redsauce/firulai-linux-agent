@@ -17,6 +17,7 @@ OUTPUT_DIR="/var/lib/rs-agent"
 OUTPUT_FILE="inventory.json"
 STATE_FILE="$OUTPUT_DIR/state.env"
 LOCK_FILE="/run/lock/rs-agent.lock"
+PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
@@ -43,11 +44,50 @@ acquire_execution_lock() {
     fi
 }
 
+ensure_private_directory() {
+    local directory="$1"
+
+    if [ -L "$directory" ]; then
+        echo "ERROR: Ruta insegura: $directory es un enlace simbolico"
+        return 1
+    fi
+
+    mkdir -p "$directory"
+
+    if [ -L "$directory" ] || [ ! -d "$directory" ]; then
+        echo "ERROR: No se pudo crear un directorio privado seguro: $directory"
+        return 1
+    fi
+
+    chown root:root "$directory" 2>/dev/null || true
+    chmod 700 "$directory"
+
+    if [ ! -O "$directory" ]; then
+        echo "ERROR: Directorio inseguro: $directory no pertenece al usuario actual"
+        return 1
+    fi
+}
+
+init_private_tmp_dir() {
+    if ! command -v mktemp >/dev/null 2>&1; then
+        echo "ERROR: mktemp no está disponible."
+        return 1
+    fi
+
+    ensure_private_directory "$(dirname "$PRIVATE_TMP_DIR")"
+    ensure_private_directory "$PRIVATE_TMP_DIR"
+}
+
+make_private_temp_file() {
+    local prefix="$1"
+    mktemp "$PRIVATE_TMP_DIR/${prefix}.XXXXXX"
+}
+
 record_success_state() {
     local completed_epoch completed_utc temporary_file
     completed_epoch=$(date +%s)
     completed_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-    temporary_file="${STATE_FILE}.tmp.$$"
+    temporary_file=$(mktemp "${STATE_FILE}.tmp.XXXXXX") || return 1
 
     if ! printf 'LAST_SUCCESS_EPOCH=%s\nLAST_SUCCESS_UTC=%s\n' "$completed_epoch" "$completed_utc" > "$temporary_file"; then
         echo "ERROR: No se pudo escribir el estado temporal $temporary_file"
@@ -186,7 +226,7 @@ identity_matches_local_system() {
 
 validate_uuid_ownership() {
     local payload response_file http_code exit_code response_body
-    response_file="/tmp/rsm_uuid_check_response.txt"
+    response_file=$(make_private_temp_file "rsm_uuid_check_response") || return 1
     payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
 
     echo "Validando que el UUID no pertenece a otro sistema..."
@@ -204,6 +244,7 @@ validate_uuid_ownership() {
         --max-time 20)
     exit_code=$?
     response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
         echo "ERROR: No se pudo validar el UUID antes de enviar inventario (curl exit: $exit_code)."
@@ -504,11 +545,18 @@ download_update() {
 
 send_to_rsm() {
     local inventory_json="$1"
-    local debug_json_path="/tmp/rsm_debug_payload.json"
-    local response_file="/tmp/rsm_response.txt"
-    local response_headers_file="/tmp/rsm_response_headers.txt"
-    local curl_trace_file="/tmp/rsm_curl_verbose.log"
+    local debug_json_path
+    local response_file
+    local response_headers_file
+    local curl_trace_file=""
     local inventory_hash="unavailable"
+
+    debug_json_path=$(make_private_temp_file "rsm_debug_payload") || return 1
+    response_file=$(make_private_temp_file "rsm_response") || return 1
+    response_headers_file=$(make_private_temp_file "rsm_response_headers") || return 1
+    if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
+        curl_trace_file=$(make_private_temp_file "rsm_curl_verbose") || return 1
+    fi
 
     echo ""
     echo "Enviando inventario a RSM..."
@@ -546,8 +594,6 @@ send_to_rsm() {
     fi
     echo ""
     echo "Ejecutando petición a RSM..."
-
-    rm -f "$response_file" "$response_headers_file" "$curl_trace_file"
 
     local curl_args=(
         --silent
@@ -631,10 +677,17 @@ main() {
 
     check_root
     acquire_execution_lock
+    if ! init_private_tmp_dir; then
+        exit 1
+    fi
     echo "Origen de ejecución: $EXECUTION_TRIGGER"
     check_for_updates
-    validate_uuid_ownership
-    mkdir -p "$OUTPUT_DIR"
+    if ! validate_uuid_ownership; then
+        exit 1
+    fi
+    if ! ensure_private_directory "$OUTPUT_DIR"; then
+        exit 1
+    fi
 
     # --- Timezone ---
     echo "Recopilando información de timezone..."
@@ -704,9 +757,21 @@ main() {
 
     # --- Guardar localmente ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"
+    local temporary_output_path
     echo ""
     echo "Guardando inventario en ${output_path}..."
-    printf '%s' "$inventory_json" > "$output_path"
+    temporary_output_path=$(mktemp "$OUTPUT_DIR/${OUTPUT_FILE}.XXXXXX") || {
+        echo "ERROR: No se pudo crear el inventario temporal en $OUTPUT_DIR"
+        exit 1
+    }
+    chmod 600 "$temporary_output_path" 2>/dev/null || true
+    if ! printf '%s' "$inventory_json" > "$temporary_output_path"; then
+        echo "ERROR: No se pudo escribir el inventario temporal $temporary_output_path"
+        rm -f "$temporary_output_path"
+        exit 1
+    fi
+    chown root:root "$temporary_output_path" 2>/dev/null || true
+    mv -f "$temporary_output_path" "$output_path"
     chmod 600 "$output_path" 2>/dev/null || true
 
     # --- Enviar a RSM ---

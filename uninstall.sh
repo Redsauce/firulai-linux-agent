@@ -11,6 +11,7 @@ INSTALL_DIR="/opt/rs-agent"
 DATA_DIR="/var/lib/rs-agent"
 CONFIG_FILE="$DATA_DIR/config.env"
 LOG_FILE="/var/log/rs-agent.log"
+PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_ITEMS_UPDATE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/update.php"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
@@ -41,6 +42,45 @@ check_root() {
         echo "Ejecuta: sudo bash $INSTALL_DIR/uninstall.sh"
         exit 1
     fi
+}
+
+ensure_private_directory() {
+    local directory="$1"
+
+    if [ -L "$directory" ]; then
+        error "Ruta insegura: $directory es un enlace simbolico"
+        return 1
+    fi
+
+    mkdir -p "$directory"
+
+    if [ -L "$directory" ] || [ ! -d "$directory" ]; then
+        error "No se pudo crear un directorio privado seguro: $directory"
+        return 1
+    fi
+
+    chown root:root "$directory" 2>/dev/null || true
+    chmod 700 "$directory"
+
+    if [ ! -O "$directory" ]; then
+        error "Directorio inseguro: $directory no pertenece al usuario actual"
+        return 1
+    fi
+}
+
+init_private_tmp_dir() {
+    if ! command -v mktemp >/dev/null 2>&1; then
+        error "mktemp no esta disponible"
+        return 1
+    fi
+
+    ensure_private_directory "$(dirname "$PRIVATE_TMP_DIR")"
+    ensure_private_directory "$PRIVATE_TMP_DIR"
+}
+
+make_private_temp_file() {
+    local prefix="$1"
+    mktemp "$PRIVATE_TMP_DIR/${prefix}.XXXXXX"
 }
 
 validate_uuid() {
@@ -117,7 +157,7 @@ confirm_uninstall() {
 
 find_system_id_by_uuid() {
     local payload response_file http_code exit_code response_body system_id
-    response_file=$(mktemp)
+    response_file=$(make_private_temp_file "rsm_uninstall_uuid_lookup") || return 1
     payload="{\"propertyIDs\":[\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
 
     http_code=$(curl \
@@ -167,7 +207,7 @@ mark_system_disconnected_in_rsm() {
         return 0
     fi
 
-    response_file=$(mktemp)
+    response_file=$(make_private_temp_file "rsm_uninstall_status_update") || return 1
     payload="[{\"ID\":\"$system_id\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_DISCONNECTED_VALUE\"}]"
 
     http_code=$(curl \
@@ -239,6 +279,9 @@ main() {
 
     load_config
     parse_args "$@"
+    if ! init_private_tmp_dir; then
+        exit 1
+    fi
     confirm_uninstall
 
     if ! mark_system_disconnected_in_rsm; then

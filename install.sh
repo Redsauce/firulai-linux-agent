@@ -55,6 +55,7 @@ DATA_DIR="/var/lib/rs-agent"
 LOG_FILE="/var/log/rs-agent.log"
 CONFIG_FILE="$DATA_DIR/config.env"
 RUNNER_FILE="$INSTALL_DIR/rs_agent_runner.sh"
+PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 SYSTEMD_SERVICE_FILE="/etc/systemd/system/rs-agent.service"
 SYSTEMD_TIMER_FILE="/etc/systemd/system/rs-agent.timer"
 SCHEDULER_TYPE=""
@@ -98,6 +99,40 @@ info() {
 
 warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+ensure_private_directory() {
+    local directory="$1"
+
+    if [ -L "$directory" ]; then
+        error "Ruta insegura: $directory es un enlace simbolico"
+        return 1
+    fi
+
+    mkdir -p "$directory"
+
+    if [ -L "$directory" ] || [ ! -d "$directory" ]; then
+        error "No se pudo crear un directorio privado seguro: $directory"
+        return 1
+    fi
+
+    chown root:root "$directory" 2>/dev/null || true
+    chmod 700 "$directory"
+
+    if [ ! -O "$directory" ]; then
+        error "Directorio inseguro: $directory no pertenece al usuario actual"
+        return 1
+    fi
+}
+
+init_private_tmp_dir() {
+    ensure_private_directory "$(dirname "$PRIVATE_TMP_DIR")"
+    ensure_private_directory "$PRIVATE_TMP_DIR"
+}
+
+make_private_temp_file() {
+    local prefix="$1"
+    mktemp "$PRIVATE_TMP_DIR/${prefix}.XXXXXX"
 }
 
 banner() {
@@ -205,6 +240,12 @@ check_dependencies() {
         exit 1
     fi
     log "flock encontrado: $(command -v flock)"
+
+    if ! command -v mktemp &> /dev/null; then
+        error "mktemp no esta instalado"
+        exit 1
+    fi
+    log "mktemp encontrado: $(command -v mktemp)"
 }
 
 validate_uuid_format() {
@@ -278,7 +319,7 @@ identity_matches_local_system() {
 
 check_uuid_available() {
     local payload response_file http_code exit_code response_body
-    response_file="/tmp/rsm_install_uuid_check_response.txt"
+    response_file=$(make_private_temp_file "rsm_install_uuid_check_response")
     payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
 
     info "Validando UUID en RSM..."
@@ -299,6 +340,7 @@ check_uuid_available() {
     exit_code=$?
     set -e
     response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
         error "No se pudo validar el UUID en RSM (curl exit: $exit_code)."
@@ -390,7 +432,7 @@ update_rsm_system_on_install() {
         exit 1
     fi
 
-    response_file="/tmp/rsm_install_system_update_response.txt"
+    response_file=$(make_private_temp_file "rsm_install_system_update_response")
     payload="[{\"ID\":\"$RSM_SYSTEM_ITEM_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\":\"$(json_escape "$SYSTEM_ALIAS")\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE\"}]"
 
     info "Marcando sistema como activo en Firulai..."
@@ -450,8 +492,11 @@ create_directories() {
     info "Creando directorios..."
     
     mkdir -p "$INSTALL_DIR"
-    mkdir -p "$DATA_DIR"
+    chown root:root "$INSTALL_DIR" 2>/dev/null || true
+    chmod 755 "$INSTALL_DIR"
+    ensure_private_directory "$DATA_DIR"
     touch "$LOG_FILE"
+    chown root:root "$LOG_FILE" 2>/dev/null || true
     chmod 644 "$LOG_FILE"
     
     log "Directorios creados"
@@ -511,13 +556,19 @@ download_uninstaller() {
 }
 
 write_agent_config() {
+    local temporary_file
+
     info "Guardando configuración local del agente..."
 
-    cat > "$CONFIG_FILE" << CONFIG_EOF
+    temporary_file=$(mktemp "$DATA_DIR/config.env.XXXXXX")
+    chmod 600 "$temporary_file"
+    cat > "$temporary_file" << CONFIG_EOF
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
 UUID=$(shell_single_quote "$UUID")
 SYSTEM_ALIAS=$(shell_single_quote "$SYSTEM_ALIAS")
 CONFIG_EOF
+    chown root:root "$temporary_file" 2>/dev/null || true
+    mv -f "$temporary_file" "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
 
     log "Configuración guardada: $CONFIG_FILE"
@@ -661,6 +712,7 @@ main() {
     check_root
     detect_distro
     check_dependencies
+    init_private_tmp_dir
     require_system_alias
     validate_uuid_format "$UUID"
     check_local_agent_installation
