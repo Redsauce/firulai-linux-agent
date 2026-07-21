@@ -7,11 +7,24 @@
 
 set -uo pipefail
 
-INSTALL_DIR="/opt/rs-agent"
-DATA_DIR="/var/lib/rs-agent"
+RUN_AS_ROOT=0
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    RUN_AS_ROOT=1
+fi
+
+if [ "$RUN_AS_ROOT" = "1" ]; then
+    INSTALL_DIR="/opt/rs-agent"
+    DATA_DIR="/var/lib/rs-agent"
+    LOG_FILE="/var/log/rs-agent.log"
+    PRIVATE_TMP_DIR="/run/rs-agent/tmp"
+else
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-$HOME/.local/share/rs-agent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/rs-agent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/rs-agent/tmp}"
+fi
+
 CONFIG_FILE="$DATA_DIR/config.env"
-LOG_FILE="/var/log/rs-agent.log"
-PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_ITEMS_UPDATE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/update.php"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
@@ -38,9 +51,7 @@ error() {
 
 check_root() {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-        error "Este script requiere permisos de root"
-        echo "Ejecuta: sudo bash $INSTALL_DIR/uninstall.sh"
-        exit 1
+        warn "Modo no-root experimental: solo se eliminara la instalacion del usuario actual."
     fi
 }
 
@@ -74,6 +85,7 @@ init_private_tmp_dir() {
         return 1
     fi
 
+    ensure_private_directory "$DATA_DIR"
     ensure_private_directory "$(dirname "$PRIVATE_TMP_DIR")"
     ensure_private_directory "$PRIVATE_TMP_DIR"
 }
@@ -244,13 +256,15 @@ mark_system_disconnected_in_rsm() {
 remove_automatic_execution() {
     info "Eliminando ejecución automática..."
 
-    if command -v systemctl &>/dev/null; then
-        systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
-        systemctl stop rs-agent.service >/dev/null 2>&1 || true
-    fi
-    rm -f /etc/systemd/system/rs-agent.timer /etc/systemd/system/rs-agent.service
-    if command -v systemctl &>/dev/null; then
-        systemctl daemon-reload >/dev/null 2>&1 || true
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        if command -v systemctl &>/dev/null; then
+            systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
+            systemctl stop rs-agent.service >/dev/null 2>&1 || true
+        fi
+        rm -f /etc/systemd/system/rs-agent.timer /etc/systemd/system/rs-agent.service
+        if command -v systemctl &>/dev/null; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
     fi
 
     if command -v crontab &>/dev/null; then

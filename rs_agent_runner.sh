@@ -4,11 +4,23 @@
 
 set -uo pipefail
 
-INSTALL_DIR="/opt/rs-agent"
-DATA_DIR="/var/lib/rs-agent"
+RUN_AS_ROOT=0
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    RUN_AS_ROOT=1
+fi
+
+if [ "$RUN_AS_ROOT" = "1" ]; then
+    INSTALL_DIR="/opt/rs-agent"
+    DATA_DIR="/var/lib/rs-agent"
+    LOG_FILE="/var/log/rs-agent.log"
+else
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-$HOME/.local/share/rs-agent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/rs-agent.log}"
+fi
+
 CONFIG_FILE="$DATA_DIR/config.env"
 STATE_FILE="$DATA_DIR/state.env"
-LOG_FILE="/var/log/rs-agent.log"
 AGENT_SCRIPT="$INSTALL_DIR/rs_agent.sh"
 TRIGGER="automatico"
 
@@ -32,10 +44,7 @@ error_line() {
     printf '%s [ERROR] %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')" "$1" | tee -a "$LOG_FILE" >&2
 }
 
-if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    error_line "El runner automático debe ejecutarse como root."
-    exit 1
-fi
+mkdir -p "$(dirname "$LOG_FILE")"
 
 if [ ! -r "$CONFIG_FILE" ] || [ ! -x "$AGENT_SCRIPT" ]; then
     error_line "Instalación incompleta: faltan $CONFIG_FILE o $AGENT_SCRIPT."

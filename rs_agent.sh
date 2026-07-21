@@ -12,12 +12,27 @@ set -uo pipefail
 
 AGENT_VERSION="0.3.4"
 GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
-GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
-OUTPUT_DIR="/var/lib/rs-agent"
+GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-agent/rs_agent.sh}"
+
+RUN_AS_ROOT=0
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    RUN_AS_ROOT=1
+fi
+
+if [ "$RUN_AS_ROOT" = "1" ]; then
+    INSTALL_DIR="/opt/rs-agent"
+    OUTPUT_DIR="/var/lib/rs-agent"
+    LOCK_FILE="/run/lock/rs-agent.lock"
+    PRIVATE_TMP_DIR="/run/rs-agent/tmp"
+else
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-$HOME/.local/share/rs-agent}"
+    OUTPUT_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
+    LOCK_FILE="$OUTPUT_DIR/rs-agent.lock"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$OUTPUT_DIR}/rs-agent/tmp}"
+fi
+
 OUTPUT_FILE="inventory.json"
 STATE_FILE="$OUTPUT_DIR/state.env"
-LOCK_FILE="/run/lock/rs-agent.lock"
-PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
@@ -74,6 +89,7 @@ init_private_tmp_dir() {
         return 1
     fi
 
+    ensure_private_directory "$OUTPUT_DIR"
     ensure_private_directory "$(dirname "$PRIVATE_TMP_DIR")"
     ensure_private_directory "$PRIVATE_TMP_DIR"
 }
@@ -150,9 +166,7 @@ json_extract_rsm_property() {
 
 check_root() {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-        echo "ERROR: Este script requiere permisos de root"
-        echo "   Ejecuta con: sudo bash rs_agent.sh --token TOKEN --uuid UUID --alias ALIAS"
-        exit 1
+        echo "INFO: Modo no-root experimental; el inventario puede ser menos completo."
     fi
 }
 
@@ -525,7 +539,7 @@ check_for_updates() {
 }
 
 download_update() {
-    local script_path="/opt/rs-agent/rs_agent.sh"
+    local script_path="$INSTALL_DIR/rs_agent.sh"
     local backup_path="${script_path}.backup"
 
     echo "Descargando actualización..."

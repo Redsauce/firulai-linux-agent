@@ -10,6 +10,20 @@ Agente de inventario para sistemas Linux. Recopila información del sistema, paq
 curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
 ```
 
+### Modo no-root experimental
+
+La rama `experiment/non-root-agent` permite instalar y ejecutar el agente sin
+`sudo` para comparar resultados. No es equivalente al modo root: usa rutas del
+usuario, cron de usuario y el inventario puede ser menos completo.
+
+Rutas usadas en modo no-root:
+
+| Ruta | Descripción |
+|------|-------------|
+| `~/.local/share/rs-agent/` | Scripts del agente |
+| `~/.local/state/rs-agent/` | Configuración, estado, inventario y logs |
+| `${XDG_RUNTIME_DIR:-~/.local/state}/rs-agent/tmp/` | Temporales privados del usuario |
+
 El instalador (`install.sh`) realiza los siguientes pasos:
 
 1. **Verifica dependencias** — comprueba que `curl` y bash 4+ estén disponibles.
