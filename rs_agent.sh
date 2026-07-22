@@ -31,6 +31,7 @@ else
     PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$OUTPUT_DIR}/rs-agent/tmp}"
 fi
 
+CORE_SOFTWARE_FILE="${RS_AGENT_CORE_SOFTWARE_FILE:-$INSTALL_DIR/core_software.tsv}"
 OUTPUT_FILE="inventory.json"
 STATE_FILE="$OUTPUT_DIR/state.env"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
@@ -481,28 +482,53 @@ collect_npm_packages() {
     printf '%s' "$packages_json"
 }
 
+resolve_command_path() {
+    local binary="$1"
+    local resolved=""
+
+    if [[ "$binary" == */* ]]; then
+        [ -x "$binary" ] && printf '%s' "$binary"
+        return
+    fi
+
+    resolved=$(command -v "$binary" 2>/dev/null || true)
+    if [ -n "$resolved" ]; then
+        printf '%s' "$resolved"
+        return
+    fi
+
+    local directory
+    for directory in /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin /snap/bin; do
+        if [ -x "$directory/$binary" ]; then
+            printf '%s' "$directory/$binary"
+            return
+        fi
+    done
+}
+
 collect_core_software() {
     local software_json="" first=1
 
-    # Arrays paralelos: nombre | comando | capturar stderr (1=si, 0=no)
-    # stderr=1 para programas que imprimen la version en stderr (nginx, java, ssh...)
-    local names=("apache2"    "httpd"    "nginx"    "mysql"            "mysqld"            "postgresql"     "postgres"           "docker"            "php"            "node"            "java"          "openssh"  "openssl"           "git")
-    local cmds=( "apache2 -v" "httpd -v" "nginx -v" "mysql --version"  "mysqld --version"  "psql --version" "postgres --version" "docker --version"  "php --version"  "node --version"  "java -version" "ssh -V"   "openssl version"   "git --version")
-    local use_stderr=(1       1          1           0                  0                   0                0                    0                   0                0                 1               1          0                   0)
+    if [ ! -r "$CORE_SOFTWARE_FILE" ]; then
+        echo "WARN: No se pudo leer la configuración de software core: $CORE_SOFTWARE_FILE" >&2
+        printf '%s' "$software_json"
+        return
+    fi
 
-    local i
-    for i in "${!names[@]}"; do
-        local name="${names[$i]}"
-        local cmd="${cmds[$i]}"
-        local binary="${cmd%% *}"
+    local name binary args use_stderr resolved_binary
+    while IFS=$'\t' read -r name binary args use_stderr; do
+        [[ "$name" =~ ^[[:space:]]*# ]] && continue
+        [ -z "$name" ] && continue
+        [ -z "$binary" ] && continue
 
-        command -v "$binary" &>/dev/null || continue
+        resolved_binary=$(resolve_command_path "$binary")
+        [ -n "$resolved_binary" ] || continue
 
         local raw_output=""
-        if [ "${use_stderr[$i]}" = "1" ]; then
-            raw_output=$(timeout 10 bash -c "$cmd" 2>&1 | head -1 || true)
+        if [ "$use_stderr" = "1" ]; then
+            raw_output=$(timeout 10 "$resolved_binary" $args 2>&1 | head -1 || true)
         else
-            raw_output=$(timeout 10 bash -c "$cmd" 2>/dev/null | head -1 || true)
+            raw_output=$(timeout 10 "$resolved_binary" $args 2>/dev/null | head -1 || true)
         fi
 
         [ -z "$raw_output" ] && continue
@@ -513,7 +539,7 @@ collect_core_software() {
 
         [ "$first" = "1" ] && first=0 || software_json+=","
         software_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"raw_output\":\"$(json_escape "$raw_output")\"}"
-    done
+    done < "$CORE_SOFTWARE_FILE"
 
     printf '%s' "$software_json"
 }

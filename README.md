@@ -28,6 +28,12 @@ Rutas usadas en modo no-root:
 | `~/.local/state/rs-agent/` | Configuración, estado, inventario y logs |
 | `${XDG_RUNTIME_DIR:-~/.local/state}/rs-agent/tmp/` | Temporales privados del usuario |
 
+La detección de `core_software` se configura mediante `core_software.tsv`,
+descargado junto al agente. El script ya no contiene la lista de software
+crítico incrustada en el código; además, al resolver binarios prueba rutas
+habituales como `/usr/sbin` y `/sbin` para reducir diferencias entre root y
+no-root.
+
 El instalador (`install.sh`) realiza los siguientes pasos:
 
 1. **Verifica dependencias** — comprueba que `curl` y bash 4+ estén disponibles.

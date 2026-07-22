@@ -1,0 +1,17 @@
+# name	binary	args	capture_stderr
+apache2	apache2	-v	1
+httpd	httpd	-v	1
+nginx	nginx	-v	1
+mysql	mysql	--version	0
+mysqld	mysqld	--version	0
+mariadb	mariadb	--version	0
+mariadbd	mariadbd	--version	0
+postgresql	psql	--version	0
+postgres	postgres	--version	0
+docker	docker	--version	0
+php	php	--version	0
+node	node	--version	0
+java	java	-version	1
+openssh	ssh	-V	1
+openssl	openssl	version	0
+git	git	--version	0

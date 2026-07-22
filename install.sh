@@ -74,6 +74,7 @@ fi
 
 CONFIG_FILE="$DATA_DIR/config.env"
 RUNNER_FILE="$INSTALL_DIR/rs_agent_runner.sh"
+CORE_SOFTWARE_FILE="$INSTALL_DIR/core_software.tsv"
 SCHEDULER_TYPE=""
 
 # RSM System lookup
@@ -566,6 +567,19 @@ download_runner() {
     fi
 }
 
+download_core_software_config() {
+    info "Descargando configuración de software core..."
+
+    CORE_SOFTWARE_URL="${GITHUB_RAW_URL}/core_software.tsv?ts=$(date +%s)"
+    if curl -fsSL "$CORE_SOFTWARE_URL" -o "$CORE_SOFTWARE_FILE"; then
+        chmod 644 "$CORE_SOFTWARE_FILE"
+        log "Configuración de software core descargada: $CORE_SOFTWARE_FILE"
+    else
+        error "No se pudo descargar $CORE_SOFTWARE_URL"
+        exit 1
+    fi
+}
+
 download_uninstaller() {
     info "Descargando desinstalador desde GitHub..."
 
@@ -769,6 +783,7 @@ main() {
     create_directories
     download_agent
     download_runner
+    download_core_software_config
     download_uninstaller
     write_agent_config
     
