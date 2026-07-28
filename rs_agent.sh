@@ -116,11 +116,6 @@ json_escape() {
     printf '%s' "$s"
 }
 
-# Extrae el primer patron semver o X.Y de un string.
-extract_version() {
-    printf '%s' "$1" | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_-]+)?' | head -1
-}
-
 json_extract_first_string_key() {
     local json="$1"
     local key="$2"
@@ -383,14 +378,25 @@ collect_hardware() {
 collect_packages_dpkg() {
     local packages_json="" first=1
 
-    while IFS=$'\t' read -r name version status; do
+    while IFS='|' read -r name version source_package source_version upstream_version status; do
         [ -z "$name" ] && continue
         # Solo paquetes con estado "installed"
         case "$status" in *"installed"*) ;; *) continue ;; esac
 
+        local package_json
+        package_json="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"dpkg\""
+
+        if [ -n "$source_package" ]; then
+            package_json+=",\"source_package\":\"$(json_escape "$source_package")\""
+            [ -n "$source_version" ] && package_json+=",\"source_version\":\"$(json_escape "$source_version")\""
+            [ -n "$upstream_version" ] && package_json+=",\"upstream_version\":\"$(json_escape "$upstream_version")\""
+        fi
+
+        package_json+="}"
+
         [ "$first" = "1" ] && first=0 || packages_json+=","
-        packages_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"dpkg\"}"
-    done < <(dpkg-query -W -f='${Package}\t${Version}\t${Status}\n' 2>/dev/null)
+        packages_json+="$package_json"
+    done < <(dpkg-query -W -f='${Package}|${Version}|${source:Package}|${source:Version}|${source:Upstream-Version}|${Status}\n' 2>/dev/null)
 
     printf '%s' "$packages_json"
 }
@@ -465,43 +471,6 @@ collect_npm_packages() {
     done < <(npm list -g --depth=0 2>/dev/null | grep -E '[├└]')
 
     printf '%s' "$packages_json"
-}
-
-collect_core_software() {
-    local software_json="" first=1
-
-    # Arrays paralelos: nombre | comando | capturar stderr (1=si, 0=no)
-    # stderr=1 para programas que imprimen la version en stderr (nginx, java, ssh...)
-    local names=("apache2"    "httpd"    "nginx"    "mysql"            "mysqld"            "postgresql"     "postgres"           "docker"            "php"            "node"            "java"          "openssh"  "openssl"           "git")
-    local cmds=( "apache2 -v" "httpd -v" "nginx -v" "mysql --version"  "mysqld --version"  "psql --version" "postgres --version" "docker --version"  "php --version"  "node --version"  "java -version" "ssh -V"   "openssl version"   "git --version")
-    local use_stderr=(1       1          1           0                  0                   0                0                    0                   0                0                 1               1          0                   0)
-
-    local i
-    for i in "${!names[@]}"; do
-        local name="${names[$i]}"
-        local cmd="${cmds[$i]}"
-        local binary="${cmd%% *}"
-
-        command -v "$binary" &>/dev/null || continue
-
-        local raw_output=""
-        if [ "${use_stderr[$i]}" = "1" ]; then
-            raw_output=$(timeout 10 bash -c "$cmd" 2>&1 | head -1 || true)
-        else
-            raw_output=$(timeout 10 bash -c "$cmd" 2>/dev/null | head -1 || true)
-        fi
-
-        [ -z "$raw_output" ] && continue
-
-        local version
-        version=$(extract_version "$raw_output")
-        [ -z "$version" ] && version="unknown"
-
-        [ "$first" = "1" ] && first=0 || software_json+=","
-        software_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"raw_output\":\"$(json_escape "$raw_output")\"}"
-    done
-
-    printf '%s' "$software_json"
 }
 
 # ============ AUTO-ACTUALIZACION ============
@@ -744,16 +713,9 @@ main() {
     local total=$(( sys_count + pip_count + npm_count ))
     echo "   Total unificado: ${total} paquetes"
 
-    # --- Software core ---
-    echo "Detectando software core..."
-    local core_json core_count=0
-    core_json=$(collect_core_software)
-    [ -n "$core_json" ] && core_count=$(printf '%s' "$core_json" | grep -o '"name"' | wc -l | tr -d ' ')
-    echo "   -> ${core_count} aplicaciones detectadas"
-
     # --- Construir JSON final ---
     local inventory_json
-    inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}],\"core_software\":[${core_json}]}"
+    inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}]}"
 
     # --- Guardar localmente ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"
@@ -809,7 +771,6 @@ main() {
     echo "   - Hostname:     $(hostname -s 2>/dev/null || hostname)"
     echo "   - Firmware:     ${firmware_count}"
     echo "   - Total paquetes: ${total}"
-    echo "   - Software core:  ${core_count}"
     echo "   - Archivo:      ${output_path}"
     echo "   - Tamano:       ${file_size} bytes"
     echo ""
