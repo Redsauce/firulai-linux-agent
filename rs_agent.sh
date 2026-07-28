@@ -375,46 +375,112 @@ collect_hardware() {
         "$firmware_json"
 }
 
+select_source_package_version() {
+    local component_version="$1"
+    local source_version="$2"
+    local upstream_version="$3"
+
+    if [ -n "$source_version" ] && [ "$source_version" = "$component_version" ] && [ -n "$upstream_version" ] && [ "$upstream_version" != "unknown" ]; then
+        printf '%s' "$upstream_version"
+        return
+    fi
+
+    if [ -n "$source_version" ] && [ "$source_version" != "unknown" ]; then
+        printf '%s' "$source_version"
+        return
+    fi
+
+    if [ -n "$upstream_version" ] && [ "$upstream_version" != "unknown" ]; then
+        printf '%s' "$upstream_version"
+    fi
+}
+
+select_component_version() {
+    local component_version="$1"
+    local source_version="$2"
+    local upstream_version="$3"
+
+    if [ -n "$source_version" ] && [ "$source_version" = "$component_version" ] && [ -n "$upstream_version" ] && [ "$upstream_version" != "unknown" ]; then
+        printf '%s' "$upstream_version"
+        return
+    fi
+
+    printf '%s' "$component_version"
+}
+
 collect_packages_dpkg() {
-    local packages_json="" first=1
+    local components_json="" source_packages_json="" first_component=1 first_source=1
+    local component_count=0 source_package_count=0
+    declare -A seen_source_packages=()
 
     while IFS='|' read -r name version source_package source_version upstream_version status; do
         [ -z "$name" ] && continue
         # Solo paquetes con estado "installed"
         case "$status" in *"installed"*) ;; *) continue ;; esac
 
-        local package_json
-        package_json="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"dpkg\""
-
         if [ -n "$source_package" ]; then
-            package_json+=",\"source_package\":\"$(json_escape "$source_package")\""
-            [ -n "$source_version" ] && package_json+=",\"source_version\":\"$(json_escape "$source_version")\""
-            [ -n "$upstream_version" ] && package_json+=",\"upstream_version\":\"$(json_escape "$upstream_version")\""
+            if [ -z "${seen_source_packages[$source_package]+x}" ]; then
+                local selected_source_version source_json
+                selected_source_version=$(select_source_package_version "$version" "$source_version" "$upstream_version")
+                source_json="{\"name\":\"$(json_escape "$source_package")\",\"version\":\"$(json_escape "$selected_source_version")\"}"
+
+                [ "$first_source" = "1" ] && first_source=0 || source_packages_json+=","
+                source_packages_json+="$source_json"
+                seen_source_packages[$source_package]=1
+                source_package_count=$((source_package_count + 1))
+            fi
+
+            if [ "$name" = "$source_package" ]; then
+                continue
+            fi
         fi
 
-        package_json+="}"
+        local component_json selected_component_version
+        selected_component_version=$(select_component_version "$version" "$source_version" "$upstream_version")
+        component_json="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$selected_component_version")\",\"manager\":\"dpkg\""
 
-        [ "$first" = "1" ] && first=0 || packages_json+=","
-        packages_json+="$package_json"
+        if [ -n "$source_package" ]; then
+            component_json+=",\"source_package\":\"$(json_escape "$source_package")\""
+            [ -n "$source_version" ] && component_json+=",\"source_version\":\"$(json_escape "$source_version")\""
+            [ -n "$upstream_version" ] && component_json+=",\"upstream_version\":\"$(json_escape "$upstream_version")\""
+        fi
+
+        component_json+="}"
+
+        [ "$first_component" = "1" ] && first_component=0 || components_json+=","
+        components_json+="$component_json"
+        component_count=$((component_count + 1))
     done < <(dpkg-query -W -f='${Package}|${Version}|${source:Package}|${source:Version}|${source:Upstream-Version}|${Status}\n' 2>/dev/null)
 
-    printf '%s' "$packages_json"
+    SYSTEM_COMPONENTS_JSON="$components_json"
+    SYSTEM_PACKAGES_JSON="$source_packages_json"
+    SYSTEM_COMPONENTS_COUNT="$component_count"
+    SYSTEM_PACKAGES_COUNT="$source_package_count"
 }
 
 collect_packages_rpm() {
-    local packages_json="" first=1
+    local components_json="" first=1 component_count=0
 
     while IFS=$'\t' read -r name version; do
         [ -z "$name" ] && continue
 
-        [ "$first" = "1" ] && first=0 || packages_json+=","
-        packages_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"rpm\"}"
+        [ "$first" = "1" ] && first=0 || components_json+=","
+        components_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"rpm\"}"
+        component_count=$((component_count + 1))
     done < <(rpm -qa --queryformat '%{NAME}\t%{VERSION}-%{RELEASE}\n' 2>/dev/null)
 
-    printf '%s' "$packages_json"
+    SYSTEM_COMPONENTS_JSON="$components_json"
+    SYSTEM_PACKAGES_JSON=""
+    SYSTEM_COMPONENTS_COUNT="$component_count"
+    SYSTEM_PACKAGES_COUNT=0
 }
 
 collect_packages() {
+    SYSTEM_COMPONENTS_JSON=""
+    SYSTEM_PACKAGES_JSON=""
+    SYSTEM_COMPONENTS_COUNT=0
+    SYSTEM_PACKAGES_COUNT=0
+
     if command -v dpkg-query &>/dev/null; then
         collect_packages_dpkg
     elif command -v rpm &>/dev/null; then
@@ -684,10 +750,13 @@ main() {
 
     # --- Paquetes del sistema ---
     echo "Recopilando paquetes del sistema..."
-    local sys_json sys_count=0
-    sys_json=$(collect_packages)
-    [ -n "$sys_json" ] && sys_count=$(printf '%s' "$sys_json" | grep -o '"manager"' | wc -l | tr -d ' ')
-    echo "   -> ${sys_count} paquetes del sistema"
+    collect_packages
+    local sys_json="$SYSTEM_COMPONENTS_JSON"
+    local source_packages_json="$SYSTEM_PACKAGES_JSON"
+    local sys_count="$SYSTEM_COMPONENTS_COUNT"
+    local source_package_count="$SYSTEM_PACKAGES_COUNT"
+    echo "   -> ${sys_count} componentes del sistema"
+    echo "   -> ${source_package_count} paquetes source"
 
     # --- Paquetes Python ---
     echo "Recopilando paquetes Python..."
@@ -703,19 +772,19 @@ main() {
     [ -n "$npm_json" ] && npm_count=$(printf '%s' "$npm_json" | grep -o '"manager":"npm"' | wc -l | tr -d ' ')
     echo "   -> ${npm_count} paquetes Node.js"
 
-    # Unificar todos los paquetes en un array JSON
-    local all_packages_json=""
+    # Unificar todos los componentes en un array JSON
+    local all_components_json=""
     for part in "$sys_json" "$pip_json" "$npm_json"; do
         [ -z "$part" ] && continue
-        [ -n "$all_packages_json" ] && all_packages_json+=","
-        all_packages_json+="$part"
+        [ -n "$all_components_json" ] && all_components_json+=","
+        all_components_json+="$part"
     done
     local total=$(( sys_count + pip_count + npm_count ))
-    echo "   Total unificado: ${total} paquetes"
+    echo "   Total unificado: ${total} componentes"
 
     # --- Construir JSON final ---
     local inventory_json
-    inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"packages\":[${all_packages_json}]}"
+    inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"components\":[${all_components_json}],\"packages\":[${source_packages_json}]}"
 
     # --- Guardar localmente ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"
@@ -770,7 +839,8 @@ main() {
     echo "   - Sistema:      $(printf '%s' "$system_json" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//')"
     echo "   - Hostname:     $(hostname -s 2>/dev/null || hostname)"
     echo "   - Firmware:     ${firmware_count}"
-    echo "   - Total paquetes: ${total}"
+    echo "   - Total componentes: ${total}"
+    echo "   - Total packages:    ${source_package_count}"
     echo "   - Archivo:      ${output_path}"
     echo "   - Tamano:       ${file_size} bytes"
     echo ""
