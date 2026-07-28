@@ -573,7 +573,7 @@ send_to_rsm() {
         --location "$RSM_API_URL"
         --header "Authorization: $AGENT_TOKEN"
         --form "RStrigger=newServerData"
-        --form "RSdata=$inventory_json"
+        --form "RSdata=<$debug_json_path;type=application/json"
         --form "RStoken=$AGENT_TOKEN"
         --max-time 30
     )
