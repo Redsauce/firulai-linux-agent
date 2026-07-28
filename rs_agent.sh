@@ -514,13 +514,13 @@ download_update() {
 
 send_to_rsm() {
     local inventory_json="$1"
-    local debug_json_path
+    local inventory_json_path
     local response_file
     local response_headers_file
     local curl_trace_file=""
     local inventory_hash="unavailable"
 
-    debug_json_path=$(make_private_temp_file "rsm_debug_payload") || return 1
+    inventory_json_path=$(make_private_temp_file "rsm_inventory_payload") || return 1
     response_file=$(make_private_temp_file "rsm_response") || return 1
     response_headers_file=$(make_private_temp_file "rsm_response_headers") || return 1
     if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
@@ -530,9 +530,9 @@ send_to_rsm() {
     echo ""
     echo "Enviando inventario a RSM..."
 
-    printf '%s' "$inventory_json" > "$debug_json_path"
-    chmod 600 "$debug_json_path" 2>/dev/null || true
-    printf 'JSON guardado en: %s\n' "$debug_json_path"
+    printf '%s' "$inventory_json" > "$inventory_json_path"
+    chmod 600 "$inventory_json_path" 2>/dev/null || true
+    printf 'JSON guardado en: %s\n' "$inventory_json_path"
     printf 'Longitud: %d caracteres (%d KB aprox)\n' "${#inventory_json}" "$(( ${#inventory_json} / 1024 ))"
     if command -v sha256sum >/dev/null 2>&1; then
         inventory_hash=$(printf '%s' "$inventory_json" | sha256sum | awk '{print $1}')
@@ -555,7 +555,7 @@ send_to_rsm() {
     echo "   - Header Authorization: <oculto>"
     echo "   - Form RStrigger: newServerData"
     echo "   - Form RStoken: <oculto>"
-    echo "   - Form RSdata: $debug_json_path (${#inventory_json} chars)"
+    echo "   - Form RSdata: $inventory_json_path (${#inventory_json} chars)"
     echo "   - Response body: $response_file"
     echo "   - Response headers: $response_headers_file"
     if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
@@ -573,7 +573,7 @@ send_to_rsm() {
         --location "$RSM_API_URL"
         --header "Authorization: $AGENT_TOKEN"
         --form "RStrigger=newServerData"
-        --form "RSdata=<$debug_json_path;type=application/json"
+        --form "RSdata=<$inventory_json_path;type=application/json"
         --form "RStoken=$AGENT_TOKEN"
         --max-time 30
     )
