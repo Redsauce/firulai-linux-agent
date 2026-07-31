@@ -366,11 +366,13 @@ run_privileged_command() {
     local command_string="$1"
 
     has_interactive_tty || {
-        error "No interactive terminal is available to request the root/admin password."
+        error "No interactive terminal is available to request privileged access."
         return 1
     }
 
+    info "This action needs privileged access."
     if command -v sudo >/dev/null 2>&1; then
+        info "Trying sudo first. sudo asks for the current user's password and requires sudo permissions."
         if sudo sh -c "$command_string"; then
             return 0
         fi
@@ -378,11 +380,12 @@ run_privileged_command() {
     fi
 
     if command -v su >/dev/null 2>&1; then
+        info "Trying su fallback. su asks for the root password and requires root login to be allowed."
         su -c "$command_string"
         return $?
     fi
 
-    error "Neither sudo nor su was found to request root/admin permissions."
+    error "Neither sudo nor su was found to request privileged access."
     return 1
 }
 
@@ -402,10 +405,10 @@ choose_scheduler_interactively() {
     info "Automatic execution setup:"
     echo "  1) User cron" > /dev/tty
     echo "     + Does not require root and does not depend on an active user session." > /dev/tty
-    echo "     - Requires cron/crontab installed, active, and allowed. If not, installation/activation will be attempted, requiring the root/admin password." > /dev/tty
+    echo "     - Requires cron/crontab installed, active, and allowed. If not, installation/activation will be attempted and will need privileged access." > /dev/tty
     echo "  2) systemd --user" > /dev/tty
     echo "     + Better integration with systemd and systemctl --user." > /dev/tty
-    echo "     - Requires linger to run without an active session. If it is not active, it will be enabled, requiring the root/admin password." > /dev/tty
+    echo "     - Requires linger to run without an active session. If it is not active, it will be enabled and will need privileged access." > /dev/tty
     printf "Choose scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     reply=$(trim_string "$reply")
@@ -780,12 +783,12 @@ offer_install_cron() {
     }
 
     warn "cron/crontab is not installed."
-    if ! ask_yes_no "Do you want us to install cron now? This requires the root/admin password."; then
+    if ! ask_yes_no "Do you want us to install cron now? This needs privileged access."; then
         error "Cannot continue with cron without crontab."
         return 1
     fi
 
-    info "Attempting to install cron with root/admin permissions..."
+    info "Attempting to install cron with privileged access..."
     run_privileged_command "$command_string"
 }
 
@@ -799,12 +802,12 @@ offer_enable_cron_daemon() {
     }
 
     warn "cron/crond does not appear to be active."
-    if ! ask_yes_no "Do you want us to enable it now? This requires the root/admin password."; then
+    if ! ask_yes_no "Do you want us to enable it now? This needs privileged access."; then
         error "Cannot continue with cron if the daemon is not active."
         return 1
     fi
 
-    info "Attempting to enable cron with root/admin permissions..."
+    info "Attempting to enable cron with privileged access..."
     run_privileged_command "$command_string"
 }
 
@@ -823,7 +826,7 @@ check_cron_prerequisites() {
         if ! grep -qi "no crontab" "$crontab_error_file"; then
             error "The current user cannot manage their crontab."
             error "An administrator must allow crontabs for this user and review cron policies."
-            error "This may require root/admin permissions. Contact Firulai if you need help."
+            error "This may require privileged access. Contact Firulai if you need help."
             cat "$crontab_error_file" 2>/dev/null || true
             rm -f "$crontab_error_file"
             return 1
@@ -858,7 +861,7 @@ check_systemd_user_prerequisites() {
     if ! systemd_user_available; then
         error "systemd --user cannot be used: it is not available for this user/session."
         error "An administrator must review the user systemd setup, or you should choose cron."
-        error "This may require root/admin permissions. Contact Firulai if you need help."
+        error "This may require privileged access. Contact Firulai if you need help."
         return 1
     fi
 
@@ -868,13 +871,13 @@ check_systemd_user_prerequisites() {
         warn "linger is not enabled for $username."
         warn "systemd --user will not be reliable without an active session until linger is enabled."
 
-        if ! ask_yes_no "Do you want us to enable linger now? This requires the root/admin password."; then
+        if ! ask_yes_no "Do you want us to enable linger now? This needs privileged access."; then
             error "Cannot continue with systemd --user without linger."
             error "You can choose user cron or contact Firulai."
             return 1
         fi
 
-        info "Attempting to enable linger with root/admin permissions..."
+        info "Attempting to enable linger with privileged access..."
         if ! run_privileged_command "loginctl enable-linger $(shell_single_quote "$username")" || ! user_linger_enabled; then
             error "Could not enable linger for $username."
             error "Contact Firulai if you need help."
