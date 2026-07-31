@@ -17,6 +17,7 @@ set -e
 AGENT_TOKEN=${1:-""}
 UUID=${2:-""}
 SYSTEM_ALIAS=""
+SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-auto}"
 
 if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
     echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
@@ -34,13 +35,29 @@ while [ $# -gt 0 ]; do
             SYSTEM_ALIAS="$2"
             shift 2
             ;;
+        --scheduler)
+            if [ $# -lt 2 ]; then
+                echo "[ERROR] --scheduler requiere un valor: auto, cron o systemd-user"
+                exit 1
+            fi
+            SCHEDULER_CHOICE="$2"
+            shift 2
+            ;;
         *)
             echo "[ERROR] Argumento desconocido: $1"
-            echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+            echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--scheduler auto|cron|systemd-user]"
             exit 1
             ;;
     esac
 done
+
+case "$SCHEDULER_CHOICE" in
+    auto|cron|systemd-user) ;;
+    *)
+        echo "[ERROR] --scheduler debe ser: auto, cron o systemd-user"
+        exit 1
+        ;;
+esac
 
 # ============================================================================
 # CONFIGURACION
@@ -218,6 +235,55 @@ require_system_alias() {
         echo "Si el alias contiene espacios, envuélvelo entre comillas."
         exit 1
     fi
+}
+
+systemd_user_available() {
+    [ "$RUN_AS_ROOT" != "1" ] || return 1
+    command -v systemctl &> /dev/null || return 1
+    systemctl --user show-environment >/dev/null 2>&1
+}
+
+user_linger_enabled() {
+    [ "$RUN_AS_ROOT" != "1" ] || return 1
+    command -v loginctl >/dev/null 2>&1 || return 1
+    [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)" = "yes" ]
+}
+
+choose_scheduler_interactively() {
+    if [ "$RUN_AS_ROOT" = "1" ] || [ "$SCHEDULER_CHOICE" != "auto" ]; then
+        return 0
+    fi
+
+    if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+        info "No hay terminal interactiva; se elegira el scheduler automaticamente."
+        return 0
+    fi
+
+    local reply
+    echo "" > /dev/tty
+    info "Seleccion de ejecucion automatica:"
+    echo "  1) cron de usuario: no requiere root, pero necesita cron/crontab instalado, activo y permitido para este usuario." > /dev/tty
+    echo "  2) systemd --user: mejor integracion, pero para ejecutarse sin sesion activa necesita linger; habilitar linger requiere root/admin." > /dev/tty
+    printf "Scheduler [cron/systemd/auto] (cron): " > /dev/tty
+    IFS= read -r reply < /dev/tty || reply=""
+    reply=$(trim_string "$reply")
+
+    case "$reply" in
+        ""|cron|c|1)
+            SCHEDULER_CHOICE="cron"
+            ;;
+        systemd|systemd-user|s|2)
+            SCHEDULER_CHOICE="systemd-user"
+            ;;
+        auto|a)
+            SCHEDULER_CHOICE="auto"
+            ;;
+        *)
+            error "Scheduler desconocido: $reply"
+            echo "Usa cron, systemd-user o auto." > /dev/tty
+            exit 1
+            ;;
+    esac
 }
 
 detect_distro() {
@@ -563,21 +629,43 @@ cron_scheduler_required() {
         return 0
     fi
 
-    if command -v systemctl &> /dev/null && systemctl --user show-environment >/dev/null 2>&1; then
-        local linger=""
-        if command -v loginctl >/dev/null 2>&1; then
-            linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)
-        fi
+    if [ "$SCHEDULER_CHOICE" = "cron" ]; then
+        return 0
+    fi
 
-        if [ "$linger" = "yes" ] || [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" = "1" ]; then
-            return 1
-        fi
+    if [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
+        return 1
+    fi
+
+    if systemd_user_available && { user_linger_enabled || [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" = "1" ]; }; then
+        return 1
     fi
 
     return 0
 }
 
+check_systemd_user_prerequisites() {
+    if ! systemd_user_available; then
+        error "No se puede usar systemd --user: no esta disponible para este usuario/sesion."
+        error "Elige cron de usuario o contacta con Firulai para revisar una alternativa."
+        return 1
+    fi
+
+    if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
+        error "No se puede usar systemd --user de forma fiable: linger no esta habilitado para el usuario actual."
+        error "Habilitar linger requiere root/admin: loginctl enable-linger $(id -un)"
+        error "Elige cron de usuario o contacta con Firulai."
+        return 1
+    fi
+}
+
 check_automatic_execution_prerequisites() {
+    if [ "$RUN_AS_ROOT" != "1" ] && [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
+        info "Verificando requisitos de systemd --user..."
+        check_systemd_user_prerequisites
+        return
+    fi
+
     if cron_scheduler_required; then
         info "Verificando requisitos de cron para la ejecucion automatica..."
         check_cron_prerequisites
@@ -747,18 +835,13 @@ TIMER_EOF
         return 0
     fi
 
-    if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &> /dev/null && systemctl --user show-environment >/dev/null 2>&1; then
-        local linger=""
-        if command -v loginctl >/dev/null 2>&1; then
-            linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)
-        fi
-
-        if [ "$linger" != "yes" ] && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
+    if [ "$RUN_AS_ROOT" != "1" ] && [ "$SCHEDULER_CHOICE" != "cron" ] && systemd_user_available; then
+        if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
             warn "systemd --user disponible, pero lingering no esta habilitado para el usuario actual."
             warn "Se usara cron de usuario para evitar depender de una sesion activa."
         else
-        mkdir -p "$SYSTEMD_USER_DIR"
-        cat > "$SYSTEMD_USER_SERVICE_FILE" << SERVICE_EOF
+            mkdir -p "$SYSTEMD_USER_DIR"
+            cat > "$SYSTEMD_USER_SERVICE_FILE" << SERVICE_EOF
 [Unit]
 Description=Firulai Inventory Agent execution
 ConditionPathExists=$RUNNER_FILE
@@ -771,7 +854,7 @@ RestartSec=30min
 TimeoutStartSec=30min
 SERVICE_EOF
 
-        cat > "$SYSTEMD_USER_TIMER_FILE" << TIMER_EOF
+            cat > "$SYSTEMD_USER_TIMER_FILE" << TIMER_EOF
 [Unit]
 Description=Firulai Inventory Agent daily schedule
 
@@ -785,16 +868,20 @@ Unit=rs-agent.service
 WantedBy=timers.target
 TIMER_EOF
 
-        chmod 644 "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
-        if systemctl --user daemon-reload && systemctl --user enable --now rs-agent.timer; then
-            SCHEDULER_TYPE="systemd --user timer persistente"
-            log "Timer systemd de usuario configurado a las 03:00"
-            return 0
-        fi
+            chmod 644 "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
+            if systemctl --user daemon-reload && systemctl --user enable --now rs-agent.timer; then
+                SCHEDULER_TYPE="systemd --user timer persistente"
+                log "Timer systemd de usuario configurado a las 03:00"
+                return 0
+            fi
 
-        warn "No se pudo habilitar systemd --user; se intentara cron de usuario."
-        rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
-        systemctl --user daemon-reload >/dev/null 2>&1 || true
+            rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
+            systemctl --user daemon-reload >/dev/null 2>&1 || true
+            if [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
+                error "No se pudo habilitar systemd --user."
+                return 1
+            fi
+            warn "No se pudo habilitar systemd --user; se intentara cron de usuario."
         fi
     fi
 
@@ -902,6 +989,7 @@ main() {
     check_dependencies
     init_private_tmp_dir
     require_system_alias
+    choose_scheduler_interactively
     validate_uuid_format "$UUID"
     check_local_agent_installation
     warn_about_parallel_root_installation

@@ -12,6 +12,13 @@ curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experi
 
 Si el script se ejecuta sin `sudo`, instala solo para el usuario actual. Si se ejecuta como root, conserva el modo clasico de sistema.
 
+En modo no-root interactivo, el instalador pregunta que scheduler usar. Tambien puede indicarse de forma explicita:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> --scheduler cron
+curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> --scheduler systemd-user
+```
+
 ## Rutas no-root
 
 Por defecto, en modo usuario:
@@ -32,22 +39,30 @@ Estas rutas se pueden sobrescribir con `RS_AGENT_INSTALL_DIR`, `RS_AGENT_DATA_DI
 
 El inventario se planifica a las `03:00` hora local.
 
-En modo no-root, el instalador intenta primero crear un timer de usuario:
+En modo no-root, el instalador puede usar cron de usuario o `systemd --user`.
+
+Cron de usuario:
+
+- No requiere root.
+- Requiere que `cron/crontab` este instalado, activo y permitido para el usuario.
+- Si esos requisitos fallan, la instalacion automatica no se completa y se indica contactar con Firulai o con el administrador.
+
+```bash
+crontab -l | grep rs_agent_runner
+```
+
+`systemd --user`:
+
+- Tiene mejor integracion con systemd.
+- Para ejecutarse sin sesion activa necesita `linger`.
+- Habilitar `linger` requiere root/admin: `loginctl enable-linger <usuario>`.
 
 ```bash
 systemctl --user status rs-agent.timer
 systemctl --user list-timers rs-agent.timer
 ```
 
-Si `systemd --user` no esta disponible o `linger` no esta habilitado, usa el crontab del usuario actual:
-
-```bash
-crontab -l | grep rs_agent_runner
-```
-
-El instalador valida que `crontab` exista, que el usuario pueda gestionar su crontab y que el daemon cron este activo. Si cron no esta disponible o las politicas del sistema bloquean crontabs de usuario, la instalacion no-root no se completa como automatica y se muestra un error indicando que se contacte con Firulai o con el administrador del sistema.
-
-Nota: un timer `systemd --user` puede no ejecutarse cuando el usuario no tiene sesion activa si `linger` no esta habilitado. En ese caso, cron de usuario es el fallback por defecto.
+Con `--scheduler auto`, si `systemd --user` no es fiable por falta de `linger`, se usa cron de usuario como fallback.
 
 ## Uso manual
 
