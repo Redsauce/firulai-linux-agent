@@ -671,6 +671,15 @@ TIMER_EOF
     fi
 
     if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &> /dev/null && systemctl --user show-environment >/dev/null 2>&1; then
+        local linger=""
+        if command -v loginctl >/dev/null 2>&1; then
+            linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)
+        fi
+
+        if [ "$linger" != "yes" ] && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
+            warn "systemd --user disponible, pero lingering no esta habilitado para el usuario actual."
+            warn "Se usara cron de usuario para evitar depender de una sesion activa."
+        else
         mkdir -p "$SYSTEMD_USER_DIR"
         cat > "$SYSTEMD_USER_SERVICE_FILE" << SERVICE_EOF
 [Unit]
@@ -703,20 +712,13 @@ TIMER_EOF
         if systemctl --user daemon-reload && systemctl --user enable --now rs-agent.timer; then
             SCHEDULER_TYPE="systemd --user timer persistente"
             log "Timer systemd de usuario configurado a las 03:00"
-            if command -v loginctl >/dev/null 2>&1; then
-                local linger
-                linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)
-                if [ "$linger" != "yes" ]; then
-                    warn "systemd --user puede no ejecutarse sin sesion activa si lingering no esta habilitado."
-                    warn "Si necesitas ejecucion garantizada sin login, usa cron de usuario o habilita lingering con un administrador."
-                fi
-            fi
             return 0
         fi
 
         warn "No se pudo habilitar systemd --user; se intentara cron de usuario."
         rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
         systemctl --user daemon-reload >/dev/null 2>&1 || true
+        fi
     fi
 
     if ! command -v crontab &> /dev/null; then
