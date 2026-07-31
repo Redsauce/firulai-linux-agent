@@ -601,7 +601,7 @@ run_privileged_command() {
     info "This action needs privileged access."
     if command -v su >/dev/null 2>&1; then
         info "Trying root via su. su asks for the root password and requires root login to be allowed."
-        if su -c "$command_string"; then
+        if su -c "$command_string" < /dev/tty; then
             return 0
         fi
         warn "The privileged action could not be completed with su/root."
