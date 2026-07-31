@@ -402,10 +402,10 @@ choose_scheduler_interactively() {
     info "Automatic execution setup:"
     echo "  1) User cron" > /dev/tty
     echo "     + Does not require root and does not depend on an active user session." > /dev/tty
-    echo "     - Requires cron/crontab installed, active, and allowed. If not, we can try to install/enable it, requiring the root/admin password." > /dev/tty
+    echo "     - Necesita cron/crontab instalado, activo y permitido. Si no lo está, se procederá a la instalación, requiriendo contraseña de root/admin." > /dev/tty
     echo "  2) systemd --user" > /dev/tty
     echo "     + Better integration with systemd and systemctl --user." > /dev/tty
-    echo "     - Requires linger to run without an active session. If not enabled, we can try to enable it, requiring the root/admin password." > /dev/tty
+    echo "     - Para ejecutarse sin sesión activa necesita linger. Si no está activo se habilitará, requiriendo contraseña de root/admin." > /dev/tty
     printf "Choose scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     reply=$(trim_string "$reply")
