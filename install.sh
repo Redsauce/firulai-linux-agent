@@ -377,22 +377,16 @@ run_privileged_command() {
 
     info "This action needs privileged access."
     if command -v su >/dev/null 2>&1; then
-        info "Trying root via su first. su asks for the root password and requires root login to be allowed."
+        info "Trying root via su. su asks for the root password and requires root login to be allowed."
         if su -c "$command_string"; then
             return 0
         fi
         warn "The privileged action could not be completed with su/root."
+    else
+        warn "su was not found, so root access cannot be requested from this user."
     fi
 
-    if command -v sudo >/dev/null 2>&1; then
-        info "Trying sudo fallback. sudo asks for the current user's password and requires sudo permissions."
-        if sudo sh -c "$command_string"; then
-            return 0
-        fi
-        warn "The privileged action could not be completed with sudo."
-    fi
-
-    error "Neither sudo nor su was found to request privileged access."
+    error "The privileged action was not completed. Run the installer as root and choose no-root mode, or run the required command from a root session."
     return 1
 }
 
