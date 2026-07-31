@@ -402,10 +402,10 @@ choose_scheduler_interactively() {
     info "Automatic execution setup:"
     echo "  1) User cron" > /dev/tty
     echo "     + Does not require root and does not depend on an active user session." > /dev/tty
-    echo "     - Necesita cron/crontab instalado, activo y permitido. Si no lo está, se procederá a la instalación, requiriendo contraseña de root/admin." > /dev/tty
+    echo "     - Requires cron/crontab installed, active, and allowed. If not, installation/activation will be attempted, requiring the root/admin password." > /dev/tty
     echo "  2) systemd --user" > /dev/tty
     echo "     + Better integration with systemd and systemctl --user." > /dev/tty
-    echo "     - Para ejecutarse sin sesión activa necesita linger. Si no está activo se habilitará, requiriendo contraseña de root/admin." > /dev/tty
+    echo "     - Requires linger to run without an active session. If it is not active, it will be enabled, requiring the root/admin password." > /dev/tty
     printf "Choose scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     reply=$(trim_string "$reply")
@@ -438,39 +438,39 @@ detect_distro() {
         VERSION="unknown"
     fi
     
-    info "Distribucion: $DISTRO $VERSION"
+    info "Distribution: $DISTRO $VERSION"
 }
 
 check_dependencies() {
-    info "Verificando dependencias..."
+    info "Checking dependencies..."
 
     # Verificar curl (deberia estar si llegamos aqui)
     if ! command -v curl &> /dev/null; then
         error "curl no esta instalado"
         exit 1
     fi
-    log "curl encontrado: $(curl --version | head -1)"
+    log "curl found: $(curl --version | head -1)"
 
     # Verificar bash 4+ (requerido por el agente para arrays asociativos)
     local bash_major
     bash_major=$(bash --version | grep -oE '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
     if [ "${bash_major:-0}" -lt 4 ]; then
-        error "Se requiere bash 4 o superior (encontrado: $bash_major)"
+        error "bash 4 or higher is required (found: $bash_major)"
         exit 1
     fi
-    log "bash ${bash_major} encontrado"
+    log "bash ${bash_major} found"
 
     if ! command -v flock &> /dev/null; then
         error "flock no está instalado (normalmente forma parte del paquete util-linux)"
         exit 1
     fi
-    log "flock encontrado: $(command -v flock)"
+    log "flock found: $(command -v flock)"
 
     if ! command -v mktemp &> /dev/null; then
         error "mktemp no esta instalado"
         exit 1
     fi
-    log "mktemp encontrado: $(command -v mktemp)"
+    log "mktemp found: $(command -v mktemp)"
 }
 
 validate_uuid_format() {

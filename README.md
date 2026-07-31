@@ -38,7 +38,7 @@ User cron:
 
 - Does not require root for the user crontab.
 - Does not depend on an active user session.
-- Necesita cron/crontab instalado, activo y permitido. Si no lo está, se procederá a la instalación, requiriendo contraseña de root/admin.
+- Requires cron/crontab installed, active, and allowed. If not, installation/activation will be attempted, requiring the root/admin password.
 - If system policies block user crontabs, the automatic install cannot continue and the user is told to contact Firulai or the administrator.
 
 ```bash
@@ -49,7 +49,7 @@ crontab -l | grep rs_agent_runner
 
 - Better integration with systemd.
 - Better visibility through `systemctl --user`.
-- Para ejecutarse sin sesión activa necesita linger. Si no está activo se habilitará, requiriendo contraseña de root/admin.
+- Requires linger to run without an active session. If it is not active, it will be enabled, requiring the root/admin password.
 
 ```bash
 systemctl --user status rs-agent.timer
