@@ -3,7 +3,7 @@
 #
 # Redsauce Inventory Agent
 # Version: 0.3.4 - Estado persistente y recuperación de ejecuciones perdidas
-# Requiere: root, bash 4+, curl, lscpu, lsblk, uname
+# Requiere: bash 4+, curl, lscpu, lsblk, uname
 #
 
 set -uo pipefail
@@ -11,13 +11,28 @@ set -uo pipefail
 # ============ CONFIGURACION ============
 
 AGENT_VERSION="0.3.4"
-GITHUB_API_URL="https://api.github.com/repos/redsauce/inventory-agent/releases/latest"
-GITHUB_AGENT_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main/rs_agent.sh"
-OUTPUT_DIR="/var/lib/rs-agent"
+GITHUB_API_URL="https://api.github.com/repos/Redsauce/firulai-linux-agent/releases/latest"
+GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/rs_agent.sh}"
+
+RUN_AS_ROOT=0
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    RUN_AS_ROOT=1
+fi
+
+if [ "$RUN_AS_ROOT" = "1" ]; then
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/rs-agent}"
+    OUTPUT_DIR="${RS_AGENT_DATA_DIR:-/var/lib/rs-agent}"
+    LOCK_FILE="${RS_AGENT_LOCK_FILE:-/run/lock/rs-agent.lock}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/rs-agent/tmp}"
+else
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/rs-agent}"
+    OUTPUT_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
+    LOCK_FILE="${RS_AGENT_LOCK_FILE:-$OUTPUT_DIR/rs-agent.lock}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$OUTPUT_DIR}/rs-agent/tmp}"
+fi
+
 OUTPUT_FILE="inventory.json"
 STATE_FILE="$OUTPUT_DIR/state.env"
-LOCK_FILE="/run/lock/rs-agent.lock"
-PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
@@ -144,10 +159,8 @@ json_extract_rsm_property() {
 # ============ VALIDACION Y ARGUMENTOS ============
 
 check_root() {
-    if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-        echo "ERROR: Este script requiere permisos de root"
-        echo "   Ejecuta con: sudo bash rs_agent.sh --token TOKEN --uuid UUID --alias ALIAS"
-        exit 1
+    if [ "$RUN_AS_ROOT" != "1" ]; then
+        echo "INFO: Modo no-root; el inventario puede ser menos completo si el sistema restringe algun comando."
     fi
 }
 
@@ -161,7 +174,7 @@ validate_uuid() {
 
 parse_args() {
     if [ $# -eq 0 ]; then
-        echo "Uso: sudo bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS>"
+        echo "Uso: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS>"
         exit 1
     fi
 
@@ -560,7 +573,7 @@ check_for_updates() {
 }
 
 download_update() {
-    local script_path="/opt/rs-agent/rs_agent.sh"
+    local script_path="$INSTALL_DIR/rs_agent.sh"
     local backup_path="${script_path}.backup"
 
     echo "Descargando actualización..."

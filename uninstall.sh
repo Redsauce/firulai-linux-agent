@@ -7,11 +7,29 @@
 
 set -uo pipefail
 
-INSTALL_DIR="/opt/rs-agent"
-DATA_DIR="/var/lib/rs-agent"
+RUN_AS_ROOT=0
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    RUN_AS_ROOT=1
+fi
+
+if [ "$RUN_AS_ROOT" = "1" ]; then
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/rs-agent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/rs-agent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-/var/log/rs-agent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/rs-agent/tmp}"
+    SYSTEMD_USER_SERVICE_FILE=""
+    SYSTEMD_USER_TIMER_FILE=""
+else
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/rs-agent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/rs-agent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/rs-agent/tmp}"
+    SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    SYSTEMD_USER_SERVICE_FILE="$SYSTEMD_USER_DIR/rs-agent.service"
+    SYSTEMD_USER_TIMER_FILE="$SYSTEMD_USER_DIR/rs-agent.timer"
+fi
+
 CONFIG_FILE="$DATA_DIR/config.env"
-LOG_FILE="/var/log/rs-agent.log"
-PRIVATE_TMP_DIR="/run/rs-agent/tmp"
 RSM_ITEMS_GET_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
 RSM_ITEMS_UPDATE_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/update.php"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
@@ -37,10 +55,8 @@ error() {
 }
 
 check_root() {
-    if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-        error "Este script requiere permisos de root"
-        echo "Ejecuta: sudo bash $INSTALL_DIR/uninstall.sh"
-        exit 1
+    if [ "$RUN_AS_ROOT" != "1" ]; then
+        warn "Modo no-root: solo se eliminara la instalacion del usuario actual."
     fi
 }
 
@@ -122,7 +138,7 @@ parse_args() {
 
     if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
         error "No se encontrÓ token o UUID para notificar a RSM"
-        echo "Uso manual: sudo bash uninstall.sh --token <TOKEN> --uuid <UUID>"
+        echo "Uso manual: bash uninstall.sh --token <TOKEN> --uuid <UUID>"
         exit 1
     fi
 
@@ -244,17 +260,24 @@ mark_system_disconnected_in_rsm() {
 remove_automatic_execution() {
     info "Eliminando ejecución automática..."
 
-    if command -v systemctl &>/dev/null; then
+    if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &>/dev/null; then
         systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
         systemctl stop rs-agent.service >/dev/null 2>&1 || true
     fi
-    rm -f /etc/systemd/system/rs-agent.timer /etc/systemd/system/rs-agent.service
-    if command -v systemctl &>/dev/null; then
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        rm -f /etc/systemd/system/rs-agent.timer /etc/systemd/system/rs-agent.service
+    fi
+    if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &>/dev/null; then
         systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &>/dev/null; then
+        systemctl --user disable --now rs-agent.timer >/dev/null 2>&1 || true
+        rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
     fi
 
     if command -v crontab &>/dev/null; then
-        if ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent" || true) | crontab -; then
+        if ({ crontab -l 2>/dev/null || true; } | grep -Fv "$INSTALL_DIR/rs_agent" || true) | crontab -; then
             log "Entradas de cron eliminadas"
         else
             warn "No se pudo actualizar el crontab o no había entradas configuradas"

@@ -5,7 +5,7 @@
 # ============================================================================
 #
 # Uso:
-#   curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
+#   curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
 #
 
 set -e
@@ -19,7 +19,7 @@ UUID=${2:-""}
 SYSTEM_ALIAS=""
 
 if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
-    echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+    echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
     exit 1
 fi
 
@@ -36,7 +36,7 @@ while [ $# -gt 0 ]; do
             ;;
         *)
             echo "[ERROR] Argumento desconocido: $1"
-            echo "[ERROR] Uso: curl ... | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+            echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
             exit 1
             ;;
     esac
@@ -46,18 +46,39 @@ done
 # CONFIGURACION
 # ============================================================================
 
-# URL de GitHub donde esta el agente
-GITHUB_RAW_URL="https://raw.githubusercontent.com/redsauce/inventory-agent/main"
+# URL de GitHub donde esta el agente. En esta rama experimental apunta a la
+# propia rama para probar instalacion no-root sin mezclarla con main.
+GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main}"
+
+RUN_AS_ROOT=0
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    RUN_AS_ROOT=1
+fi
 
 # Directorios de instalacion
-INSTALL_DIR="/opt/rs-agent"
-DATA_DIR="/var/lib/rs-agent"
-LOG_FILE="/var/log/rs-agent.log"
+if [ "$RUN_AS_ROOT" = "1" ]; then
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/rs-agent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/rs-agent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-/var/log/rs-agent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/rs-agent/tmp}"
+    SYSTEMD_SERVICE_FILE="/etc/systemd/system/rs-agent.service"
+    SYSTEMD_TIMER_FILE="/etc/systemd/system/rs-agent.timer"
+    SYSTEMD_USER_DIR=""
+    SYSTEMD_USER_SERVICE_FILE=""
+    SYSTEMD_USER_TIMER_FILE=""
+else
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/rs-agent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/rs-agent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/rs-agent/tmp}"
+    SYSTEMD_SERVICE_FILE=""
+    SYSTEMD_TIMER_FILE=""
+    SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    SYSTEMD_USER_SERVICE_FILE="$SYSTEMD_USER_DIR/rs-agent.service"
+    SYSTEMD_USER_TIMER_FILE="$SYSTEMD_USER_DIR/rs-agent.timer"
+fi
 CONFIG_FILE="$DATA_DIR/config.env"
 RUNNER_FILE="$INSTALL_DIR/rs_agent_runner.sh"
-PRIVATE_TMP_DIR="/run/rs-agent/tmp"
-SYSTEMD_SERVICE_FILE="/etc/systemd/system/rs-agent.service"
-SYSTEMD_TIMER_FILE="/etc/systemd/system/rs-agent.timer"
 SCHEDULER_TYPE=""
 
 # RSM System lookup
@@ -145,13 +166,12 @@ banner() {
 }
 
 check_root() {
-    if [ "$EUID" -ne 0 ]; then 
-        error "Este script debe ejecutarse como root"
-        echo ""
-        echo "Ejecuta:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
-        echo ""
-        exit 1
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        warn "Instalador ejecutado como root; se usaran rutas de sistema."
+        warn "Para probar instalacion no-root, ejecuta el one-liner sin sudo."
+    else
+        info "Modo no-root: el agente se instalara solo para el usuario actual."
+        warn "El inventario puede ser menos completo que en modo root si el sistema restringe algun comando."
     fi
 }
 
@@ -193,7 +213,7 @@ require_system_alias() {
         error "El alias del sistema es obligatorio."
         echo ""
         echo "Ejecuta el instalador indicando el alias con la opcion --alias:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/redsauce/inventory-agent/main/install.sh | sudo bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+        echo "  curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
         echo ""
         echo "Si el alias contiene espacios, envuélvelo entre comillas."
         exit 1
@@ -393,10 +413,24 @@ check_uuid_available() {
 
 check_existing_installation() {
     if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
+        local manual_prefix=""
+        [ "$RUN_AS_ROOT" = "1" ] && manual_prefix="sudo "
         warn "Ya existe una instalación previa del agente en este sistema."
         warn "Si deseas instalar un nuevo agente, desinstala el actual primero:"
-        warn "  sudo bash $INSTALL_DIR/uninstall.sh"
+        warn "  ${manual_prefix}bash $INSTALL_DIR/uninstall.sh"
         exit 1
+    fi
+}
+
+warn_about_parallel_root_installation() {
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        return 0
+    fi
+
+    if [ -f "/opt/rs-agent/rs_agent.sh" ] || [ -f "/var/lib/rs-agent/config.env" ]; then
+        warn "Se ha detectado una instalacion root existente en /opt/rs-agent o /var/lib/rs-agent."
+        warn "La instalacion no-root convivira con ella usando rutas del usuario actual."
+        warn "Para comparar resultados, lo mas claro es usar otro UUID/alias de prueba."
     fi
 }
 
@@ -419,7 +453,11 @@ check_local_agent_installation() {
 
         echo ""
         echo "Si necesitas reinstalar el agente, desinstala primero el agente actual:"
-        echo "  sudo bash $INSTALL_DIR/uninstall.sh"
+        if [ "$RUN_AS_ROOT" = "1" ]; then
+            echo "  sudo bash $INSTALL_DIR/uninstall.sh"
+        else
+            echo "  bash $INSTALL_DIR/uninstall.sh"
+        fi
         exit 1
     fi
 }
@@ -471,16 +509,22 @@ update_rsm_system_on_install() {
 
 cleanup_partial_installation() {
     warn "Limpiando instalación parcial..."
-    if command -v systemctl &> /dev/null; then
+    if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null; then
         systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
         systemctl stop rs-agent.service >/dev/null 2>&1 || true
     fi
-    rm -f "$SYSTEMD_SERVICE_FILE" "$SYSTEMD_TIMER_FILE"
-    if command -v systemctl &> /dev/null; then
+    [ -n "$SYSTEMD_SERVICE_FILE" ] && rm -f "$SYSTEMD_SERVICE_FILE"
+    [ -n "$SYSTEMD_TIMER_FILE" ] && rm -f "$SYSTEMD_TIMER_FILE"
+    if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null; then
         systemctl daemon-reload >/dev/null 2>&1 || true
     fi
+    if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &> /dev/null; then
+        systemctl --user disable --now rs-agent.timer >/dev/null 2>&1 || true
+        rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
+    fi
     if command -v crontab &> /dev/null; then
-        ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent" || true) | crontab - || true
+        ({ crontab -l 2>/dev/null || true; } | grep -Fv "$INSTALL_DIR/rs_agent" || true) | crontab - || true
     fi
     rm -rf "$INSTALL_DIR"
     rm -rf "$DATA_DIR"
@@ -497,7 +541,11 @@ create_directories() {
     ensure_private_directory "$DATA_DIR"
     touch "$LOG_FILE"
     chown root:root "$LOG_FILE" 2>/dev/null || true
-    chmod 644 "$LOG_FILE"
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        chmod 644 "$LOG_FILE"
+    else
+        chmod 600 "$LOG_FILE"
+    fi
     
     log "Directorios creados"
 }
@@ -577,7 +625,7 @@ CONFIG_EOF
 setup_automatic_execution() {
     info "Configurando ejecución automática..."
 
-    if command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
+    if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
         cat > "$SYSTEMD_SERVICE_FILE" << SERVICE_EOF
 [Unit]
 Description=Firulai Inventory Agent execution
@@ -622,6 +670,55 @@ TIMER_EOF
         return 0
     fi
 
+    if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &> /dev/null && systemctl --user show-environment >/dev/null 2>&1; then
+        mkdir -p "$SYSTEMD_USER_DIR"
+        cat > "$SYSTEMD_USER_SERVICE_FILE" << SERVICE_EOF
+[Unit]
+Description=Firulai Inventory Agent execution
+ConditionPathExists=$RUNNER_FILE
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $RUNNER_FILE --if-due --trigger systemd-user-timer
+Restart=on-failure
+RestartSec=30min
+TimeoutStartSec=30min
+SERVICE_EOF
+
+        cat > "$SYSTEMD_USER_TIMER_FILE" << TIMER_EOF
+[Unit]
+Description=Firulai Inventory Agent daily schedule
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+AccuracySec=1min
+Unit=rs-agent.service
+
+[Install]
+WantedBy=timers.target
+TIMER_EOF
+
+        chmod 644 "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
+        if systemctl --user daemon-reload && systemctl --user enable --now rs-agent.timer; then
+            SCHEDULER_TYPE="systemd --user timer persistente"
+            log "Timer systemd de usuario configurado a las 03:00"
+            if command -v loginctl >/dev/null 2>&1; then
+                local linger
+                linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)
+                if [ "$linger" != "yes" ]; then
+                    warn "systemd --user puede no ejecutarse sin sesion activa si lingering no esta habilitado."
+                    warn "Si necesitas ejecucion garantizada sin login, usa cron de usuario o habilita lingering con un administrador."
+                fi
+            fi
+            return 0
+        fi
+
+        warn "No se pudo habilitar systemd --user; se intentara cron de usuario."
+        rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
+    fi
+
     if ! command -v crontab &> /dev/null; then
         error "El sistema no dispone de systemd activo ni del comando crontab"
         return 1
@@ -633,13 +730,22 @@ TIMER_EOF
 
     # Comprobar cada 30 minutos permite ejecutar a las 03:00 y reintentar una
     # ejecución perdida sin duplicarla gracias a state.env y flock.
-    if ! ({ crontab -l 2>/dev/null || true; } | grep -v "$INSTALL_DIR/rs_agent" || true; echo "$cron_watchdog"; echo "$cron_reboot") | crontab -; then
-        error "No se pudo actualizar el crontab de root"
+    if ! ({ crontab -l 2>/dev/null || true; } | grep -Fv "$INSTALL_DIR/rs_agent" || true; echo "$cron_watchdog"; echo "$cron_reboot") | crontab -; then
+        if [ "$RUN_AS_ROOT" = "1" ]; then
+            error "No se pudo actualizar el crontab de root"
+        else
+            error "No se pudo actualizar el crontab del usuario actual"
+        fi
         return 1
     fi
 
-    SCHEDULER_TYPE="cron con recuperación al arrancar y comprobación cada 30 minutos"
-    log "Cron configurado con ejecución diaria y recuperación automática"
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        SCHEDULER_TYPE="cron de root con recuperacion al arrancar y comprobacion cada 30 minutos"
+        log "Cron de root configurado con ejecucion diaria y recuperacion automatica"
+    else
+        SCHEDULER_TYPE="cron de usuario con recuperacion al arrancar y comprobacion cada 30 minutos"
+        log "Cron de usuario configurado con ejecucion diaria y recuperacion automatica"
+    fi
 }
 
 test_agent() {
@@ -664,6 +770,9 @@ test_agent() {
 }
 
 print_summary() {
+    local manual_prefix=""
+    [ "$RUN_AS_ROOT" = "1" ] && manual_prefix="sudo "
+
     echo ""
     echo "============================================================================"
     echo "  INSTALACIÓN COMPLETADA"
@@ -678,7 +787,7 @@ print_summary() {
     echo "Ejecución:"
     echo "   - Automática:  Diariamente a las 3:00 AM ($SCHEDULER_TYPE)"
     echo "   - Recuperación: una ejecución pendiente al volver a estar operativo"
-    echo "   - Manual:      sudo bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
+    echo "   - Manual:      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
     echo ""
     echo "Alias:"
     echo "   - Valor actual: $SYSTEM_ALIAS"
@@ -695,7 +804,7 @@ print_summary() {
     echo "   - Incluye: OS, kernel, CPU, modelo de discos, paquetes, software crítico"
     echo ""
     echo "Desinstalar:"
-    echo "   sudo bash $INSTALL_DIR/uninstall.sh"
+    echo "   ${manual_prefix}bash $INSTALL_DIR/uninstall.sh"
     echo ""
     echo "============================================================================"
     echo ""
@@ -716,6 +825,7 @@ main() {
     require_system_alias
     validate_uuid_format "$UUID"
     check_local_agent_installation
+    warn_about_parallel_root_installation
     check_uuid_available
     update_rsm_system_on_install
     
