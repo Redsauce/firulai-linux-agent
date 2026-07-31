@@ -365,24 +365,31 @@ ask_yes_no() {
 run_privileged_command() {
     local command_string="$1"
 
+    if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+        sh -c "$command_string"
+        return $?
+    fi
+
     has_interactive_tty || {
         error "No interactive terminal is available to request privileged access."
         return 1
     }
 
     info "This action needs privileged access."
+    if command -v su >/dev/null 2>&1; then
+        info "Trying root via su first. su asks for the root password and requires root login to be allowed."
+        if su -c "$command_string"; then
+            return 0
+        fi
+        warn "The privileged action could not be completed with su/root."
+    fi
+
     if command -v sudo >/dev/null 2>&1; then
-        info "Trying sudo first. sudo asks for the current user's password and requires sudo permissions."
+        info "Trying sudo fallback. sudo asks for the current user's password and requires sudo permissions."
         if sudo sh -c "$command_string"; then
             return 0
         fi
         warn "The privileged action could not be completed with sudo."
-    fi
-
-    if command -v su >/dev/null 2>&1; then
-        info "Trying su fallback. su asks for the root password and requires root login to be allowed."
-        su -c "$command_string"
-        return $?
     fi
 
     error "Neither sudo nor su was found to request privileged access."
