@@ -83,6 +83,39 @@ early_user_linger_enabled_for() {
     [ "$(loginctl show-user "$username" -p Linger --value 2>/dev/null || true)" = "yes" ]
 }
 
+early_user_runtime_dir_for() {
+    local username="$1"
+    local user_uid
+    user_uid=$(id -u "$username" 2>/dev/null) || return 1
+    printf '/run/user/%s' "$user_uid"
+}
+
+early_wait_for_user_systemd_bus_for() {
+    local username="$1"
+    local runtime_dir attempts=0
+    runtime_dir=$(early_user_runtime_dir_for "$username") || return 1
+
+    while [ "$attempts" -lt 10 ]; do
+        [ -S "$runtime_dir/bus" ] && return 0
+        sleep 1
+        attempts=$((attempts + 1))
+    done
+
+    return 1
+}
+
+early_start_user_systemd_manager_for() {
+    local username="$1"
+    local user_uid
+    user_uid=$(id -u "$username" 2>/dev/null) || return 1
+
+    if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+        systemctl start "user@${user_uid}.service" 2>/dev/null || true
+    fi
+
+    early_wait_for_user_systemd_bus_for "$username"
+}
+
 early_cron_daemon_active() {
     if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
         systemctl is-active --quiet cron.service 2>/dev/null && return 0
@@ -231,6 +264,13 @@ early_preconfigure_no_root_privileged_requirements() {
             fi
             echo "[OK] linger enabled for $target_user"
         fi
+
+        echo "[INFO] Starting systemd user manager for $target_user..."
+        if ! early_start_user_systemd_manager_for "$target_user"; then
+            echo "[ERROR] systemd user bus was not available for $target_user after enabling linger." >&2
+            exit 1
+        fi
+        echo "[OK] systemd user manager is available for $target_user"
     fi
 }
 
@@ -250,7 +290,11 @@ reexec_as_no_root_user() {
 
     early_preconfigure_no_root_privileged_requirements "$target_user"
 
-    command_string="export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
+    local target_uid target_runtime_dir
+    target_uid=$(id -u "$target_user")
+    target_runtime_dir="/run/user/$target_uid"
+
+    command_string="export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
     if [ -n "$SYSTEM_ALIAS" ]; then
         command_string="$command_string --alias $(early_shell_single_quote "$SYSTEM_ALIAS")"
     fi
@@ -492,9 +536,29 @@ require_system_alias() {
     fi
 }
 
+prepare_systemd_user_environment() {
+    local user_uid runtime_dir
+
+    [ "$RUN_AS_ROOT" != "1" ] || return 1
+
+    user_uid=$(id -u 2>/dev/null) || return 1
+    runtime_dir="/run/user/$user_uid"
+
+    if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "$runtime_dir" ]; then
+        export XDG_RUNTIME_DIR="$runtime_dir"
+    fi
+
+    if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ]; then
+        export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+    fi
+
+    [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ]
+}
+
 systemd_user_available() {
     [ "$RUN_AS_ROOT" != "1" ] || return 1
     command -v systemctl &> /dev/null || return 1
+    prepare_systemd_user_environment || return 1
     systemctl --user show-environment >/dev/null 2>&1
 }
 
