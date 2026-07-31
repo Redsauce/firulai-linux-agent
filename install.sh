@@ -17,7 +17,7 @@ set -e
 AGENT_TOKEN=${1:-""}
 UUID=${2:-""}
 SYSTEM_ALIAS=""
-SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-auto}"
+SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-}"
 
 if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
     echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
@@ -35,29 +35,23 @@ while [ $# -gt 0 ]; do
             SYSTEM_ALIAS="$2"
             shift 2
             ;;
-        --scheduler)
-            if [ $# -lt 2 ]; then
-                echo "[ERROR] --scheduler requiere un valor: auto, cron o systemd-user"
-                exit 1
-            fi
-            SCHEDULER_CHOICE="$2"
-            shift 2
-            ;;
         *)
             echo "[ERROR] Argumento desconocido: $1"
-            echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--scheduler auto|cron|systemd-user]"
+            echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
             exit 1
             ;;
     esac
 done
 
-case "$SCHEDULER_CHOICE" in
-    auto|cron|systemd-user) ;;
-    *)
-        echo "[ERROR] --scheduler debe ser: auto, cron o systemd-user"
-        exit 1
-        ;;
-esac
+if [ -n "$SCHEDULER_CHOICE" ]; then
+    case "$SCHEDULER_CHOICE" in
+        cron|systemd-user) ;;
+        *)
+            echo "[ERROR] RS_AGENT_SCHEDULER debe ser: cron o systemd-user"
+            exit 1
+            ;;
+    esac
+fi
 
 # ============================================================================
 # CONFIGURACION
@@ -250,21 +244,26 @@ user_linger_enabled() {
 }
 
 choose_scheduler_interactively() {
-    if [ "$RUN_AS_ROOT" = "1" ] || [ "$SCHEDULER_CHOICE" != "auto" ]; then
+    if [ "$RUN_AS_ROOT" = "1" ] || [ -n "$SCHEDULER_CHOICE" ]; then
         return 0
     fi
 
     if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
-        info "No hay terminal interactiva; se elegira el scheduler automaticamente."
+        warn "No hay terminal interactiva; se usara cron de usuario por defecto."
+        SCHEDULER_CHOICE="cron"
         return 0
     fi
 
     local reply
     echo "" > /dev/tty
     info "Seleccion de ejecucion automatica:"
-    echo "  1) cron de usuario: no requiere root, pero necesita cron/crontab instalado, activo y permitido para este usuario." > /dev/tty
-    echo "  2) systemd --user: mejor integracion, pero para ejecutarse sin sesion activa necesita linger; habilitar linger requiere root/admin." > /dev/tty
-    printf "Scheduler [cron/systemd/auto] (cron): " > /dev/tty
+    echo "  1) Cron de usuario" > /dev/tty
+    echo "     + No requiere root y no depende de sesion activa." > /dev/tty
+    echo "     - Necesita cron/crontab instalado, activo y permitido para este usuario." > /dev/tty
+    echo "  2) systemd --user" > /dev/tty
+    echo "     + Mejor integracion con systemd y systemctl --user." > /dev/tty
+    echo "     - Para ejecutarse sin sesion activa necesita linger; habilitarlo requiere root/admin." > /dev/tty
+    printf "Elige scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     reply=$(trim_string "$reply")
 
@@ -275,12 +274,9 @@ choose_scheduler_interactively() {
         systemd|systemd-user|s|2)
             SCHEDULER_CHOICE="systemd-user"
             ;;
-        auto|a)
-            SCHEDULER_CHOICE="auto"
-            ;;
         *)
             error "Scheduler desconocido: $reply"
-            echo "Usa cron, systemd-user o auto." > /dev/tty
+            echo "Usa 1/cron o 2/systemd-user." > /dev/tty
             exit 1
             ;;
     esac
@@ -597,8 +593,9 @@ check_cron_prerequisites() {
     local crontab_error_file
 
     if ! command -v crontab &> /dev/null; then
-        error "No se puede configurar ejecucion automatica no-root: el comando crontab no esta disponible."
-        error "Instala/activa cron en el sistema o contacta con Firulai para revisar una alternativa."
+        error "No se puede configurar cron de usuario: el comando crontab no esta disponible."
+        error "Para continuar con cron, un administrador debe instalar/activar cron en el sistema."
+        error "Esta accion requiere permisos root/admin. Contacta con Firulai si necesitas ayuda."
         return 1
     fi
 
@@ -606,7 +603,8 @@ check_cron_prerequisites() {
     if ! crontab -l >/dev/null 2>"$crontab_error_file"; then
         if ! grep -qi "no crontab" "$crontab_error_file"; then
             error "El usuario actual no puede gestionar su crontab."
-            error "Revisa las politicas de cron del sistema o contacta con Firulai."
+            error "Un administrador debe permitir crontabs para este usuario y revisar las politicas de cron."
+            error "Esta accion puede requerir permisos root/admin. Contacta con Firulai si necesitas ayuda."
             cat "$crontab_error_file" 2>/dev/null || true
             rm -f "$crontab_error_file"
             return 1
@@ -616,7 +614,8 @@ check_cron_prerequisites() {
 
     if ! cron_daemon_active; then
         error "El comando crontab existe, pero no se pudo confirmar que el daemon cron este activo."
-        error "Activa cron/crond en el sistema o contacta con Firulai para revisar una alternativa."
+        error "Para continuar con cron, un administrador debe activar cron/crond en el sistema."
+        error "Esta accion requiere permisos root/admin. Contacta con Firulai si necesitas ayuda."
         return 1
     fi
 }
@@ -629,15 +628,7 @@ cron_scheduler_required() {
         return 0
     fi
 
-    if [ "$SCHEDULER_CHOICE" = "cron" ]; then
-        return 0
-    fi
-
     if [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
-        return 1
-    fi
-
-    if systemd_user_available && { user_linger_enabled || [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" = "1" ]; }; then
         return 1
     fi
 
@@ -647,14 +638,16 @@ cron_scheduler_required() {
 check_systemd_user_prerequisites() {
     if ! systemd_user_available; then
         error "No se puede usar systemd --user: no esta disponible para este usuario/sesion."
-        error "Elige cron de usuario o contacta con Firulai para revisar una alternativa."
+        error "Un administrador debe revisar la configuracion de systemd de usuario o debes elegir cron."
+        error "Esta revision puede requerir permisos root/admin. Contacta con Firulai si necesitas ayuda."
         return 1
     fi
 
     if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
         error "No se puede usar systemd --user de forma fiable: linger no esta habilitado para el usuario actual."
-        error "Habilitar linger requiere root/admin: loginctl enable-linger $(id -un)"
-        error "Elige cron de usuario o contacta con Firulai."
+        error "Para continuar con systemd --user, un administrador debe habilitar linger:"
+        error "  loginctl enable-linger $(id -un)"
+        error "Esta accion requiere permisos root/admin. Contacta con Firulai si necesitas ayuda."
         return 1
     fi
 }
