@@ -40,7 +40,8 @@ Cron de usuario:
 
 - No requiere root.
 - Requiere que `cron/crontab` este instalado, activo y permitido para el usuario.
-- Si esos requisitos fallan, la instalacion automatica no se completa y se indica que un administrador debe instalar/activar cron o permitir crontabs para el usuario.
+- Si falta cron o no esta activo, el instalador puede intentar instalarlo/activarlo en ese momento solicitando contraseña root/admin.
+- Si las politicas del sistema bloquean crontabs para el usuario, la instalacion automatica no se completa y se indica contactar con Firulai o con el administrador.
 
 ```bash
 crontab -l | grep rs_agent_runner
@@ -50,7 +51,7 @@ crontab -l | grep rs_agent_runner
 
 - Tiene mejor integracion con systemd.
 - Para ejecutarse sin sesion activa necesita `linger`.
-- Habilitar `linger` requiere root/admin: `loginctl enable-linger <usuario>`.
+- Si `linger` no esta habilitado, el instalador puede intentar habilitarlo en ese momento solicitando contraseña root/admin.
 
 ```bash
 systemctl --user status rs-agent.timer

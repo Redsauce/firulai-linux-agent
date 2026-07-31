@@ -243,6 +243,47 @@ user_linger_enabled() {
     [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)" = "yes" ]
 }
 
+has_interactive_tty() {
+    [ -r /dev/tty ] && [ -w /dev/tty ]
+}
+
+ask_yes_no() {
+    local prompt="$1"
+    local reply
+
+    has_interactive_tty || return 1
+    printf "%s [s/N]: " "$prompt" > /dev/tty
+    IFS= read -r reply < /dev/tty || reply=""
+    case "$reply" in
+        s|S|y|Y|yes|YES|si|SI) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+run_privileged_command() {
+    local command_string="$1"
+
+    has_interactive_tty || {
+        error "No hay terminal interactiva para solicitar contraseña de root/admin."
+        return 1
+    }
+
+    if command -v sudo >/dev/null 2>&1; then
+        if sudo sh -c "$command_string"; then
+            return 0
+        fi
+        warn "No se pudo completar la accion con sudo."
+    fi
+
+    if command -v su >/dev/null 2>&1; then
+        su -c "$command_string"
+        return $?
+    fi
+
+    error "No se encontro sudo ni su para solicitar permisos de root/admin."
+    return 1
+}
+
 choose_scheduler_interactively() {
     if [ "$RUN_AS_ROOT" = "1" ] || [ -n "$SCHEDULER_CHOICE" ]; then
         return 0
@@ -259,10 +300,10 @@ choose_scheduler_interactively() {
     info "Seleccion de ejecucion automatica:"
     echo "  1) Cron de usuario" > /dev/tty
     echo "     + No requiere root y no depende de sesion activa." > /dev/tty
-    echo "     - Necesita cron/crontab instalado, activo y permitido para este usuario." > /dev/tty
+    echo "     - Necesita cron/crontab instalado, activo y permitido; si falta, podemos intentar instalarlo/activarlo con contraseña root/admin." > /dev/tty
     echo "  2) systemd --user" > /dev/tty
     echo "     + Mejor integracion con systemd y systemctl --user." > /dev/tty
-    echo "     - Para ejecutarse sin sesion activa necesita linger; habilitarlo requiere root/admin." > /dev/tty
+    echo "     - Para ejecutarse sin sesion activa necesita linger; podemos intentar habilitarlo con contraseña root/admin." > /dev/tty
     printf "Elige scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     reply=$(trim_string "$reply")
@@ -589,14 +630,90 @@ cron_daemon_active() {
     return 1
 }
 
+cron_install_command() {
+    if command -v apt-get >/dev/null 2>&1; then
+        printf '%s' 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y cron'
+        return 0
+    fi
+
+    if command -v dnf >/dev/null 2>&1; then
+        printf '%s' 'dnf install -y cronie'
+        return 0
+    fi
+
+    if command -v yum >/dev/null 2>&1; then
+        printf '%s' 'yum install -y cronie'
+        return 0
+    fi
+
+    if command -v zypper >/dev/null 2>&1; then
+        printf '%s' 'zypper --non-interactive install cron'
+        return 0
+    fi
+
+    return 1
+}
+
+cron_enable_command() {
+    if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+        printf '%s' 'systemctl enable --now cron.service 2>/dev/null || systemctl enable --now crond.service 2>/dev/null || systemctl enable --now cronie.service'
+        return 0
+    fi
+
+    if command -v service >/dev/null 2>&1; then
+        printf '%s' 'service cron start 2>/dev/null || service crond start'
+        return 0
+    fi
+
+    return 1
+}
+
+offer_install_cron() {
+    local command_string
+
+    command_string=$(cron_install_command) || {
+        error "No se pudo determinar como instalar cron automaticamente en esta distribucion."
+        error "Instala cron manualmente o contacta con Firulai."
+        return 1
+    }
+
+    warn "cron/crontab no esta instalado."
+    if ! ask_yes_no "Quieres que intentemos instalar cron ahora? Requiere contraseña de root/admin."; then
+        error "No se puede continuar con cron sin instalar crontab."
+        return 1
+    fi
+
+    info "Intentando instalar cron con permisos root/admin..."
+    run_privileged_command "$command_string"
+}
+
+offer_enable_cron_daemon() {
+    local command_string
+
+    command_string=$(cron_enable_command) || {
+        error "No se pudo determinar como activar cron automaticamente en esta distribucion."
+        error "Activa cron manualmente o contacta con Firulai."
+        return 1
+    }
+
+    warn "cron/crond no parece estar activo."
+    if ! ask_yes_no "Quieres que intentemos activarlo ahora? Requiere contraseña de root/admin."; then
+        error "No se puede continuar con cron si el daemon no esta activo."
+        return 1
+    fi
+
+    info "Intentando activar cron con permisos root/admin..."
+    run_privileged_command "$command_string"
+}
+
 check_cron_prerequisites() {
     local crontab_error_file
 
     if ! command -v crontab &> /dev/null; then
-        error "No se puede configurar cron de usuario: el comando crontab no esta disponible."
-        error "Para continuar con cron, un administrador debe instalar/activar cron en el sistema."
-        error "Esta accion requiere permisos root/admin. Contacta con Firulai si necesitas ayuda."
-        return 1
+        if ! offer_install_cron || ! command -v crontab &> /dev/null; then
+            error "No se pudo dejar crontab disponible. Contacta con Firulai si necesitas ayuda."
+            return 1
+        fi
     fi
 
     crontab_error_file=$(make_private_temp_file "cron_access_check") || return 1
@@ -613,10 +730,10 @@ check_cron_prerequisites() {
     rm -f "$crontab_error_file"
 
     if ! cron_daemon_active; then
-        error "El comando crontab existe, pero no se pudo confirmar que el daemon cron este activo."
-        error "Para continuar con cron, un administrador debe activar cron/crond en el sistema."
-        error "Esta accion requiere permisos root/admin. Contacta con Firulai si necesitas ayuda."
-        return 1
+        if ! offer_enable_cron_daemon || ! cron_daemon_active; then
+            error "No se pudo confirmar que cron este activo. Contacta con Firulai si necesitas ayuda."
+            return 1
+        fi
     fi
 }
 
@@ -644,11 +761,23 @@ check_systemd_user_prerequisites() {
     fi
 
     if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
-        error "No se puede usar systemd --user de forma fiable: linger no esta habilitado para el usuario actual."
-        error "Para continuar con systemd --user, un administrador debe habilitar linger:"
-        error "  loginctl enable-linger $(id -un)"
-        error "Esta accion requiere permisos root/admin. Contacta con Firulai si necesitas ayuda."
-        return 1
+        local username
+        username=$(id -un)
+        warn "linger no esta habilitado para $username."
+        warn "systemd --user no sera fiable sin sesion activa hasta habilitar linger."
+
+        if ! ask_yes_no "Quieres que intentemos habilitar linger ahora? Requiere contraseña de root/admin."; then
+            error "No se puede continuar con systemd --user sin linger."
+            error "Puedes elegir cron de usuario o contactar con Firulai."
+            return 1
+        fi
+
+        info "Intentando habilitar linger con permisos root/admin..."
+        if ! run_privileged_command "loginctl enable-linger $(shell_single_quote "$username")" || ! user_linger_enabled; then
+            error "No se pudo habilitar linger para $username."
+            error "Contacta con Firulai si necesitas ayuda."
+            return 1
+        fi
     fi
 }
 
