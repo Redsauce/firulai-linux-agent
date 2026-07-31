@@ -77,6 +77,163 @@ early_shell_single_quote() {
     printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
+early_user_linger_enabled_for() {
+    local username="$1"
+    command -v loginctl >/dev/null 2>&1 || return 1
+    [ "$(loginctl show-user "$username" -p Linger --value 2>/dev/null || true)" = "yes" ]
+}
+
+early_cron_daemon_active() {
+    if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+        systemctl is-active --quiet cron.service 2>/dev/null && return 0
+        systemctl is-active --quiet crond.service 2>/dev/null && return 0
+        systemctl is-active --quiet cronie.service 2>/dev/null && return 0
+    fi
+
+    if command -v service >/dev/null 2>&1; then
+        service cron status >/dev/null 2>&1 && return 0
+        service crond status >/dev/null 2>&1 && return 0
+    fi
+
+    if command -v pgrep >/dev/null 2>&1; then
+        pgrep -x cron >/dev/null 2>&1 && return 0
+        pgrep -x crond >/dev/null 2>&1 && return 0
+    fi
+
+    return 1
+}
+
+early_cron_install_command() {
+    if command -v apt-get >/dev/null 2>&1; then
+        printf '%s' 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y cron'
+        return 0
+    fi
+
+    if command -v dnf >/dev/null 2>&1; then
+        printf '%s' 'dnf install -y cronie'
+        return 0
+    fi
+
+    if command -v yum >/dev/null 2>&1; then
+        printf '%s' 'yum install -y cronie'
+        return 0
+    fi
+
+    if command -v zypper >/dev/null 2>&1; then
+        printf '%s' 'zypper --non-interactive install cron'
+        return 0
+    fi
+
+    return 1
+}
+
+early_cron_enable_command() {
+    if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+        printf '%s' 'systemctl enable --now cron.service 2>/dev/null || systemctl enable --now crond.service 2>/dev/null || systemctl enable --now cronie.service'
+        return 0
+    fi
+
+    if command -v service >/dev/null 2>&1; then
+        printf '%s' 'service cron start 2>/dev/null || service crond start'
+        return 0
+    fi
+
+    return 1
+}
+
+early_choose_no_root_scheduler() {
+    local reply
+
+    if [ -n "$SCHEDULER_CHOICE" ]; then
+        return 0
+    fi
+
+    if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+        echo "[WARN] No interactive terminal detected; user cron will be used by default."
+        SCHEDULER_CHOICE="cron"
+        return 0
+    fi
+
+    echo "" > /dev/tty
+    echo "No-root automatic execution setup:" > /dev/tty
+    echo "  1) User cron" > /dev/tty
+    echo "     + Does not require root for agent execution and does not depend on an active user session." > /dev/tty
+    echo "     - Requires cron/crontab installed, active, and allowed." > /dev/tty
+    echo "  2) systemd --user" > /dev/tty
+    echo "     + Better integration with systemd and systemctl --user." > /dev/tty
+    echo "     - Requires linger to run without an active session; it will be enabled now as root if needed." > /dev/tty
+    printf "Choose scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
+    IFS= read -r reply < /dev/tty || reply=""
+    reply=$(early_trim_string "$reply")
+
+    case "$reply" in
+        ""|cron|c|1)
+            SCHEDULER_CHOICE="cron"
+            ;;
+        systemd|systemd-user|s|2)
+            SCHEDULER_CHOICE="systemd-user"
+            ;;
+        *)
+            echo "[ERROR] Unknown scheduler: $reply" > /dev/tty
+            echo "[ERROR] Use 1/cron or 2/systemd-user." > /dev/tty
+            exit 1
+            ;;
+    esac
+}
+
+early_preconfigure_no_root_privileged_requirements() {
+    local target_user="$1"
+
+    early_choose_no_root_scheduler
+
+    if [ "$SCHEDULER_CHOICE" = "cron" ]; then
+        local cron_command
+
+        if ! command -v crontab >/dev/null 2>&1; then
+            cron_command=$(early_cron_install_command) || {
+                echo "[ERROR] Could not determine how to install cron automatically on this distribution." >&2
+                exit 1
+            }
+            echo "[INFO] Installing cron as root..."
+            sh -c "$cron_command"
+            if ! command -v crontab >/dev/null 2>&1; then
+                echo "[ERROR] cron/crontab is still not available after installation." >&2
+                exit 1
+            fi
+        fi
+
+        if ! early_cron_daemon_active; then
+            cron_command=$(early_cron_enable_command) || {
+                echo "[ERROR] Could not determine how to enable cron automatically on this distribution." >&2
+                exit 1
+            }
+            echo "[INFO] Enabling cron as root..."
+            sh -c "$cron_command"
+            if ! early_cron_daemon_active; then
+                echo "[ERROR] cron does not appear to be active after enabling it." >&2
+                exit 1
+            fi
+        fi
+    elif [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
+        if ! command -v loginctl >/dev/null 2>&1; then
+            echo "[ERROR] loginctl is required to enable linger for systemd --user." >&2
+            exit 1
+        fi
+
+        if early_user_linger_enabled_for "$target_user"; then
+            echo "[OK] linger is already enabled for $target_user"
+        else
+            echo "[INFO] Enabling linger for $target_user as root..."
+            loginctl enable-linger "$target_user"
+            if ! early_user_linger_enabled_for "$target_user"; then
+                echo "[ERROR] Could not enable linger for $target_user." >&2
+                exit 1
+            fi
+            echo "[OK] linger enabled for $target_user"
+        fi
+    fi
+}
+
 reexec_as_no_root_user() {
     local target_user="$1"
     local command_string
@@ -91,7 +248,9 @@ reexec_as_no_root_user() {
         exit 1
     fi
 
-    command_string="curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
+    early_preconfigure_no_root_privileged_requirements "$target_user"
+
+    command_string="export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
     if [ -n "$SYSTEM_ALIAS" ]; then
         command_string="$command_string --alias $(early_shell_single_quote "$SYSTEM_ALIAS")"
     fi
@@ -131,7 +290,7 @@ choose_install_mode_if_root() {
     echo "" > /dev/tty
     echo "Installation mode:" > /dev/tty
     echo "  1) Root/system install: uses /opt, /var/lib, system services; requires root." > /dev/tty
-    echo "  2) No-root user install: installs under a regular user's home and asks scheduler later." > /dev/tty
+    echo "  2) No-root user install: installs under a regular user's home and configures privileged prerequisites before switching user." > /dev/tty
     printf "Choose install mode [1=root, 2=no-root] (1): " > /dev/tty
     IFS= read -r mode_reply < /dev/tty || mode_reply=""
     mode_reply=$(early_trim_string "$mode_reply")
