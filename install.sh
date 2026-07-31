@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# Redsauce Inventory Agent - Instalador One-Liner
+# Firulai Inventory Agent - One-liner installer
 # Version 0.2.4 - Recuperación de ejecuciones perdidas con systemd/cron
 # ============================================================================
 #
@@ -65,6 +65,109 @@ RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
     RUN_AS_ROOT=1
 fi
+
+early_trim_string() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+early_shell_single_quote() {
+    printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+reexec_as_no_root_user() {
+    local target_user="$1"
+    local command_string
+
+    if ! id "$target_user" >/dev/null 2>&1; then
+        echo "[ERROR] User does not exist: $target_user"
+        exit 1
+    fi
+
+    if [ "$(id -u "$target_user")" -eq 0 ]; then
+        echo "[ERROR] The selected no-root user cannot be root."
+        exit 1
+    fi
+
+    command_string="curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
+    if [ -n "$SYSTEM_ALIAS" ]; then
+        command_string="$command_string --alias $(early_shell_single_quote "$SYSTEM_ALIAS")"
+    fi
+
+    echo "[INFO] Re-running installer as no-root user: $target_user"
+    exec su - "$target_user" -c "$command_string"
+}
+
+choose_install_mode_if_root() {
+    local mode_reply target_user
+
+    [ "$RUN_AS_ROOT" = "1" ] || return 0
+
+    if [ -n "${RS_AGENT_INSTALL_MODE:-}" ]; then
+        case "$RS_AGENT_INSTALL_MODE" in
+            root) return 0 ;;
+            no-root)
+                target_user="${RS_AGENT_TARGET_USER:-${SUDO_USER:-}}"
+                if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
+                    echo "[ERROR] RS_AGENT_TARGET_USER is required for no-root mode when running as root."
+                    exit 1
+                fi
+                reexec_as_no_root_user "$target_user"
+                ;;
+            *)
+                echo "[ERROR] RS_AGENT_INSTALL_MODE must be root or no-root"
+                exit 1
+                ;;
+        esac
+    fi
+
+    if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+        echo "[WARN] Running as root without an interactive terminal; continuing with root/system install."
+        return 0
+    fi
+
+    echo "" > /dev/tty
+    echo "Installation mode:" > /dev/tty
+    echo "  1) Root/system install: uses /opt, /var/lib, system services; requires root." > /dev/tty
+    echo "  2) No-root user install: installs under a regular user's home and asks scheduler later." > /dev/tty
+    printf "Choose install mode [1=root, 2=no-root] (1): " > /dev/tty
+    IFS= read -r mode_reply < /dev/tty || mode_reply=""
+    mode_reply=$(early_trim_string "$mode_reply")
+
+    case "$mode_reply" in
+        ""|1|root|r)
+            return 0
+            ;;
+        2|no-root|user|u)
+            target_user="${SUDO_USER:-}"
+            if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
+                printf "Target no-root user: " > /dev/tty
+                IFS= read -r target_user < /dev/tty || target_user=""
+                target_user=$(early_trim_string "$target_user")
+            else
+                printf "Target no-root user (%s): " "$target_user" > /dev/tty
+                local target_reply=""
+                IFS= read -r target_reply < /dev/tty || target_reply=""
+                target_reply=$(early_trim_string "$target_reply")
+                [ -n "$target_reply" ] && target_user="$target_reply"
+            fi
+
+            if [ -z "$target_user" ]; then
+                echo "[ERROR] A target no-root user is required." > /dev/tty
+                exit 1
+            fi
+            reexec_as_no_root_user "$target_user"
+            ;;
+        *)
+            echo "[ERROR] Unknown install mode: $mode_reply" > /dev/tty
+            exit 1
+            ;;
+    esac
+}
+
+choose_install_mode_if_root
 
 # Directorios de instalacion
 if [ "$RUN_AS_ROOT" = "1" ]; then
@@ -170,19 +273,18 @@ make_private_temp_file() {
 banner() {
     echo ""
     echo "============================================================================"
-    echo "  Redsauce Inventory Agent - Instalador v0.2.4"
-    echo "  Optimizado para detección de vulnerabilidades CVE"
+    echo "  Firulai Inventory Agent - Installer v0.2.4"
+    echo "  System analysis agent for vulnerability detection"
     echo "============================================================================"
     echo ""
 }
 
 check_root() {
     if [ "$RUN_AS_ROOT" = "1" ]; then
-        warn "Instalador ejecutado como root; se usaran rutas de sistema."
-        warn "Para probar instalacion no-root, ejecuta el one-liner sin sudo."
+        warn "Root/system installation mode selected; system paths will be used."
     else
-        info "Modo no-root: el agente se instalara solo para el usuario actual."
-        warn "El inventario puede ser menos completo que en modo root si el sistema restringe algun comando."
+        info "No-root installation mode selected; the agent will be installed only for the current user."
+        warn "The inventory may be less complete than root mode if the system restricts some commands."
     fi
 }
 
@@ -264,7 +366,7 @@ run_privileged_command() {
     local command_string="$1"
 
     has_interactive_tty || {
-        error "No hay terminal interactiva para solicitar contraseña de root/admin."
+        error "No interactive terminal is available to request the root/admin password."
         return 1
     }
 
@@ -272,7 +374,7 @@ run_privileged_command() {
         if sudo sh -c "$command_string"; then
             return 0
         fi
-        warn "No se pudo completar la accion con sudo."
+        warn "The privileged action could not be completed with sudo."
     fi
 
     if command -v su >/dev/null 2>&1; then
@@ -280,7 +382,7 @@ run_privileged_command() {
         return $?
     fi
 
-    error "No se encontro sudo ni su para solicitar permisos de root/admin."
+    error "Neither sudo nor su was found to request root/admin permissions."
     return 1
 }
 
@@ -290,21 +392,21 @@ choose_scheduler_interactively() {
     fi
 
     if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
-        warn "No hay terminal interactiva; se usara cron de usuario por defecto."
+        warn "No interactive terminal detected; user cron will be used by default."
         SCHEDULER_CHOICE="cron"
         return 0
     fi
 
     local reply
     echo "" > /dev/tty
-    info "Seleccion de ejecucion automatica:"
-    echo "  1) Cron de usuario" > /dev/tty
-    echo "     + No requiere root y no depende de sesion activa." > /dev/tty
-    echo "     - Necesita cron/crontab instalado, activo y permitido; si falta, podemos intentar instalarlo/activarlo con contraseña root/admin." > /dev/tty
+    info "Automatic execution setup:"
+    echo "  1) User cron" > /dev/tty
+    echo "     + Does not require root and does not depend on an active user session." > /dev/tty
+    echo "     - Requires cron/crontab installed, active, and allowed. If not, we can try to install/enable it, requiring the root/admin password." > /dev/tty
     echo "  2) systemd --user" > /dev/tty
-    echo "     + Mejor integracion con systemd y systemctl --user." > /dev/tty
-    echo "     - Para ejecutarse sin sesion activa necesita linger; podemos intentar habilitarlo con contraseña root/admin." > /dev/tty
-    printf "Elige scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
+    echo "     + Better integration with systemd and systemctl --user." > /dev/tty
+    echo "     - Requires linger to run without an active session. If not enabled, we can try to enable it, requiring the root/admin password." > /dev/tty
+    printf "Choose scheduler [1=cron, 2=systemd-user] (1): " > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     reply=$(trim_string "$reply")
 
@@ -316,8 +418,8 @@ choose_scheduler_interactively() {
             SCHEDULER_CHOICE="systemd-user"
             ;;
         *)
-            error "Scheduler desconocido: $reply"
-            echo "Usa 1/cron o 2/systemd-user." > /dev/tty
+            error "Unknown scheduler: $reply"
+            echo "Use 1/cron or 2/systemd-user." > /dev/tty
             exit 1
             ;;
     esac
@@ -672,18 +774,18 @@ offer_install_cron() {
     local command_string
 
     command_string=$(cron_install_command) || {
-        error "No se pudo determinar como instalar cron automaticamente en esta distribucion."
-        error "Instala cron manualmente o contacta con Firulai."
+        error "Could not determine how to install cron automatically on this distribution."
+        error "Install cron manually or contact Firulai."
         return 1
     }
 
-    warn "cron/crontab no esta instalado."
-    if ! ask_yes_no "Quieres que intentemos instalar cron ahora? Requiere contraseña de root/admin."; then
-        error "No se puede continuar con cron sin instalar crontab."
+    warn "cron/crontab is not installed."
+    if ! ask_yes_no "Do you want us to install cron now? This requires the root/admin password."; then
+        error "Cannot continue with cron without crontab."
         return 1
     fi
 
-    info "Intentando instalar cron con permisos root/admin..."
+    info "Attempting to install cron with root/admin permissions..."
     run_privileged_command "$command_string"
 }
 
@@ -691,18 +793,18 @@ offer_enable_cron_daemon() {
     local command_string
 
     command_string=$(cron_enable_command) || {
-        error "No se pudo determinar como activar cron automaticamente en esta distribucion."
-        error "Activa cron manualmente o contacta con Firulai."
+        error "Could not determine how to enable cron automatically on this distribution."
+        error "Enable cron manually or contact Firulai."
         return 1
     }
 
-    warn "cron/crond no parece estar activo."
-    if ! ask_yes_no "Quieres que intentemos activarlo ahora? Requiere contraseña de root/admin."; then
-        error "No se puede continuar con cron si el daemon no esta activo."
+    warn "cron/crond does not appear to be active."
+    if ! ask_yes_no "Do you want us to enable it now? This requires the root/admin password."; then
+        error "Cannot continue with cron if the daemon is not active."
         return 1
     fi
 
-    info "Intentando activar cron con permisos root/admin..."
+    info "Attempting to enable cron with root/admin permissions..."
     run_privileged_command "$command_string"
 }
 
@@ -711,7 +813,7 @@ check_cron_prerequisites() {
 
     if ! command -v crontab &> /dev/null; then
         if ! offer_install_cron || ! command -v crontab &> /dev/null; then
-            error "No se pudo dejar crontab disponible. Contacta con Firulai si necesitas ayuda."
+            error "Could not make crontab available. Contact Firulai if you need help."
             return 1
         fi
     fi
@@ -719,9 +821,9 @@ check_cron_prerequisites() {
     crontab_error_file=$(make_private_temp_file "cron_access_check") || return 1
     if ! crontab -l >/dev/null 2>"$crontab_error_file"; then
         if ! grep -qi "no crontab" "$crontab_error_file"; then
-            error "El usuario actual no puede gestionar su crontab."
-            error "Un administrador debe permitir crontabs para este usuario y revisar las politicas de cron."
-            error "Esta accion puede requerir permisos root/admin. Contacta con Firulai si necesitas ayuda."
+            error "The current user cannot manage their crontab."
+            error "An administrator must allow crontabs for this user and review cron policies."
+            error "This may require root/admin permissions. Contact Firulai if you need help."
             cat "$crontab_error_file" 2>/dev/null || true
             rm -f "$crontab_error_file"
             return 1
@@ -731,7 +833,7 @@ check_cron_prerequisites() {
 
     if ! cron_daemon_active; then
         if ! offer_enable_cron_daemon || ! cron_daemon_active; then
-            error "No se pudo confirmar que cron este activo. Contacta con Firulai si necesitas ayuda."
+            error "Could not confirm that cron is active. Contact Firulai if you need help."
             return 1
         fi
     fi
@@ -754,28 +856,28 @@ cron_scheduler_required() {
 
 check_systemd_user_prerequisites() {
     if ! systemd_user_available; then
-        error "No se puede usar systemd --user: no esta disponible para este usuario/sesion."
-        error "Un administrador debe revisar la configuracion de systemd de usuario o debes elegir cron."
-        error "Esta revision puede requerir permisos root/admin. Contacta con Firulai si necesitas ayuda."
+        error "systemd --user cannot be used: it is not available for this user/session."
+        error "An administrator must review the user systemd setup, or you should choose cron."
+        error "This may require root/admin permissions. Contact Firulai if you need help."
         return 1
     fi
 
     if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
         local username
         username=$(id -un)
-        warn "linger no esta habilitado para $username."
-        warn "systemd --user no sera fiable sin sesion activa hasta habilitar linger."
+        warn "linger is not enabled for $username."
+        warn "systemd --user will not be reliable without an active session until linger is enabled."
 
-        if ! ask_yes_no "Quieres que intentemos habilitar linger ahora? Requiere contraseña de root/admin."; then
-            error "No se puede continuar con systemd --user sin linger."
-            error "Puedes elegir cron de usuario o contactar con Firulai."
+        if ! ask_yes_no "Do you want us to enable linger now? This requires the root/admin password."; then
+            error "Cannot continue with systemd --user without linger."
+            error "You can choose user cron or contact Firulai."
             return 1
         fi
 
-        info "Intentando habilitar linger con permisos root/admin..."
+        info "Attempting to enable linger with root/admin permissions..."
         if ! run_privileged_command "loginctl enable-linger $(shell_single_quote "$username")" || ! user_linger_enabled; then
-            error "No se pudo habilitar linger para $username."
-            error "Contacta con Firulai si necesitas ayuda."
+            error "Could not enable linger for $username."
+            error "Contact Firulai if you need help."
             return 1
         fi
     fi
@@ -952,15 +1054,15 @@ TIMER_EOF
             error "systemd no pudo habilitar rs-agent.timer"
             return 1
         fi
-        SCHEDULER_TYPE="systemd.timer persistente"
-        log "Timer systemd configurado a las 03:00 con recuperación al arrancar"
+        SCHEDULER_TYPE="persistent systemd timer"
+        log "systemd timer configured at 03:00 with boot recovery"
         return 0
     fi
 
     if [ "$RUN_AS_ROOT" != "1" ] && [ "$SCHEDULER_CHOICE" != "cron" ] && systemd_user_available; then
         if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
-            warn "systemd --user disponible, pero lingering no esta habilitado para el usuario actual."
-            warn "Se usara cron de usuario para evitar depender de una sesion activa."
+            warn "systemd --user is available, but linger is not enabled for the current user."
+            warn "User cron will be used to avoid depending on an active session."
         else
             mkdir -p "$SYSTEMD_USER_DIR"
             cat > "$SYSTEMD_USER_SERVICE_FILE" << SERVICE_EOF
@@ -992,18 +1094,18 @@ TIMER_EOF
 
             chmod 644 "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
             if systemctl --user daemon-reload && systemctl --user enable --now rs-agent.timer; then
-                SCHEDULER_TYPE="systemd --user timer persistente"
-                log "Timer systemd de usuario configurado a las 03:00"
+                SCHEDULER_TYPE="persistent systemd --user timer"
+                log "systemd --user timer configured at 03:00"
                 return 0
             fi
 
             rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
             systemctl --user daemon-reload >/dev/null 2>&1 || true
             if [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
-                error "No se pudo habilitar systemd --user."
+                error "Could not enable systemd --user."
                 return 1
             fi
-            warn "No se pudo habilitar systemd --user; se intentara cron de usuario."
+            warn "Could not enable systemd --user; user cron will be tried instead."
         fi
     fi
 
@@ -1028,11 +1130,11 @@ TIMER_EOF
     fi
 
     if [ "$RUN_AS_ROOT" = "1" ]; then
-        SCHEDULER_TYPE="cron de root con recuperacion al arrancar y comprobacion cada 30 minutos"
-        log "Cron de root configurado con ejecucion diaria y recuperacion automatica"
+        SCHEDULER_TYPE="root cron with boot recovery and 30-minute checks"
+        log "Root cron configured with daily execution and automatic recovery"
     else
-        SCHEDULER_TYPE="cron de usuario con recuperacion al arrancar y comprobacion cada 30 minutos"
-        log "Cron de usuario configurado con ejecucion diaria y recuperacion automatica"
+        SCHEDULER_TYPE="user cron with boot recovery and 30-minute checks"
+        log "User cron configured with daily execution and automatic recovery"
     fi
 }
 
@@ -1088,7 +1190,7 @@ print_summary() {
     echo "   - Sin dependencia de Python ni jq (bash puro)"
     echo "   - Envia inventario completo en cada ejecución a RSM"
     echo "   - RSM detecta y gestiona los cambios"
-    echo "   - Optimizado para detección de vulnerabilidades CVE"
+    echo "   - System analysis agent for vulnerability detection"
     echo "   - Incluye: OS, kernel, CPU, modelo de discos, paquetes, software crítico"
     echo ""
     echo "Desinstalar:"

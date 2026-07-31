@@ -1,7 +1,7 @@
 #!/bin/bash
 # -*- coding: utf-8 -*-
 #
-# Redsauce Inventory Agent - Uninstaller
+# Firulai Inventory Agent - Uninstaller
 # Marca el sistema como inactivo en RSM y elimina la instalacion local.
 #
 
@@ -148,7 +148,7 @@ parse_args() {
 confirm_uninstall() {
     echo ""
     echo "============================================================"
-    echo "Redsauce Inventory Agent - DesinstalaciÓn"
+    echo "Firulai Inventory Agent - Uninstall"
     echo "============================================================"
     echo ""
     echo "Esta acción solo borrará la instalación local del agente."

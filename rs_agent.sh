@@ -1,7 +1,7 @@
 #!/bin/bash
 # -*- coding: utf-8 -*-
 #
-# Redsauce Inventory Agent
+# Firulai Inventory Agent
 # Version: 0.3.4 - Estado persistente y recuperación de ejecuciones perdidas
 # Requiere: bash 4+, curl, lscpu, lsblk, uname
 #
@@ -719,7 +719,7 @@ main() {
 
     echo ""
     echo "============================================================"
-    printf  'Redsauce Inventory Agent v%s - Recopilando informacion\n' "$AGENT_VERSION"
+    printf  'Firulai Inventory Agent v%s - Collecting system information\n' "$AGENT_VERSION"
     echo "============================================================"
     echo ""
 
