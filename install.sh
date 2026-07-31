@@ -613,6 +613,30 @@ run_privileged_command() {
     return 1
 }
 
+prepare_systemd_user_manager_with_privileged_access() {
+    local username user_uid command_string
+
+    [ "$RUN_AS_ROOT" != "1" ] || return 1
+    command -v loginctl >/dev/null 2>&1 || return 1
+    command -v systemctl >/dev/null 2>&1 || return 1
+
+    username=$(id -un)
+    user_uid=$(id -u)
+    command_string="loginctl enable-linger $(shell_single_quote "$username") && systemctl start $(shell_single_quote "user@${user_uid}.service")"
+
+    info "Preparing systemd --user with privileged access..."
+    if ! run_privileged_command "$command_string"; then
+        return 1
+    fi
+
+    if ! early_wait_for_user_systemd_bus_for "$username"; then
+        return 1
+    fi
+
+    prepare_systemd_user_environment
+    systemd_user_available
+}
+
 choose_scheduler_interactively() {
     if [ "$RUN_AS_ROOT" = "1" ] || [ -n "$SCHEDULER_CHOICE" ]; then
         return 0
@@ -1082,16 +1106,27 @@ cron_scheduler_required() {
 }
 
 check_systemd_user_prerequisites() {
+    local username
+    username=$(id -un)
+
     if ! systemd_user_available; then
-        error "systemd --user cannot be used: it is not available for this user/session."
-        error "An administrator must review the user systemd setup, or you should choose cron."
-        error "This may require privileged access. Contact Firulai if you need help."
-        return 1
+        warn "systemd --user is not available for this user/session yet."
+        warn "This can happen after switching user with su because the user systemd bus is not started."
+
+        if ! ask_yes_no "Do you want us to prepare systemd --user now? This needs privileged access."; then
+            error "Cannot continue with systemd --user without a user systemd bus."
+            error "You can run the installer from root and choose no-root mode, choose user cron, or contact Firulai."
+            return 1
+        fi
+
+        if ! prepare_systemd_user_manager_with_privileged_access; then
+            error "Could not prepare systemd --user for $username."
+            error "You can run the installer from root and choose no-root mode, choose user cron, or contact Firulai."
+            return 1
+        fi
     fi
 
     if ! user_linger_enabled && [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" != "1" ]; then
-        local username
-        username=$(id -un)
         warn "linger is not enabled for $username."
         warn "systemd --user will not be reliable without an active session until linger is enabled."
 
@@ -1102,7 +1137,7 @@ check_systemd_user_prerequisites() {
         fi
 
         info "Attempting to enable linger with privileged access..."
-        if ! run_privileged_command "loginctl enable-linger $(shell_single_quote "$username")" || ! user_linger_enabled; then
+        if ! prepare_systemd_user_manager_with_privileged_access || ! user_linger_enabled; then
             error "Could not enable linger for $username."
             error "Contact Firulai if you need help."
             return 1
