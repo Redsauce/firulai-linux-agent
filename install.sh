@@ -1,17 +1,17 @@
 #!/bin/bash
 # ============================================================================
 # Firulai Inventory Agent - One-liner installer
-# Version 0.2.4 - Recuperación de ejecuciones perdidas con systemd/cron
+# Version 0.2.4 - Missed execution recovery with systemd/cron
 # ============================================================================
 #
-# Uso:
+# Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
 #
 
 set -e
 
 # ============================================================================
-# PARAMETROS
+# PARAMETERS
 # ============================================================================
 
 AGENT_TOKEN=${1:-""}
@@ -20,7 +20,7 @@ SYSTEM_ALIAS=""
 SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-}"
 
 if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
-    echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+    echo "[ERROR] Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
     exit 1
 fi
 
@@ -29,15 +29,15 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --alias)
             if [ $# -lt 2 ]; then
-                echo "[ERROR] --alias requiere un valor"
+                echo "[ERROR] --alias requires a value"
                 exit 1
             fi
             SYSTEM_ALIAS="$2"
             shift 2
             ;;
         *)
-            echo "[ERROR] Argumento desconocido: $1"
-            echo "[ERROR] Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+            echo "[ERROR] Unknown argument: $1"
+            echo "[ERROR] Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
             exit 1
             ;;
     esac
@@ -47,18 +47,18 @@ if [ -n "$SCHEDULER_CHOICE" ]; then
     case "$SCHEDULER_CHOICE" in
         cron|systemd-user) ;;
         *)
-            echo "[ERROR] RS_AGENT_SCHEDULER debe ser: cron o systemd-user"
+            echo "[ERROR] RS_AGENT_SCHEDULER must be: cron or systemd-user"
             exit 1
             ;;
     esac
 fi
 
 # ============================================================================
-# CONFIGURACION
+# CONFIGURATION
 # ============================================================================
 
-# URL de GitHub donde esta el agente. En esta rama experimental apunta a la
-# propia rama para probar instalacion no-root sin mezclarla con main.
+# GitHub URL where the agent is hosted. In this experimental branch it points to
+# the same branch to test no-root installation without mixing it with main.
 GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main}"
 
 RUN_AS_ROOT=0
@@ -169,7 +169,7 @@ choose_install_mode_if_root() {
 
 choose_install_mode_if_root
 
-# Directorios de instalacion
+# Installation directories
 if [ "$RUN_AS_ROOT" = "1" ]; then
     INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/rs-agent}"
     DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/rs-agent}"
@@ -240,14 +240,14 @@ ensure_private_directory() {
     local directory="$1"
 
     if [ -L "$directory" ]; then
-        error "Ruta insegura: $directory es un enlace simbolico"
+        error "Unsafe path: $directory is a symbolic link"
         return 1
     fi
 
     mkdir -p "$directory"
 
     if [ -L "$directory" ] || [ ! -d "$directory" ]; then
-        error "No se pudo crear un directorio privado seguro: $directory"
+        error "Could not create a secure private directory: $directory"
         return 1
     fi
 
@@ -255,7 +255,7 @@ ensure_private_directory() {
     chmod 700 "$directory"
 
     if [ ! -O "$directory" ]; then
-        error "Directorio inseguro: $directory no pertenece al usuario actual"
+        error "Unsafe directory: $directory is not owned by the current user"
         return 1
     fi
 }
@@ -315,20 +315,20 @@ require_system_alias() {
     if [ -z "$SYSTEM_ALIAS" ]; then
         if [ -r /dev/tty ]; then
             echo ""
-            info "Este instalador necesita un alias para identificar el sistema en Firulai."
-            printf "Alias del sistema: " > /dev/tty
+            info "This installer needs an alias to identify the system in Firulai."
+            printf "System alias: " > /dev/tty
             IFS= read -r SYSTEM_ALIAS < /dev/tty || SYSTEM_ALIAS=""
             SYSTEM_ALIAS=$(trim_string "$SYSTEM_ALIAS")
         fi
     fi
 
     if [ -z "$SYSTEM_ALIAS" ]; then
-        error "El alias del sistema es obligatorio."
+        error "System alias is required."
         echo ""
-        echo "Ejecuta el instalador indicando el alias con la opcion --alias:"
+        echo "Run the installer with the --alias option:"
         echo "  curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
         echo ""
-        echo "Si el alias contiene espacios, envuélvelo entre comillas."
+        echo "If the alias contains spaces, wrap it in quotes."
         exit 1
     fi
 }
@@ -354,7 +354,7 @@ ask_yes_no() {
     local reply
 
     has_interactive_tty || return 1
-    printf "%s [s/N]: " "$prompt" > /dev/tty
+    printf "%s [y/N]: " "$prompt" > /dev/tty
     IFS= read -r reply < /dev/tty || reply=""
     case "$reply" in
         s|S|y|Y|yes|YES|si|SI) return 0 ;;
@@ -444,14 +444,14 @@ detect_distro() {
 check_dependencies() {
     info "Checking dependencies..."
 
-    # Verificar curl (deberia estar si llegamos aqui)
+    # Verify curl (it should be available if we reached this point)
     if ! command -v curl &> /dev/null; then
-        error "curl no esta instalado"
+        error "curl is not installed"
         exit 1
     fi
     log "curl found: $(curl --version | head -1)"
 
-    # Verificar bash 4+ (requerido por el agente para arrays asociativos)
+    # Verify bash 4+ (required by the agent for associative arrays)
     local bash_major
     bash_major=$(bash --version | grep -oE '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
     if [ "${bash_major:-0}" -lt 4 ]; then
@@ -461,13 +461,13 @@ check_dependencies() {
     log "bash ${bash_major} found"
 
     if ! command -v flock &> /dev/null; then
-        error "flock no está instalado (normalmente forma parte del paquete util-linux)"
+        error "flock is not installed (normally provided by the util-linux package)"
         exit 1
     fi
     log "flock found: $(command -v flock)"
 
     if ! command -v mktemp &> /dev/null; then
-        error "mktemp no esta instalado"
+        error "mktemp is not installed"
         exit 1
     fi
     log "mktemp found: $(command -v mktemp)"
@@ -476,7 +476,7 @@ check_dependencies() {
 validate_uuid_format() {
     local uuid="$1"
     if [[ ! "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-        error "'$uuid' no es un UUID valido"
+        error "'$uuid' is not a valid UUID"
         exit 1
     fi
 }
@@ -547,7 +547,7 @@ check_uuid_available() {
     response_file=$(make_private_temp_file "rsm_install_uuid_check_response")
     payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
 
-    info "Validando UUID en RSM..."
+    info "Validating UUID in RSM..."
 
     set +e
     http_code=$(curl \
@@ -568,21 +568,21 @@ check_uuid_available() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo validar el UUID en RSM (curl exit: $exit_code)."
-        error "Por seguridad, la instalación no continuará sin confirmar que el UUID está disponible."
+        error "Could not validate the UUID in RSM (curl exit: $exit_code)."
+        error "For safety, installation will not continue without confirming that the UUID is available."
         exit 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitió validar el UUID (HTTP $http_code)."
-        error "Por seguridad, la instalación no continuará sin confirmar que el UUID está disponible."
-        echo "Respuesta: $response_body"
+        error "RSM did not allow UUID validation (HTTP $http_code)."
+        error "For safety, installation will not continue without confirming that the UUID is available."
+        echo "Response: $response_body"
         exit 1
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID"; then
-        error "UUID inválido: no existe en RSM."
-        error "No se puede instalar el agente con un UUID que no haya sido generado desde Add New System."
+        error "Invalid UUID: it does not exist in RSM."
+        error "The agent cannot be installed with a UUID that was not generated from Add New System."
         echo ""
         echo "UUID: $UUID"
         exit 1
@@ -591,8 +591,8 @@ check_uuid_available() {
     RSM_SYSTEM_ITEM_ID=$(json_extract_first_scalar_key "$response_body" "ID")
     [ -z "$RSM_SYSTEM_ITEM_ID" ] && RSM_SYSTEM_ITEM_ID=$(json_extract_first_scalar_key "$response_body" "id")
     if [ -z "$RSM_SYSTEM_ITEM_ID" ]; then
-        error "No se pudo localizar el item de RSM asociado al UUID."
-        error "Por seguridad, la instalación no continuará sin poder actualizar el estado."
+        error "Could not locate the RSM item associated with the UUID."
+        error "For safety, installation will not continue without being able to update the status."
         exit 1
     fi
 
@@ -601,18 +601,18 @@ check_uuid_available() {
     existing_fqdn=$(json_extract_rsm_property "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
 
     if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
-        log "UUID reservado en RSM y disponible para instalación"
+        log "UUID reserved in RSM and available for installation"
         return 0
     fi
 
     if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
-        log "UUID ya asociado a este sistema en RSM; se reactivará el agente y se actualizará el inventario"
+        log "UUID already associated with this system in RSM; the agent will be reactivated and inventory updated"
         return 0
     fi
 
     echo ""
-    error "Este UUID ya pertenece a otro sistema en RSM."
-    error "No se puede instalar este agente en el equipo local con ese UUID."
+    error "This UUID already belongs to another system in RSM."
+    error "This agent cannot be installed on the local machine with that UUID."
     exit 1
 }
 
@@ -620,8 +620,8 @@ check_existing_installation() {
     if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
         local manual_prefix=""
         [ "$RUN_AS_ROOT" = "1" ] && manual_prefix="sudo "
-        warn "Ya existe una instalación previa del agente en este sistema."
-        warn "Si deseas instalar un nuevo agente, desinstala el actual primero:"
+        warn "An existing agent installation was found on this system."
+        warn "To install a new agent, uninstall the current one first:"
         warn "  ${manual_prefix}bash $INSTALL_DIR/uninstall.sh"
         exit 1
     fi
@@ -633,9 +633,9 @@ warn_about_parallel_root_installation() {
     fi
 
     if [ -f "/opt/rs-agent/rs_agent.sh" ] || [ -f "/var/lib/rs-agent/config.env" ]; then
-        warn "Se ha detectado una instalacion root existente en /opt/rs-agent o /var/lib/rs-agent."
-        warn "La instalacion no-root convivira con ella usando rutas del usuario actual."
-        warn "Para comparar resultados, lo mas claro es usar otro UUID/alias de prueba."
+        warn "An existing root installation was found in /opt/rs-agent or /var/lib/rs-agent."
+        warn "The no-root installation will coexist with it using current-user paths."
+        warn "For comparison, use a separate test UUID/alias."
     fi
 }
 
@@ -647,17 +647,17 @@ check_local_agent_installation() {
         fi
 
         if [ -n "$installed_uuid" ] && [ "$installed_uuid" = "$UUID" ]; then
-            error "Este sistema ya tiene un agente instalado con este UUID."
+            error "This system already has an agent installed with this UUID."
         else
-            error "Ya existe un agente instalado en este sistema."
+            error "An agent is already installed on this system."
             if [ -n "$installed_uuid" ]; then
-                echo "UUID instalado actualmente: $installed_uuid"
+                echo "Currently installed UUID: $installed_uuid"
             fi
-            echo "UUID solicitado: $UUID"
+            echo "Requested UUID: $UUID"
         fi
 
         echo ""
-        echo "Si necesitas reinstalar el agente, desinstala primero el agente actual:"
+        echo "To reinstall the agent, uninstall the current agent first:"
         if [ "$RUN_AS_ROOT" = "1" ]; then
             echo "  sudo bash $INSTALL_DIR/uninstall.sh"
         else
@@ -671,14 +671,14 @@ update_rsm_system_on_install() {
     local payload response_file http_code exit_code response_body
 
     if [ -z "$RSM_SYSTEM_ITEM_ID" ]; then
-        error "No se pudo actualizar RSM porque no se encontro el item del UUID."
+        error "Could not update RSM because the UUID item was not found."
         exit 1
     fi
 
     response_file=$(make_private_temp_file "rsm_install_system_update_response")
     payload="[{\"ID\":\"$RSM_SYSTEM_ITEM_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\":\"$(json_escape "$SYSTEM_ALIAS")\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE\"}]"
 
-    info "Marcando sistema como activo en Firulai..."
+    info "Marking system as active in Firulai..."
 
     set +e
     http_code=$(curl \
@@ -699,17 +699,17 @@ update_rsm_system_on_install() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo activar el sistema en RSM (curl exit: $exit_code)."
+        error "Could not activate the system in RSM (curl exit: $exit_code)."
         exit 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitió activar el sistema (HTTP $http_code)."
-        echo "Respuesta: $response_body"
+        error "RSM did not allow system activation (HTTP $http_code)."
+        echo "Response: $response_body"
         exit 1
     fi
 
-    log "Sistema marcado como activo en Firulai"
+    log "System marked as active in Firulai"
 }
 
 cron_daemon_active() {
@@ -885,19 +885,19 @@ check_systemd_user_prerequisites() {
 
 check_automatic_execution_prerequisites() {
     if [ "$RUN_AS_ROOT" != "1" ] && [ "$SCHEDULER_CHOICE" = "systemd-user" ]; then
-        info "Verificando requisitos de systemd --user..."
+        info "Checking systemd --user requirements..."
         check_systemd_user_prerequisites
         return
     fi
 
     if cron_scheduler_required; then
-        info "Verificando requisitos de cron para la ejecucion automatica..."
+        info "Checking cron requirements for automatic execution..."
         check_cron_prerequisites
     fi
 }
 
 cleanup_partial_installation() {
-    warn "Limpiando instalación parcial..."
+    warn "Cleaning partial installation..."
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null; then
         systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
         systemctl stop rs-agent.service >/dev/null 2>&1 || true
@@ -918,11 +918,11 @@ cleanup_partial_installation() {
     rm -rf "$INSTALL_DIR"
     rm -rf "$DATA_DIR"
     rm -f "$LOG_FILE"
-    log "Instalación parcial eliminada"
+    log "Partial installation removed"
 }
 
 create_directories() {
-    info "Creando directorios..."
+    info "Creating directories..."
     
     mkdir -p "$INSTALL_DIR"
     chown root:root "$INSTALL_DIR" 2>/dev/null || true
@@ -936,58 +936,58 @@ create_directories() {
         chmod 600 "$LOG_FILE"
     fi
     
-    log "Directorios creados"
+    log "Directories created"
 }
 
 download_agent() {
-    info "Descargando agente desde GitHub..."
+    info "Downloading agent from GitHub..."
 
     AGENT_URL="${GITHUB_RAW_URL}/rs_agent.sh?ts=$(date +%s)"
 
     if curl -fsSL "$AGENT_URL" -o "$INSTALL_DIR/rs_agent.sh"; then
         chmod +x "$INSTALL_DIR/rs_agent.sh"
-        log "Agente descargado: $INSTALL_DIR/rs_agent.sh"
+        log "Agent downloaded: $INSTALL_DIR/rs_agent.sh"
     else
-        error "No se pudo descargar el agente desde GitHub"
+        error "Could not download the agent from GitHub"
         error ""
-        error "URL intentada: $AGENT_URL"
+        error "Attempted URL: $AGENT_URL"
         error ""
-        error "Verifica que:"
-        error "  - Tienes conexión a internet"
-        error "  - GitHub es accesible desde este servidor"
+        error "Check that:"
+        error "  - You have internet connectivity"
+        error "  - GitHub is accessible from this server"
         exit 1
     fi
 }
 
 download_runner() {
-    info "Descargando runner de ejecución automática..."
+    info "Downloading automatic execution runner..."
 
     RUNNER_URL="${GITHUB_RAW_URL}/rs_agent_runner.sh?ts=$(date +%s)"
     if curl -fsSL "$RUNNER_URL" -o "$RUNNER_FILE"; then
         chmod +x "$RUNNER_FILE"
-        log "Runner descargado: $RUNNER_FILE"
+        log "Runner downloaded: $RUNNER_FILE"
     else
-        error "No se pudo descargar $RUNNER_URL"
+        error "Could not download $RUNNER_URL"
         exit 1
     fi
 }
 
 download_uninstaller() {
-    info "Descargando desinstalador desde GitHub..."
+    info "Downloading uninstaller from GitHub..."
 
     UNINSTALLER_URL="${GITHUB_RAW_URL}/uninstall.sh?ts=$(date +%s)"
 
     if curl -fsSL "$UNINSTALLER_URL" -o "$INSTALL_DIR/uninstall.sh"; then
         chmod +x "$INSTALL_DIR/uninstall.sh"
-        log "Desinstalador descargado: $INSTALL_DIR/uninstall.sh"
+        log "Uninstaller downloaded: $INSTALL_DIR/uninstall.sh"
     else
-        error "No se pudo descargar el desinstalador desde GitHub"
+        error "Could not download the uninstaller from GitHub"
         error ""
-        error "URL intentada: $UNINSTALLER_URL"
+        error "Attempted URL: $UNINSTALLER_URL"
         error ""
-        error "Verifica que:"
-        error "  - Tienes conexión a internet"
-        error "  - GitHub es accesible desde este servidor"
+        error "Check that:"
+        error "  - You have internet connectivity"
+        error "  - GitHub is accessible from this server"
         exit 1
     fi
 }
@@ -995,7 +995,7 @@ download_uninstaller() {
 write_agent_config() {
     local temporary_file
 
-    info "Guardando configuración local del agente..."
+    info "Saving local agent configuration..."
 
     temporary_file=$(mktemp "$DATA_DIR/config.env.XXXXXX")
     chmod 600 "$temporary_file"
@@ -1008,11 +1008,11 @@ CONFIG_EOF
     mv -f "$temporary_file" "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
 
-    log "Configuración guardada: $CONFIG_FILE"
+    log "Configuration saved: $CONFIG_FILE"
 }
 
 setup_automatic_execution() {
-    info "Configurando ejecución automática..."
+    info "Configuring automatic execution..."
 
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
         cat > "$SYSTEMD_SERVICE_FILE" << SERVICE_EOF
@@ -1047,11 +1047,11 @@ TIMER_EOF
 
         chmod 644 "$SYSTEMD_SERVICE_FILE" "$SYSTEMD_TIMER_FILE"
         if ! systemctl daemon-reload; then
-            error "systemd no pudo recargar las unidades"
+            error "systemd could not reload units"
             return 1
         fi
         if ! systemctl enable --now rs-agent.timer; then
-            error "systemd no pudo habilitar rs-agent.timer"
+            error "systemd could not enable rs-agent.timer"
             return 1
         fi
         SCHEDULER_TYPE="persistent systemd timer"
@@ -1110,21 +1110,21 @@ TIMER_EOF
     fi
 
     if ! check_cron_prerequisites; then
-        error "No se puede completar la instalacion con ejecucion automatica."
+        error "Cannot complete installation with automatic execution."
         return 1
     fi
 
     local cron_watchdog cron_reboot
-    cron_watchdog="*/30 * * * * /bin/bash $RUNNER_FILE --if-due --trigger cron-comprobacion >/dev/null 2>&1"
-    cron_reboot="@reboot sleep 60; /bin/bash $RUNNER_FILE --if-due --trigger cron-arranque >/dev/null 2>&1"
+    cron_watchdog="*/30 * * * * /bin/bash $RUNNER_FILE --if-due --trigger cron-check >/dev/null 2>&1"
+    cron_reboot="@reboot sleep 60; /bin/bash $RUNNER_FILE --if-due --trigger cron-boot >/dev/null 2>&1"
 
-    # Comprobar cada 30 minutos permite ejecutar a las 03:00 y reintentar una
-    # ejecución perdida sin duplicarla gracias a state.env y flock.
+    # Checking every 30 minutes allows the 03:00 run and retries one missed
+    # execution without duplicating it thanks to state.env and flock.
     if ! ({ crontab -l 2>/dev/null || true; } | grep -Fv "$INSTALL_DIR/rs_agent" || true; echo "$cron_watchdog"; echo "$cron_reboot") | crontab -; then
         if [ "$RUN_AS_ROOT" = "1" ]; then
-            error "No se pudo actualizar el crontab de root"
+            error "Could not update root crontab"
         else
-            error "No se pudo actualizar el crontab del usuario actual"
+            error "Could not update the current user's crontab"
         fi
         return 1
     fi
@@ -1139,23 +1139,23 @@ TIMER_EOF
 }
 
 test_agent() {
-    info "Ejecutando primera recopilación..."
+    info "Running initial collection..."
 
     set +e
-    RS_AGENT_TRIGGER="instalacion-inicial" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
+    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
     local agent_status=${PIPESTATUS[0]}
     set -e
 
     if [ "$agent_status" -eq 0 ]; then
         if [ -f "$DATA_DIR/inventory.json" ]; then
             INVENTORY_SIZE=$(stat -c%s "$DATA_DIR/inventory.json" 2>/dev/null || stat -f%z "$DATA_DIR/inventory.json" 2>/dev/null)
-            log "Inventario generado correctamente (${INVENTORY_SIZE} bytes)"
+            log "Inventory generated successfully (${INVENTORY_SIZE} bytes)"
             return 0
         fi
     fi
 
-    error "No se pudo generar y enviar el inventario en la primera ejecución"
-    info "El detalle del fallo se ha mostrado arriba."
+    error "Could not generate and send the inventory during the initial run"
+    info "Failure details were shown above."
     return 1
 }
 
@@ -1165,35 +1165,35 @@ print_summary() {
 
     echo ""
     echo "============================================================================"
-    echo "  INSTALACIÓN COMPLETADA"
+    echo "  INSTALLATION COMPLETED"
     echo "============================================================================"
     echo ""
-    echo "Ubicaciones:"
-    echo "   - Agente:      $INSTALL_DIR/rs_agent.sh"
-    echo "   - Inventario:  $DATA_DIR/inventory.json"
-    echo "   - Estado:      $DATA_DIR/state.env"
+    echo "Locations:"
+    echo "   - Agent:       $INSTALL_DIR/rs_agent.sh"
+    echo "   - Inventory:   $DATA_DIR/inventory.json"
+    echo "   - State:       $DATA_DIR/state.env"
     echo "   - Logs:        $LOG_FILE"
     echo ""
-    echo "Ejecución:"
-    echo "   - Automática:  Diariamente a las 3:00 AM ($SCHEDULER_TYPE)"
-    echo "   - Recuperación: una ejecución pendiente al volver a estar operativo"
+    echo "Execution:"
+    echo "   - Automatic:   Daily at 3:00 AM ($SCHEDULER_TYPE)"
+    echo "   - Recovery:    one pending execution when the system becomes operational again"
     echo "   - Manual:      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
     echo ""
     echo "Alias:"
-    echo "   - Valor actual: $SYSTEM_ALIAS"
-    echo "   - Este alias se guarda en Firulai y podrá modificarse desde la interfaz."
+    echo "   - Current value: $SYSTEM_ALIAS"
+    echo "   - This alias is saved in Firulai and can be changed from the interface."
     echo ""
-    echo "Ver inventario:"
+    echo "View inventory:"
     echo "   cat $DATA_DIR/inventory.json"
     echo ""
-    echo "Funcionamiento:"
-    echo "   - Sin dependencia de Python ni jq (bash puro)"
-    echo "   - Envia inventario completo en cada ejecución a RSM"
-    echo "   - RSM detecta y gestiona los cambios"
+    echo "Behavior:"
+    echo "   - No Python or jq dependency (pure bash)"
+    echo "   - Sends a complete inventory to RSM on every run"
+    echo "   - RSM detects and manages changes"
     echo "   - System analysis agent for vulnerability detection"
-    echo "   - Incluye: OS, kernel, CPU, modelo de discos, paquetes, software crítico"
+    echo "   - Includes: OS, kernel, CPU, disk models, packages, critical software"
     echo ""
-    echo "Desinstalar:"
+    echo "Uninstall:"
     echo "   ${manual_prefix}bash $INSTALL_DIR/uninstall.sh"
     echo ""
     echo "============================================================================"
@@ -1232,22 +1232,22 @@ main() {
     echo ""
     if ! test_agent; then
         echo ""
-        error "Instalación cancelada porque la primera ejecución del agente ha fallado."
-        error "Si el UUID ya pertenece a otro sistema, genera un UUID nuevo desde Add New System."
+        error "Installation cancelled because the initial agent run failed."
+        error "If the UUID already belongs to another system, generate a new UUID from Add New System."
         cleanup_partial_installation
         exit 1
     fi
 
     if ! setup_automatic_execution; then
-        error "No se pudo configurar la ejecución automática"
+        error "Could not configure automatic execution"
         cleanup_partial_installation
         exit 1
     fi
     
-    # Resumen
+    # Summary
     print_summary
     
-    log "Instalación exitosa"
+    log "Installation successful"
 }
 
 # Ejecutar

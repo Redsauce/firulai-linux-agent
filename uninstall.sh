@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Firulai Inventory Agent - Uninstaller
-# Marca el sistema como inactivo en RSM y elimina la instalacion local.
+# Marks the system as inactive in RSM and removes the local installation.
 #
 
 set -uo pipefail
@@ -56,7 +56,7 @@ error() {
 
 check_root() {
     if [ "$RUN_AS_ROOT" != "1" ]; then
-        warn "Modo no-root: solo se eliminara la instalacion del usuario actual."
+        warn "No-root mode: only the current user's installation will be removed."
     fi
 }
 
@@ -64,14 +64,14 @@ ensure_private_directory() {
     local directory="$1"
 
     if [ -L "$directory" ]; then
-        error "Ruta insegura: $directory es un enlace simbolico"
+        error "Unsafe path: $directory is a symbolic link"
         return 1
     fi
 
     mkdir -p "$directory"
 
     if [ -L "$directory" ] || [ ! -d "$directory" ]; then
-        error "No se pudo crear un directorio privado seguro: $directory"
+        error "Could not create a secure private directory: $directory"
         return 1
     fi
 
@@ -79,14 +79,14 @@ ensure_private_directory() {
     chmod 700 "$directory"
 
     if [ ! -O "$directory" ]; then
-        error "Directorio inseguro: $directory no pertenece al usuario actual"
+        error "Unsafe directory: $directory is not owned by the current user"
         return 1
     fi
 }
 
 init_private_tmp_dir() {
     if ! command -v mktemp >/dev/null 2>&1; then
-        error "mktemp no esta disponible"
+        error "mktemp is not available"
         return 1
     fi
 
@@ -102,7 +102,7 @@ make_private_temp_file() {
 validate_uuid() {
     local uuid="$1"
     if [[ ! "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-        error "'$uuid' no es un UUID valido"
+        error "'$uuid' is not a valid UUID"
         exit 1
     fi
 }
@@ -132,13 +132,13 @@ parse_args() {
         case "$1" in
             --token) AGENT_TOKEN="${2:-}"; shift 2 ;;
             --uuid) UUID_VAL="${2:-}"; shift 2 ;;
-            *) error "Argumento desconocido: $1"; exit 1 ;;
+            *) error "Unknown argument: $1"; exit 1 ;;
         esac
     done
 
     if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
-        error "No se encontrÓ token o UUID para notificar a RSM"
-        echo "Uso manual: bash uninstall.sh --token <TOKEN> --uuid <UUID>"
+        error "Could not find token or UUID to notify RSM"
+        echo "Manual usage: bash uninstall.sh --token <TOKEN> --uuid <UUID>"
         exit 1
     fi
 
@@ -151,21 +151,21 @@ confirm_uninstall() {
     echo "Firulai Inventory Agent - Uninstall"
     echo "============================================================"
     echo ""
-    echo "Esta acción solo borrará la instalación local del agente."
-    echo "No se borrarán los datos de RSM."
+    echo "This action will only remove the local agent installation."
+    echo "RSM data will not be deleted."
     echo ""
-    echo "El sistema quedará como inactivo en Firulai. Desde Firulai podrás"
-    echo "eliminar definitivamente sus datos o volver a instalar el agente"
-    echo "más adelante enlazándolo al System y al inventario ya guardados."
+    echo "The system will be marked as inactive in Firulai. From Firulai you can"
+    echo "delete its data permanently or reinstall the agent later by linking it"
+    echo "to the already saved System and inventory."
     echo ""
-    echo "UUID del sistema: $UUID_VAL"
+    echo "System UUID: $UUID_VAL"
     echo ""
-    read -rn 1 -p "Estas de acuerdo con desinstalar el agente local? (s/N): " reply
+    read -rn 1 -p "Do you agree to uninstall the local agent? (y/N): " reply
     echo
     case "$reply" in
         s|S|y|Y) ;;
         *)
-            warn "Desinstalación cancelada por el usuario"
+            warn "Uninstall cancelled by user"
             exit 0
             ;;
     esac
@@ -192,13 +192,13 @@ find_system_id_by_uuid() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo consultar el sistema en RSM (curl exit: $exit_code)"
+        error "Could not query the system in RSM (curl exit: $exit_code)"
         return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitió consultar el sistema (HTTP $http_code)"
-        echo "Respuesta: $response_body"
+        error "RSM did not allow querying the system (HTTP $http_code)"
+        echo "Response: $response_body"
         return 1
     fi
 
@@ -215,11 +215,11 @@ find_system_id_by_uuid() {
 mark_system_disconnected_in_rsm() {
     local system_id payload response_file http_code exit_code response_body
 
-    info "Marcando sistema como inactivo en Firulai..."
+    info "Marking system as inactive in Firulai..."
     system_id=$(find_system_id_by_uuid) || return 1
 
     if [ -z "$system_id" ]; then
-        info "No hay ningun System enlazado a este UUID en Firulai. Se continuará con la desinstalación local."
+        info "No System is linked to this UUID in Firulai. Local uninstall will continue."
         return 0
     fi
 
@@ -243,22 +243,22 @@ mark_system_disconnected_in_rsm() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "No se pudo marcar el sistema como inactivo en RSM (curl exit: $exit_code)"
+        error "Could not mark the system as inactive in RSM (curl exit: $exit_code)"
         return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM no permitió marcar el sistema como inactivo (HTTP $http_code)"
-        echo "Respuesta: $response_body"
+        error "RSM did not allow marking the system as inactive (HTTP $http_code)"
+        echo "Response: $response_body"
         return 1
     fi
 
-    log "Sistema marcado como inactivo en Firulai"
+    log "System marked as inactive in Firulai"
     return 0
 }
 
 remove_automatic_execution() {
-    info "Eliminando ejecución automática..."
+    info "Removing automatic execution..."
 
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &>/dev/null; then
         systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
@@ -278,23 +278,23 @@ remove_automatic_execution() {
 
     if command -v crontab &>/dev/null; then
         if ({ crontab -l 2>/dev/null || true; } | grep -Fv "$INSTALL_DIR/rs_agent" || true) | crontab -; then
-            log "Entradas de cron eliminadas"
+            log "Cron entries removed"
         else
-            warn "No se pudo actualizar el crontab o no había entradas configuradas"
+            warn "Could not update crontab or no entries were configured"
         fi
     fi
 
-    log "Programación automática eliminada"
+    log "Automatic schedule removed"
 }
 
 remove_local_files() {
-    info "Eliminando archivos locales..."
+    info "Removing local files..."
 
     rm -rf "$DATA_DIR"
     rm -rf "$INSTALL_DIR"
     rm -f "$LOG_FILE"
 
-    log "Archivos locales eliminados"
+    log "Local files removed"
 }
 
 main() {
@@ -308,7 +308,7 @@ main() {
     confirm_uninstall
 
     if ! mark_system_disconnected_in_rsm; then
-        error "Desinstalación detenida: no se pudo actualizar el estado en RSM"
+        error "Uninstall stopped: could not update the status in RSM"
         exit 1
     fi
 
@@ -317,7 +317,7 @@ main() {
 
     echo ""
     echo "============================================================"
-    echo "Agente desinstalado correctamente"
+    echo "Agent uninstalled successfully"
     echo "============================================================"
     echo ""
 }

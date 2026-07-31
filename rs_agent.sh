@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 # Firulai Inventory Agent
-# Version: 0.3.4 - Estado persistente y recuperación de ejecuciones perdidas
-# Requiere: bash 4+, curl, lscpu, lsblk, uname
+# Version: 0.3.4 - Persistent state and missed execution recovery
+# Requires: bash 4+, curl, lscpu, lsblk, uname
 #
 
 set -uo pipefail
 
-# ============ CONFIGURACION ============
+# ============ CONFIGURATION ============
 
 AGENT_VERSION="0.3.4"
 GITHUB_API_URL="https://api.github.com/repos/Redsauce/firulai-linux-agent/releases/latest"
@@ -43,18 +43,18 @@ UUID_VAL=""
 SYSTEM_ALIAS=""
 EXECUTION_TRIGGER="${RS_AGENT_TRIGGER:-manual}"
 
-# ============ UTILIDADES ============
+# ============ UTILITIES ============
 
 acquire_execution_lock() {
     if ! command -v flock >/dev/null 2>&1; then
-        echo "ERROR: flock no está disponible; instala el paquete util-linux."
+        echo "ERROR: flock is not available; install the util-linux package."
         exit 1
     fi
     mkdir -p "$(dirname "$LOCK_FILE")"
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
-        echo "INFO: Ya hay otra ejecución del agente en curso; esta solicitud se omite. Origen=$EXECUTION_TRIGGER"
-        # EX_TEMPFAIL permite que systemd reprograme la solicitud automática.
+        echo "INFO: Another agent run is already in progress; this request is skipped. Trigger=$EXECUTION_TRIGGER"
+        # EX_TEMPFAIL lets systemd reschedule the automatic request.
         exit 75
     fi
 }
@@ -63,14 +63,14 @@ ensure_private_directory() {
     local directory="$1"
 
     if [ -L "$directory" ]; then
-        echo "ERROR: Ruta insegura: $directory es un enlace simbolico"
+        echo "ERROR: Unsafe path: $directory is a symbolic link"
         return 1
     fi
 
     mkdir -p "$directory"
 
     if [ -L "$directory" ] || [ ! -d "$directory" ]; then
-        echo "ERROR: No se pudo crear un directorio privado seguro: $directory"
+        echo "ERROR: Could not create a secure private directory: $directory"
         return 1
     fi
 
@@ -78,14 +78,14 @@ ensure_private_directory() {
     chmod 700 "$directory"
 
     if [ ! -O "$directory" ]; then
-        echo "ERROR: Directorio inseguro: $directory no pertenece al usuario actual"
+        echo "ERROR: Unsafe directory: $directory is not owned by the current user"
         return 1
     fi
 }
 
 init_private_tmp_dir() {
     if ! command -v mktemp >/dev/null 2>&1; then
-        echo "ERROR: mktemp no está disponible."
+        echo "ERROR: mktemp is not available."
         return 1
     fi
 
@@ -105,22 +105,22 @@ record_success_state() {
     temporary_file=$(mktemp "${STATE_FILE}.tmp.XXXXXX") || return 1
 
     if ! printf 'LAST_SUCCESS_EPOCH=%s\nLAST_SUCCESS_UTC=%s\n' "$completed_epoch" "$completed_utc" > "$temporary_file"; then
-        echo "ERROR: No se pudo escribir el estado temporal $temporary_file"
+        echo "ERROR: Could not write temporary state file $temporary_file"
         rm -f "$temporary_file"
         return 1
     fi
     chmod 600 "$temporary_file" 2>/dev/null || true
     if ! mv -f "$temporary_file" "$STATE_FILE"; then
-        echo "ERROR: No se pudo actualizar el estado persistente $STATE_FILE"
+        echo "ERROR: Could not update persistent state $STATE_FILE"
         rm -f "$temporary_file"
         return 1
     fi
 
-    echo "Estado actualizado: última ejecución correcta=$completed_utc ($completed_epoch)"
+    echo "State updated: last successful run=$completed_utc ($completed_epoch)"
 }
 
-# Escapa un string para incrustarlo como valor JSON (sin jq).
-# Orden de sustituciones: primero la barra invertida para no doble-escapar.
+# Escapes a string to embed it as a JSON value (without jq).
+# Replacement order: backslash first to avoid double escaping.
 json_escape() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -156,51 +156,51 @@ json_extract_rsm_property() {
     json_extract_first_string_key "$json" "${property_id}trs"
 }
 
-# ============ VALIDACION Y ARGUMENTOS ============
+# ============ VALIDATION AND ARGUMENTS ============
 
 check_root() {
     if [ "$RUN_AS_ROOT" != "1" ]; then
-        echo "INFO: Modo no-root; el inventario puede ser menos completo si el sistema restringe algun comando."
+        echo "INFO: No-root mode; inventory may be less complete if the system restricts some commands."
     fi
 }
 
 validate_uuid() {
     local uuid="$1"
     if [[ ! "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-        echo "ERROR: '$uuid' no es un UUID valido"
+        echo "ERROR: '$uuid' is not a valid UUID"
         exit 1
     fi
 }
 
 parse_args() {
     if [ $# -eq 0 ]; then
-        echo "Uso: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS>"
+        echo "Usage: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS>"
         exit 1
     fi
 
     while [ $# -gt 0 ]; do
         case "$1" in
             --token)
-                [ $# -ge 2 ] || { echo "ERROR: --token requiere un valor"; exit 1; }
+                [ $# -ge 2 ] || { echo "ERROR: --token requires a value"; exit 1; }
                 AGENT_TOKEN="$2"
                 shift 2
                 ;;
             --uuid)
-                [ $# -ge 2 ] || { echo "ERROR: --uuid requiere un valor"; exit 1; }
+                [ $# -ge 2 ] || { echo "ERROR: --uuid requires a value"; exit 1; }
                 UUID_VAL="$2"
                 shift 2
                 ;;
             --alias)
-                [ $# -ge 2 ] || { echo "ERROR: --alias requiere un valor"; exit 1; }
+                [ $# -ge 2 ] || { echo "ERROR: --alias requires a value"; exit 1; }
                 SYSTEM_ALIAS="$2"
                 shift 2
                 ;;
-            *) echo "Argumento desconocido: $1"; exit 1 ;;
+            *) echo "Unknown argument: $1"; exit 1 ;;
         esac
     done
 
     if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ] || [ -z "$SYSTEM_ALIAS" ]; then
-        echo "ERROR: --token, --uuid y --alias son obligatorios"
+        echo "ERROR: --token, --uuid, and --alias are required"
         exit 1
     fi
 
@@ -237,7 +237,7 @@ validate_uuid_ownership() {
     response_file=$(make_private_temp_file "rsm_uuid_check_response") || return 1
     payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID_VAL\",\"operation\":\"=\"}]}"
 
-    echo "Validando que el UUID no pertenece a otro sistema..."
+    echo "Validating that the UUID does not belong to another system..."
 
     http_code=$(curl \
         --silent \
@@ -255,21 +255,21 @@ validate_uuid_ownership() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        echo "ERROR: No se pudo validar el UUID antes de enviar inventario (curl exit: $exit_code)."
-        echo "Por seguridad, la instalación no continuará sin confirmar que el UUID no pertenece a otro sistema."
+        echo "ERROR: Could not validate the UUID before sending inventory (curl exit: $exit_code)."
+        echo "For safety, installation will not continue without confirming that the UUID does not belong to another system."
         return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        echo "ERROR: RSM no permitió validar el UUID antes de enviar inventario (HTTP $http_code)."
-        echo "Por seguridad, la instalación no continuará sin confirmar que el UUID no pertenece a otro sistema."
-        echo "Respuesta: $response_body"
+        echo "ERROR: RSM did not allow UUID validation before sending inventory (HTTP $http_code)."
+        echo "For safety, installation will not continue without confirming that the UUID does not belong to another system."
+        echo "Response: $response_body"
         return 1
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID_VAL"; then
-        echo "ERROR: UUID inválido: no existe en RSM."
-        echo "No se puede enviar inventario con un UUID que no haya sido generado desde Add New System."
+        echo "ERROR: Invalid UUID: it does not exist in RSM."
+        echo "Inventory cannot be sent with a UUID that was not generated from Add New System."
         echo ""
         echo "UUID: $UUID_VAL"
         return 1
@@ -280,22 +280,22 @@ validate_uuid_ownership() {
     existing_fqdn=$(json_extract_rsm_property "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
 
     if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
-        echo "   -> UUID reservado en RSM y listo para instalar"
+        echo "   -> UUID reserved in RSM and ready to install"
         return 0
     fi
 
     if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
-        echo "   -> UUID ya asociado a este sistema, se actualizará su inventario"
+        echo "   -> UUID already associated with this system; its inventory will be updated"
         return 0
     fi
 
     echo ""
-    echo "ERROR: Este UUID ya pertenece a otro sistema en RSM."
-    echo "No se puede instalar este agente en el equipo local con ese UUID."
+    echo "ERROR: This UUID already belongs to another system in RSM."
+    echo "This agent cannot be installed on the local machine with that UUID."
     return 1
 }
 
-# ============ RECOPILADORES ============
+# ============ COLLECTORS ============
 
 collect_system_info() {
     local timezone=""
@@ -347,12 +347,12 @@ collect_system_info() {
 collect_timezone() {
     local timezone_name=""
 
-    # Intentar con timedatectl
+    # Try timedatectl
     if command -v timedatectl &>/dev/null; then
         timezone_name=$(timedatectl show -p Timezone --value 2>/dev/null) || true
     fi
 
-    # Fallback: leer /etc/timezone
+    # Fallback: read /etc/timezone
     if [ -z "$timezone_name" ] && [ -f "/etc/timezone" ]; then
         timezone_name=$(cat /etc/timezone 2>/dev/null) || true
     fi
@@ -363,11 +363,11 @@ collect_timezone() {
 collect_hardware() {
     local cpu_model firmware_json="" first=1
 
-    # CPU: extraer "Model name" con awk para manejar espacios correctamente
+    # CPU: extract "Model name" with awk to handle spaces correctly
     cpu_model=$(lscpu 2>/dev/null | awk -F':[[:space:]]+' '/^Model name/{print $2; exit}')
     [ -z "$cpu_model" ] && cpu_model="Unknown"
 
-    # Discos: awk extrae NAME y MODEL (puede tener espacios), filtrando solo discos
+    # Disks: awk extracts NAME and MODEL (may contain spaces), filtering disks only
     while IFS=$'\t' read -r dev model; do
         [ -z "$dev" ] && continue
         [ -z "$model" ] && model="Unknown"
@@ -428,7 +428,7 @@ collect_packages_dpkg() {
 
     while IFS='|' read -r name version source_package source_version upstream_version status; do
         [ -z "$name" ] && continue
-        # Solo paquetes con estado "installed"
+        # Only packages with "installed" status
         case "$status" in *"installed"*) ;; *) continue ;; esac
 
         if [ -n "$source_package" ]; then
@@ -509,8 +509,8 @@ collect_pip_packages() {
     { command -v pip &>/dev/null && [ -z "$pip_cmd" ]; } && pip_cmd="pip"
     [ -z "$pip_cmd" ] && return
 
-    # --format=columns produce: "Package    Version" con 2 lineas de cabecera (nombre + separador)
-    # tail -n +3 las elimina; el tercer campo (_rest) absorbe cualquier anotacion extra
+    # --format=columns produces: "Package    Version" with 2 header lines (name + separator)
+    # tail -n +3 removes them; the third field (_rest) absorbs any extra annotation
     while read -r name version _rest; do
         [ -z "$name" ] && continue
 
@@ -532,7 +532,7 @@ collect_npm_packages() {
     # Se eliminan los prefijos de arbol con sed y se separa nombre/version
     # por el ultimo "@" (soporta scoped packages como @angular/cli@16.0.0)
     while IFS= read -r line; do
-        # Quitar prefijo de arbol (caracteres hasta e incluyendo "── ")
+        # Remove tree prefix (characters up to and including "── ")
         local pkg_ver
         pkg_ver=$(printf '%s' "$line" | sed 's/^.*── //' | tr -d ' ')
         [[ "$pkg_ver" == *"@"* ]] || continue
@@ -552,7 +552,7 @@ collect_npm_packages() {
     printf '%s' "$packages_json"
 }
 
-# ============ AUTO-ACTUALIZACION ============
+# ============ AUTO UPDATE ============
 
 check_for_updates() {
     command -v curl &>/dev/null || return 0
@@ -560,7 +560,7 @@ check_for_updates() {
     local response latest_version
     response=$(curl -sf --max-time 5 "$GITHUB_API_URL" 2>/dev/null) || return 0
 
-    # Extraer "tag_name" del JSON sin jq: buscar el patron "tag_name":"vX.Y.Z"
+    # Extract "tag_name" from JSON without jq: find the "tag_name":"vX.Y.Z" pattern
     latest_version=$(printf '%s' "$response" \
         | grep -o '"tag_name":"[^"]*"' \
         | sed 's/"tag_name":"v\?//;s/"//')
@@ -568,7 +568,7 @@ check_for_updates() {
     [ -z "$latest_version" ] && return 0
     [ "$latest_version" = "$AGENT_VERSION" ] && return 0
 
-    echo "Nueva version disponible: $latest_version (actual: $AGENT_VERSION)"
+    echo "New version available: $latest_version (current: $AGENT_VERSION)"
     download_update
 }
 
@@ -576,20 +576,20 @@ download_update() {
     local script_path="$INSTALL_DIR/rs_agent.sh"
     local backup_path="${script_path}.backup"
 
-    echo "Descargando actualización..."
+    echo "Downloading update..."
     [ -f "$script_path" ] && cp "$script_path" "$backup_path"
 
     if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
         chmod +x "$script_path"
-        echo "Actualización completada. Reiniciando agente..."
+        echo "Update completed. Restarting agent..."
         exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS"
     else
-        echo "Error descargando actualización"
+        echo "Error downloading update"
         [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
     fi
 }
 
-# ============ ENVIO A RSM ============
+# ============ SEND TO RSM ============
 
 send_to_rsm() {
     local inventory_json="$1"
@@ -607,12 +607,12 @@ send_to_rsm() {
     fi
 
     echo ""
-    echo "Enviando inventario a RSM..."
+    echo "Sending inventory to RSM..."
 
     printf '%s' "$inventory_json" > "$inventory_json_path"
     chmod 600 "$inventory_json_path" 2>/dev/null || true
-    printf 'JSON guardado en: %s\n' "$inventory_json_path"
-    printf 'Longitud: %d caracteres (%d KB aprox)\n' "${#inventory_json}" "$(( ${#inventory_json} / 1024 ))"
+    printf 'JSON saved at: %s\n' "$inventory_json_path"
+    printf 'Length: %d characters (%d KB approx)\n' "${#inventory_json}" "$(( ${#inventory_json} / 1024 ))"
     if command -v sha256sum >/dev/null 2>&1; then
         inventory_hash=$(printf '%s' "$inventory_json" | sha256sum | awk '{print $1}')
     elif command -v shasum >/dev/null 2>&1; then
@@ -621,19 +621,19 @@ send_to_rsm() {
     printf 'SHA256 RSdata: %s\n' "$inventory_hash"
 
     echo ""
-    echo "Configuración RSM:"
+    echo "RSM configuration:"
     echo "   - URL:   $RSM_API_URL"
-    echo "   - Token agente: <configurado; valor oculto>"
+    echo "   - Agent token: <configured; value hidden>"
     echo "   - Alias: $SYSTEM_ALIAS"
     echo "   - Debug: ${RS_AGENT_DEBUG:-0}"
     echo ""
-    echo "Peticion que se va a enviar:"
-    echo "   - Metodo: POST multipart/form-data"
+    echo "Request to be sent:"
+    echo "   - Method: POST multipart/form-data"
     echo "   - Endpoint: $RSM_API_URL"
-    echo "   - Flujo: api.php recibe newServerData y RSM crea/encola jobs y eventos"
-    echo "   - Header Authorization: <oculto>"
+    echo "   - Flow: api.php receives newServerData and RSM creates/queues jobs and events"
+    echo "   - Authorization header: <hidden>"
     echo "   - Form RStrigger: newServerData"
-    echo "   - Form RStoken: <oculto>"
+    echo "   - Form RStoken: <hidden>"
     echo "   - Form RSdata: $inventory_json_path (${#inventory_json} chars)"
     echo "   - Response body: $response_file"
     echo "   - Response headers: $response_headers_file"
@@ -641,7 +641,7 @@ send_to_rsm() {
         echo "   - Curl verbose: $curl_trace_file"
     fi
     echo ""
-    echo "Ejecutando petición a RSM..."
+    echo "Executing request to RSM..."
 
     local curl_args=(
         --silent
@@ -675,7 +675,7 @@ send_to_rsm() {
     chmod 600 "$response_file" "$response_headers_file" 2>/dev/null || true
 
     echo ""
-    echo "Resultado HTTP:"
+    echo "HTTP result:"
     echo "   - curl exit: $exit_code"
     echo "   - HTTP code: $http_code"
     echo "   - Response body bytes: $(wc -c < "$response_file" 2>/dev/null || echo 0)"
@@ -687,28 +687,28 @@ send_to_rsm() {
 
     if [ "$exit_code" -ne 0 ]; then
         echo ""
-        echo "ERROR: Fallo al enviar inventario a RSM (curl exit: $exit_code)"
-        echo "Respuesta: $response_body"
+        echo "ERROR: Failed to send inventory to RSM (curl exit: $exit_code)"
+        echo "Response: $response_body"
         return 1
     fi
 
     if [ "$http_code" = "409" ] || echo "$response_body" | grep -iqE 'uuid.*(exists|ya existe)|already exists|duplicate|pertenece a otro sistema'; then
         echo ""
-        echo "ERROR: RSM indica que el UUID ya existe o pertenece a otro sistema."
-        echo "No se puede instalar este agente en el equipo local con ese UUID."
-        echo "Respuesta: $response_body"
+        echo "ERROR: RSM indicates that the UUID already exists or belongs to another system."
+        echo "This agent cannot be installed on the local machine with that UUID."
+        echo "Response: $response_body"
         return 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
         echo ""
-        echo "ERROR: RSM devolvió HTTP $http_code"
-        echo "Respuesta: $response_body"
+        echo "ERROR: RSM returned HTTP $http_code"
+        echo "Response: $response_body"
         return 1
     fi
 
     echo ""
-    printf 'Inventario enviado correctamente (%d KB)\n' "$(( ${#inventory_json} / 1024 ))"
+    printf 'Inventory sent successfully (%d KB)\n' "$(( ${#inventory_json} / 1024 ))"
     return 0
 }
 
@@ -728,7 +728,7 @@ main() {
     if ! init_private_tmp_dir; then
         exit 1
     fi
-    echo "Origen de ejecución: $EXECUTION_TRIGGER"
+    echo "Execution trigger: $EXECUTION_TRIGGER"
     check_for_updates
     if ! validate_uuid_ownership; then
         exit 1
@@ -738,54 +738,54 @@ main() {
     fi
 
     # --- Timezone ---
-    echo "Recopilando información de timezone..."
+    echo "Collecting timezone information..."
     local timezone
     timezone=$(collect_timezone)
     [ -z "$timezone" ] && timezone=""
-    echo "   -> Timezone: ${timezone:-desconocido}"
+    echo "   -> Timezone: ${timezone:-unknown}"
 
-    # --- Sistema ---
-    echo "Recopilando información del sistema..."
+    # --- System ---
+    echo "Collecting system information..."
     local system_json
     system_json=$(collect_system_info "$timezone")
     if [ -z "$system_json" ]; then
-        echo "ERROR: No se pudo recopilar la información del sistema"
+        echo "ERROR: Could not collect system information"
         exit 1
     fi
 
     # --- Hardware ---
-    echo "Recopilando información de hardware..."
+    echo "Collecting hardware information..."
     local hardware_json
     hardware_json=$(collect_hardware)
     local firmware_count
     firmware_count=$(printf '%s' "$hardware_json" | grep -o '"device"' | wc -l | tr -d ' ')
-    echo "   -> ${firmware_count} firmware(s) detectado(s)"
+    echo "   -> ${firmware_count} firmware(s) detected"
 
-    # --- Paquetes del sistema ---
-    echo "Recopilando paquetes del sistema..."
+    # --- System Packages ---
+    echo "Collecting system packages..."
     collect_packages
     local sys_json="$SYSTEM_COMPONENTS_JSON"
     local source_packages_json="$SYSTEM_PACKAGES_JSON"
     local sys_count="$SYSTEM_COMPONENTS_COUNT"
     local source_package_count="$SYSTEM_PACKAGES_COUNT"
-    echo "   -> ${sys_count} componentes del sistema"
-    echo "   -> ${source_package_count} paquetes source"
+    echo "   -> ${sys_count} system components"
+    echo "   -> ${source_package_count} source packages"
 
-    # --- Paquetes Python ---
-    echo "Recopilando paquetes Python..."
+    # --- Python Packages ---
+    echo "Collecting Python packages..."
     local pip_json pip_count=0
     pip_json=$(collect_pip_packages)
     [ -n "$pip_json" ] && pip_count=$(printf '%s' "$pip_json" | grep -o '"manager":"pip"' | wc -l | tr -d ' ')
-    echo "   -> ${pip_count} paquetes Python"
+    echo "   -> ${pip_count} Python packages"
 
-    # --- Paquetes Node.js ---
-    echo "Recopilando paquetes Node.js..."
+    # --- Node.js Packages ---
+    echo "Collecting Node.js packages..."
     local npm_json npm_count=0
     npm_json=$(collect_npm_packages)
     [ -n "$npm_json" ] && npm_count=$(printf '%s' "$npm_json" | grep -o '"manager":"npm"' | wc -l | tr -d ' ')
-    echo "   -> ${npm_count} paquetes Node.js"
+    echo "   -> ${npm_count} Node.js packages"
 
-    # Unificar todos los componentes en un array JSON
+    # Merge all components into one JSON array
     local all_components_json=""
     for part in "$sys_json" "$pip_json" "$npm_json"; do
         [ -z "$part" ] && continue
@@ -793,24 +793,24 @@ main() {
         all_components_json+="$part"
     done
     local total=$(( sys_count + pip_count + npm_count ))
-    echo "   Total unificado: ${total} componentes"
+    echo "   Unified total: ${total} components"
 
-    # --- Construir JSON final ---
+    # --- Build Final JSON ---
     local inventory_json
     inventory_json="{\"RSToken\":\"$(json_escape "$AGENT_TOKEN")\",\"system\":${system_json},\"hardware\":${hardware_json},\"components\":[${all_components_json}],\"packages\":[${source_packages_json}]}"
 
-    # --- Guardar localmente ---
+    # --- Save Locally ---
     local output_path="${OUTPUT_DIR}/${OUTPUT_FILE}"
     local temporary_output_path
     echo ""
-    echo "Guardando inventario en ${output_path}..."
+    echo "Saving inventory to ${output_path}..."
     temporary_output_path=$(mktemp "$OUTPUT_DIR/${OUTPUT_FILE}.XXXXXX") || {
-        echo "ERROR: No se pudo crear el inventario temporal en $OUTPUT_DIR"
+        echo "ERROR: Could not create temporary inventory in $OUTPUT_DIR"
         exit 1
     }
     chmod 600 "$temporary_output_path" 2>/dev/null || true
     if ! printf '%s' "$inventory_json" > "$temporary_output_path"; then
-        echo "ERROR: No se pudo escribir el inventario temporal $temporary_output_path"
+        echo "ERROR: Could not write temporary inventory $temporary_output_path"
         rm -f "$temporary_output_path"
         exit 1
     fi
@@ -818,44 +818,44 @@ main() {
     mv -f "$temporary_output_path" "$output_path"
     chmod 600 "$output_path" 2>/dev/null || true
 
-    # --- Enviar a RSM ---
+    # --- Send To RSM ---
     if ! send_to_rsm "$inventory_json"; then
         echo ""
         echo "============================================================"
-        echo "ERROR CRÍTICO: No se pudo enviar el inventario a RSM"
+        echo "CRITICAL ERROR: Could not send inventory to RSM"
         echo "============================================================"
         echo ""
-        echo "Verifica:"
-        echo "   - Token agente: <configurado; valor oculto>"
+        echo "Check:"
+        echo "   - Agent token: <configured; value hidden>"
         echo "   - UUID:  $UUID_VAL"
         echo "   - Alias: $SYSTEM_ALIAS"
         echo "   - URL:   $RSM_API_URL"
-        echo "   - Conectividad de red"
+        echo "   - Network connectivity"
         exit 1
     fi
 
     if ! record_success_state; then
-        echo "ERROR CRÍTICO: El inventario se envió, pero no se pudo guardar el estado de ejecución."
+        echo "CRITICAL ERROR: Inventory was sent, but execution state could not be saved."
         exit 1
     fi
 
-    # --- Resumen final ---
+    # --- Final Summary ---
     local file_size
     file_size=$(stat -c%s "$output_path" 2>/dev/null || stat -f%z "$output_path" 2>/dev/null || echo "?")
 
     echo ""
     echo "============================================================"
-    echo "Inventario recopilado y enviado correctamente"
+    echo "Inventory collected and sent successfully"
     echo "============================================================"
     echo ""
-    echo "Resumen:"
-    echo "   - Sistema:      $(printf '%s' "$system_json" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//')"
+    echo "Summary:"
+    echo "   - System:       $(printf '%s' "$system_json" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//')"
     echo "   - Hostname:     $(hostname -s 2>/dev/null || hostname)"
     echo "   - Firmware:     ${firmware_count}"
-    echo "   - Total componentes: ${total}"
-    echo "   - Total packages:    ${source_package_count}"
-    echo "   - Archivo:      ${output_path}"
-    echo "   - Tamano:       ${file_size} bytes"
+    echo "   - Total components: ${total}"
+    echo "   - Total packages:   ${source_package_count}"
+    echo "   - File:         ${output_path}"
+    echo "   - Size:         ${file_size} bytes"
     echo ""
 }
 
