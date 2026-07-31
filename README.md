@@ -39,13 +39,15 @@ systemctl --user status rs-agent.timer
 systemctl --user list-timers rs-agent.timer
 ```
 
-Si `systemd --user` no esta disponible, usa el crontab del usuario actual:
+Si `systemd --user` no esta disponible o `linger` no esta habilitado, usa el crontab del usuario actual:
 
 ```bash
 crontab -l | grep rs_agent_runner
 ```
 
-Nota: un timer `systemd --user` puede no ejecutarse cuando el usuario no tiene sesion activa si `linger` no esta habilitado. En ese caso, cron de usuario es el fallback mas practico para la prueba.
+El instalador valida que `crontab` exista, que el usuario pueda gestionar su crontab y que el daemon cron este activo. Si cron no esta disponible o las politicas del sistema bloquean crontabs de usuario, la instalacion no-root no se completa como automatica y se muestra un error indicando que se contacte con Firulai o con el administrador del sistema.
+
+Nota: un timer `systemd --user` puede no ejecutarse cuando el usuario no tiene sesion activa si `linger` no esta habilitado. En ese caso, cron de usuario es el fallback por defecto.
 
 ## Uso manual
 

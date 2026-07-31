@@ -507,6 +507,83 @@ update_rsm_system_on_install() {
     log "Sistema marcado como activo en Firulai"
 }
 
+cron_daemon_active() {
+    if command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
+        systemctl is-active --quiet cron.service 2>/dev/null && return 0
+        systemctl is-active --quiet crond.service 2>/dev/null && return 0
+        systemctl is-active --quiet cronie.service 2>/dev/null && return 0
+    fi
+
+    if command -v service &> /dev/null; then
+        service cron status >/dev/null 2>&1 && return 0
+        service crond status >/dev/null 2>&1 && return 0
+    fi
+
+    if command -v pgrep &> /dev/null; then
+        pgrep -x cron >/dev/null 2>&1 && return 0
+        pgrep -x crond >/dev/null 2>&1 && return 0
+    fi
+
+    return 1
+}
+
+check_cron_prerequisites() {
+    local crontab_error_file
+
+    if ! command -v crontab &> /dev/null; then
+        error "No se puede configurar ejecucion automatica no-root: el comando crontab no esta disponible."
+        error "Instala/activa cron en el sistema o contacta con Firulai para revisar una alternativa."
+        return 1
+    fi
+
+    crontab_error_file=$(make_private_temp_file "cron_access_check") || return 1
+    if ! crontab -l >/dev/null 2>"$crontab_error_file"; then
+        if ! grep -qi "no crontab" "$crontab_error_file"; then
+            error "El usuario actual no puede gestionar su crontab."
+            error "Revisa las politicas de cron del sistema o contacta con Firulai."
+            cat "$crontab_error_file" 2>/dev/null || true
+            rm -f "$crontab_error_file"
+            return 1
+        fi
+    fi
+    rm -f "$crontab_error_file"
+
+    if ! cron_daemon_active; then
+        error "El comando crontab existe, pero no se pudo confirmar que el daemon cron este activo."
+        error "Activa cron/crond en el sistema o contacta con Firulai para revisar una alternativa."
+        return 1
+    fi
+}
+
+cron_scheduler_required() {
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        if command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
+            return 1
+        fi
+        return 0
+    fi
+
+    if command -v systemctl &> /dev/null && systemctl --user show-environment >/dev/null 2>&1; then
+        local linger=""
+        if command -v loginctl >/dev/null 2>&1; then
+            linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)
+        fi
+
+        if [ "$linger" = "yes" ] || [ "${RS_AGENT_ALLOW_USER_SYSTEMD_WITHOUT_LINGER:-0}" = "1" ]; then
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+check_automatic_execution_prerequisites() {
+    if cron_scheduler_required; then
+        info "Verificando requisitos de cron para la ejecucion automatica..."
+        check_cron_prerequisites
+    fi
+}
+
 cleanup_partial_installation() {
     warn "Limpiando instalación parcial..."
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null; then
@@ -721,8 +798,8 @@ TIMER_EOF
         fi
     fi
 
-    if ! command -v crontab &> /dev/null; then
-        error "El sistema no dispone de systemd activo ni del comando crontab"
+    if ! check_cron_prerequisites; then
+        error "No se puede completar la instalacion con ejecucion automatica."
         return 1
     fi
 
@@ -828,6 +905,7 @@ main() {
     validate_uuid_format "$UUID"
     check_local_agent_installation
     warn_about_parallel_root_installation
+    check_automatic_execution_prerequisites
     check_uuid_available
     update_rsm_system_on_install
     
