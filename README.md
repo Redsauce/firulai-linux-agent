@@ -12,6 +12,30 @@ curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/i
 
 If the installer is run as a regular user, it installs only for that user. If it is run as root, it asks whether to continue as a root/system install or re-run as a no-root user.
 
+## Language
+
+The installer accepts the locale selected by the user in Firulai/RSM App user preferences:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> --locale <LOCALE>
+```
+
+If `--locale` is not provided, the installer tries to resolve it from RSM using the provided token. The selected locale is stored in `config.env` as `AGENT_LOCALE` and is reused by:
+
+- `install.sh`
+- `rs_agent.sh`
+- `rs_agent_runner.sh`
+- `uninstall.sh`
+
+Supported Firulai preference locales are `en_US`, `es_ES`, `ca_ES`, `eu_ES`, `gl_ES`, `fr_FR`, `de_DE`, `it_IT`, `ja_JP`, and `zh_CN`. Locale aliases such as `ca`, `ca-ES`, or `ca_ES` are normalized to the supported value.
+
+All user-facing messages in the Linux installer, agent run, automatic runner, and uninstaller must use the same selected language. When adding a new `t <key>` or `early_t <key>` message, add entries for every supported locale and run the i18n completeness check before release.
+
+```bash
+python3 scripts/check_i18n.py
+bash -n install.sh rs_agent.sh rs_agent_runner.sh uninstall.sh
+```
+
 ## No-Root Paths
 
 By default, user-mode installation uses:
