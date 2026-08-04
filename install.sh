@@ -5,7 +5,7 @@
 # ============================================================================
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
+#   curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
 #
 
 set -e
@@ -18,6 +18,7 @@ AGENT_TOKEN=${1:-""}
 UUID=${2:-""}
 SYSTEM_ALIAS=""
 SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-}"
+AGENT_LOCALE="${RS_AGENT_LOCALE:-}"
 
 if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
     echo "[ERROR] Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
@@ -35,9 +36,17 @@ while [ $# -gt 0 ]; do
             SYSTEM_ALIAS="$2"
             shift 2
             ;;
+        --locale|--agent-locale)
+            if [ $# -lt 2 ]; then
+                echo "[ERROR] --locale requires a value"
+                exit 1
+            fi
+            AGENT_LOCALE="$2"
+            shift 2
+            ;;
         *)
             echo "[ERROR] Unknown argument: $1"
-            echo "[ERROR] Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+            echo "[ERROR] Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <LOCALE>]"
             exit 1
             ;;
     esac
@@ -59,7 +68,7 @@ fi
 
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
-GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main}"
+GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main}"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -75,6 +84,75 @@ early_trim_string() {
 
 early_shell_single_quote() {
     printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+early_json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+early_json_extract_first_string_key() {
+    local json="$1"
+    local key="$2"
+
+    printf '%s' "$json" \
+        | tr -d '\n' \
+        | sed 's/,"/\n"/g' \
+        | sed -n "s/^.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*$/\1/p" \
+        | head -1
+}
+
+early_json_extract_rsm_property() {
+    local json="$1"
+    local property_id="$2"
+    local value
+
+    value=$(early_json_extract_first_string_key "$json" "$property_id")
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
+        return 0
+    fi
+
+    early_json_extract_first_string_key "$json" "${property_id}trs"
+}
+
+early_normalize_locale() {
+    local value
+    value=$(printf '%s' "${1:-}" | tr '[:upper:]-' '[:lower:]_')
+    case "$value" in
+        es*) printf '%s' "es_ES" ;;
+        ca*) printf '%s' "ca_ES" ;;
+        eu*) printf '%s' "eu_ES" ;;
+        gl*) printf '%s' "gl_ES" ;;
+        fr*) printf '%s' "fr_FR" ;;
+        de*) printf '%s' "de_DE" ;;
+        it*) printf '%s' "it_IT" ;;
+        ja*) printf '%s' "ja_JP" ;;
+        zh*) printf '%s' "zh_CN" ;;
+        *) printf '%s' "en_US" ;;
+    esac
+}
+
+early_resolve_locale_from_rsm() {
+    local token="$1"
+    local payload response_body locale
+    local items_get_url="https://rsm1.redsauce.net/AppController/commands_RSM/api/v2/items/get.php"
+    local app_user_agent_token_property_id="1821"
+    local app_user_locale_property_id="1824"
+
+    [ -n "$token" ] || return 1
+    command -v curl >/dev/null 2>&1 || return 1
+
+    payload="{\"propertyIDs\":[\"$app_user_agent_token_property_id\",\"$app_user_locale_property_id\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$app_user_agent_token_property_id\",\"value\":\"$(early_json_escape "$token")\",\"operation\":\"=\"}]}"
+    response_body=$(curl --silent --show-error --location --request GET "$items_get_url" --header "Authorization: $token" --header "Content-Type: application/json" --data "$payload" --max-time 20 2>/dev/null) || return 1
+    locale=$(early_json_extract_rsm_property "$response_body" "$app_user_locale_property_id")
+    [ -n "$locale" ] || return 1
+    early_normalize_locale "$locale"
 }
 
 early_user_linger_enabled_for() {
@@ -298,6 +376,9 @@ reexec_as_no_root_user() {
     if [ -n "$SYSTEM_ALIAS" ]; then
         command_string="$command_string --alias $(early_shell_single_quote "$SYSTEM_ALIAS")"
     fi
+    if [ -n "$AGENT_LOCALE" ]; then
+        command_string="$command_string --locale $(early_shell_single_quote "$AGENT_LOCALE")"
+    fi
 
     echo "[INFO] Re-running installer as no-root user: $target_user"
     exec su - "$target_user" -c "$command_string"
@@ -370,6 +451,11 @@ choose_install_mode_if_root() {
     esac
 }
 
+if [ -z "$AGENT_LOCALE" ]; then
+    AGENT_LOCALE=$(early_resolve_locale_from_rsm "$AGENT_TOKEN" 2>/dev/null || true)
+fi
+AGENT_LOCALE=$(early_normalize_locale "$AGENT_LOCALE")
+
 choose_install_mode_if_root
 
 # Installation directories
@@ -407,6 +493,10 @@ RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID="1751"
 RSM_SYSTEM_ALIAS_PROPERTY_ID="1827"
 RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE="Activo"
+RSM_ACCOUNT_AGENT_TOKEN_PROPERTY_ID="1790"
+RSM_APP_USER_AGENT_TOKEN_PROPERTY_ID="1821"
+RSM_APP_USER_ACCOUNT_PROPERTY_ID="516"
+RSM_APP_USER_LOCALE_PROPERTY_ID="1824"
 RSM_SYSTEM_ITEM_ID=""
 
 # ============================================================================
@@ -477,17 +567,17 @@ banner() {
     echo ""
     echo "============================================================================"
     echo "  Firulai Inventory Agent - Installer v0.2.4"
-    echo "  System analysis agent for vulnerability detection"
+    printf '  %s\n' "$(t banner_subtitle)"
     echo "============================================================================"
     echo ""
 }
 
 check_root() {
     if [ "$RUN_AS_ROOT" = "1" ]; then
-        warn "Root/system installation mode selected; system paths will be used."
+        warn "$(t root_mode)"
     else
-        info "No-root installation mode selected; the agent will be installed only for the current user."
-        warn "The inventory may be less complete than root mode if the system restricts some commands."
+        info "$(t user_mode)"
+        warn "$(t less_complete)"
     fi
 }
 
@@ -518,20 +608,20 @@ require_system_alias() {
     if [ -z "$SYSTEM_ALIAS" ]; then
         if [ -r /dev/tty ]; then
             echo ""
-            info "This installer needs an alias to identify the system in Firulai."
-            printf "System alias: " > /dev/tty
+            info "$(t alias_needed)"
+            printf "%s" "$(t alias_prompt)" > /dev/tty
             IFS= read -r SYSTEM_ALIAS < /dev/tty || SYSTEM_ALIAS=""
             SYSTEM_ALIAS=$(trim_string "$SYSTEM_ALIAS")
         fi
     fi
 
     if [ -z "$SYSTEM_ALIAS" ]; then
-        error "System alias is required."
+        error "$(t alias_required)"
         echo ""
-        echo "Run the installer with the --alias option:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
+        echo "$(t alias_usage)"
+        echo "  curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
         echo ""
-        echo "If the alias contains spaces, wrap it in quotes."
+        echo "$(t alias_quotes)"
         exit 1
     fi
 }
@@ -768,6 +858,178 @@ json_extract_rsm_property() {
     json_extract_first_string_key "$json" "${property_id}trs"
 }
 
+normalize_locale() {
+    local value
+    value=$(printf '%s' "${1:-}" | tr '[:upper:]-' '[:lower:]_')
+    case "$value" in
+        es*) printf '%s' "es_ES" ;;
+        ca*) printf '%s' "ca_ES" ;;
+        eu*) printf '%s' "eu_ES" ;;
+        gl*) printf '%s' "gl_ES" ;;
+        fr*) printf '%s' "fr_FR" ;;
+        de*) printf '%s' "de_DE" ;;
+        it*) printf '%s' "it_IT" ;;
+        ja*) printf '%s' "ja_JP" ;;
+        zh*) printf '%s' "zh_CN" ;;
+        *) printf '%s' "en_US" ;;
+    esac
+}
+
+t() {
+    local key="$1"
+    case "$(normalize_locale "$AGENT_LOCALE"):$key" in
+        es_ES:banner_subtitle) printf '%s' "Agente de analisis del sistema para deteccion de vulnerabilidades" ;;
+        es_ES:root_mode) printf '%s' "Modo de instalacion root/sistema seleccionado; se usaran rutas del sistema." ;;
+        es_ES:user_mode) printf '%s' "Modo de instalacion sin root seleccionado; el agente se instalara solo para el usuario actual." ;;
+        es_ES:less_complete) printf '%s' "El inventario puede ser menos completo que en modo root si el sistema restringe algunos comandos." ;;
+        es_ES:alias_needed) printf '%s' "Este instalador necesita un alias para identificar el sistema en Firulai." ;;
+        es_ES:alias_prompt) printf '%s' "Alias del sistema: " ;;
+        es_ES:alias_required) printf '%s' "El alias del sistema es obligatorio." ;;
+        es_ES:alias_usage) printf '%s' "Ejecuta el instalador con la opcion --alias:" ;;
+        es_ES:alias_quotes) printf '%s' "Si el alias contiene espacios, ponlo entre comillas." ;;
+        es_ES:validating_uuid) printf '%s' "Validando UUID en RSM..." ;;
+        es_ES:uuid_validate_failed) printf '%s' "No se pudo validar el UUID en RSM" ;;
+        es_ES:uuid_validate_safety) printf '%s' "Por seguridad, la instalacion no continuara sin confirmar que el UUID esta disponible." ;;
+        es_ES:uuid_validate_denied) printf '%s' "RSM no permitio validar el UUID" ;;
+        es_ES:response) printf '%s' "Respuesta" ;;
+        es_ES:invalid_uuid_rsm) printf '%s' "UUID invalido: no existe en RSM." ;;
+        es_ES:uuid_not_generated) printf '%s' "El agente no se puede instalar con un UUID que no se haya generado desde Add New System." ;;
+        es_ES:uuid_reserved) printf '%s' "UUID reservado en RSM y disponible para la instalacion" ;;
+        es_ES:uuid_same_system) printf '%s' "UUID ya asociado con este sistema en RSM; el agente se reactivara y el inventario se actualizara" ;;
+        es_ES:uuid_other_system) printf '%s' "Este UUID ya pertenece a otro sistema en RSM." ;;
+        es_ES:uuid_other_system_local) printf '%s' "Este agente no se puede instalar en la maquina local con ese UUID." ;;
+        es_ES:local_installed_same_uuid) printf '%s' "Este sistema ya tiene un agente instalado con este UUID." ;;
+        es_ES:existing_agent) printf '%s' "Ya existe una instalacion del agente en este sistema." ;;
+        es_ES:uninstall_current) printf '%s' "Para instalar un agente nuevo, desinstala primero el actual:" ;;
+        es_ES:config_saving) printf '%s' "Guardando configuracion local del agente..." ;;
+        es_ES:config_saved) printf '%s' "Configuracion guardada" ;;
+        es_ES:running_initial) printf '%s' "Ejecutando recoleccion inicial..." ;;
+        es_ES:inventory_ok) printf '%s' "Inventario generado correctamente" ;;
+        es_ES:initial_failed) printf '%s' "No se pudo generar y enviar el inventario durante la ejecucion inicial" ;;
+        es_ES:failure_details) printf '%s' "Los detalles del fallo se mostraron arriba." ;;
+        es_ES:install_completed) printf '%s' "INSTALACION COMPLETADA" ;;
+        es_ES:locations) printf '%s' "Ubicaciones:" ;;
+        es_ES:execution) printf '%s' "Ejecucion:" ;;
+        es_ES:automatic) printf '%s' "Automatica" ;;
+        es_ES:manual) printf '%s' "Manual" ;;
+        es_ES:current_alias) printf '%s' "Valor actual" ;;
+        es_ES:uninstall) printf '%s' "Desinstalar:" ;;
+
+        ca_ES:banner_subtitle) printf '%s' "Agent d'analisi del sistema per a deteccio de vulnerabilitats" ;;
+        ca_ES:root_mode) printf '%s' "Mode d'instal.lacio root/sistema seleccionat; s'usaran rutes del sistema." ;;
+        ca_ES:user_mode) printf '%s' "Mode d'instal.lacio sense root seleccionat; l'agent s'instal.lara nomes per a l'usuari actual." ;;
+        ca_ES:less_complete) printf '%s' "L'inventari pot ser menys complet que en mode root si el sistema restringeix algunes ordres." ;;
+        ca_ES:alias_needed) printf '%s' "Aquest instal.lador necessita un alias per identificar el sistema a Firulai." ;;
+        ca_ES:alias_prompt) printf '%s' "Alias del sistema: " ;;
+        ca_ES:alias_required) printf '%s' "L'alias del sistema es obligatori." ;;
+        ca_ES:alias_usage) printf '%s' "Executa l'instal.lador amb l'opcio --alias:" ;;
+        ca_ES:alias_quotes) printf '%s' "Si l'alias conte espais, posa'l entre cometes." ;;
+        ca_ES:validating_uuid) printf '%s' "Validant UUID a RSM..." ;;
+        ca_ES:uuid_validate_failed) printf '%s' "No s'ha pogut validar l'UUID a RSM" ;;
+        ca_ES:uuid_validate_safety) printf '%s' "Per seguretat, la instal.lacio no continuara sense confirmar que l'UUID esta disponible." ;;
+        ca_ES:uuid_validate_denied) printf '%s' "RSM no ha permes validar l'UUID" ;;
+        ca_ES:response) printf '%s' "Resposta" ;;
+        ca_ES:invalid_uuid_rsm) printf '%s' "UUID no valid: no existeix a RSM." ;;
+        ca_ES:uuid_not_generated) printf '%s' "L'agent no es pot instal.lar amb un UUID que no s'hagi generat des d'Add New System." ;;
+        ca_ES:uuid_reserved) printf '%s' "UUID reservat a RSM i disponible per a la instal.lacio" ;;
+        ca_ES:uuid_same_system) printf '%s' "UUID ja associat amb aquest sistema a RSM; l'agent es reactivara i l'inventari s'actualitzara" ;;
+        ca_ES:uuid_other_system) printf '%s' "Aquest UUID ja pertany a un altre sistema a RSM." ;;
+        ca_ES:uuid_other_system_local) printf '%s' "Aquest agent no es pot instal.lar a la maquina local amb aquest UUID." ;;
+        ca_ES:local_installed_same_uuid) printf '%s' "Aquest sistema ja te un agent instal.lat amb aquest UUID." ;;
+        ca_ES:existing_agent) printf '%s' "Ja existeix una instal.lacio de l'agent en aquest sistema." ;;
+        ca_ES:uninstall_current) printf '%s' "Per instal.lar un agent nou, desinstal.la primer l'actual:" ;;
+        ca_ES:config_saving) printf '%s' "Desant la configuracio local de l'agent..." ;;
+        ca_ES:config_saved) printf '%s' "Configuracio desada" ;;
+        ca_ES:running_initial) printf '%s' "Executant recol.leccio inicial..." ;;
+        ca_ES:inventory_ok) printf '%s' "Inventari generat correctament" ;;
+        ca_ES:initial_failed) printf '%s' "No s'ha pogut generar i enviar l'inventari durant l'execucio inicial" ;;
+        ca_ES:failure_details) printf '%s' "Els detalls de l'error s'han mostrat a dalt." ;;
+        ca_ES:install_completed) printf '%s' "INSTAL.LACIO COMPLETADA" ;;
+        ca_ES:locations) printf '%s' "Ubicacions:" ;;
+        ca_ES:execution) printf '%s' "Execucio:" ;;
+        ca_ES:automatic) printf '%s' "Automatica" ;;
+        ca_ES:manual) printf '%s' "Manual" ;;
+        ca_ES:current_alias) printf '%s' "Valor actual" ;;
+        ca_ES:uninstall) printf '%s' "Desinstal.lar:" ;;
+
+        *:banner_subtitle) printf '%s' "System analysis agent for vulnerability detection" ;;
+        *:root_mode) printf '%s' "Root/system installation mode selected; system paths will be used." ;;
+        *:user_mode) printf '%s' "No-root installation mode selected; the agent will be installed only for the current user." ;;
+        *:less_complete) printf '%s' "The inventory may be less complete than root mode if the system restricts some commands." ;;
+        *:alias_needed) printf '%s' "This installer needs an alias to identify the system in Firulai." ;;
+        *:alias_prompt) printf '%s' "System alias: " ;;
+        *:alias_required) printf '%s' "System alias is required." ;;
+        *:alias_usage) printf '%s' "Run the installer with the --alias option:" ;;
+        *:alias_quotes) printf '%s' "If the alias contains spaces, wrap it in quotes." ;;
+        *:validating_uuid) printf '%s' "Validating UUID in RSM..." ;;
+        *:uuid_validate_failed) printf '%s' "Could not validate the UUID in RSM" ;;
+        *:uuid_validate_safety) printf '%s' "For safety, installation will not continue without confirming that the UUID is available." ;;
+        *:uuid_validate_denied) printf '%s' "RSM did not allow UUID validation" ;;
+        *:response) printf '%s' "Response" ;;
+        *:invalid_uuid_rsm) printf '%s' "Invalid UUID: it does not exist in RSM." ;;
+        *:uuid_not_generated) printf '%s' "The agent cannot be installed with a UUID that was not generated from Add New System." ;;
+        *:uuid_reserved) printf '%s' "UUID reserved in RSM and available for installation" ;;
+        *:uuid_same_system) printf '%s' "UUID already associated with this system in RSM; the agent will be reactivated and inventory updated" ;;
+        *:uuid_other_system) printf '%s' "This UUID already belongs to another system in RSM." ;;
+        *:uuid_other_system_local) printf '%s' "This agent cannot be installed on the local machine with that UUID." ;;
+        *:local_installed_same_uuid) printf '%s' "This system already has an agent installed with this UUID." ;;
+        *:existing_agent) printf '%s' "An existing agent installation was found on this system." ;;
+        *:uninstall_current) printf '%s' "To install a new agent, uninstall the current one first:" ;;
+        *:config_saving) printf '%s' "Saving local agent configuration..." ;;
+        *:config_saved) printf '%s' "Configuration saved" ;;
+        *:running_initial) printf '%s' "Running initial collection..." ;;
+        *:inventory_ok) printf '%s' "Inventory generated successfully" ;;
+        *:initial_failed) printf '%s' "Could not generate and send the inventory during the initial run" ;;
+        *:failure_details) printf '%s' "Failure details were shown above." ;;
+        *:install_completed) printf '%s' "INSTALLATION COMPLETED" ;;
+        *:locations) printf '%s' "Locations:" ;;
+        *:execution) printf '%s' "Execution:" ;;
+        *:automatic) printf '%s' "Automatic" ;;
+        *:manual) printf '%s' "Manual" ;;
+        *:current_alias) printf '%s' "Current value" ;;
+        *:uninstall) printf '%s' "Uninstall:" ;;
+        *) printf '%s' "$key" ;;
+    esac
+}
+
+resolve_locale_from_rsm() {
+    local token="$1"
+    local payload response_body account_id locale
+
+    [ -n "$token" ] || return 1
+    command -v curl >/dev/null 2>&1 || return 1
+
+    payload="{\"propertyIDs\":[\"$RSM_APP_USER_AGENT_TOKEN_PROPERTY_ID\",\"$RSM_APP_USER_LOCALE_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_APP_USER_AGENT_TOKEN_PROPERTY_ID\",\"value\":\"$(json_escape "$token")\",\"operation\":\"=\"}]}"
+    response_body=$(curl --silent --show-error --location --request GET "$RSM_ITEMS_GET_URL" --header "Authorization: $token" --header "Content-Type: application/json" --data "$payload" --max-time 20 2>/dev/null) || response_body=""
+    locale=$(json_extract_rsm_property "$response_body" "$RSM_APP_USER_LOCALE_PROPERTY_ID")
+    if [ -n "$locale" ]; then
+        normalize_locale "$locale"
+        return 0
+    fi
+
+    payload="{\"propertyIDs\":[\"$RSM_ACCOUNT_AGENT_TOKEN_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_ACCOUNT_AGENT_TOKEN_PROPERTY_ID\",\"value\":\"$(json_escape "$token")\",\"operation\":\"=\"}]}"
+    response_body=$(curl --silent --show-error --location --request GET "$RSM_ITEMS_GET_URL" --header "Authorization: $token" --header "Content-Type: application/json" --data "$payload" --max-time 20 2>/dev/null) || return 1
+    account_id=$(json_extract_first_scalar_key "$response_body" "ID")
+    [ -z "$account_id" ] && account_id=$(json_extract_first_scalar_key "$response_body" "id")
+    [ -n "$account_id" ] || return 1
+
+    payload="{\"propertyIDs\":[\"$RSM_APP_USER_ACCOUNT_PROPERTY_ID\",\"$RSM_APP_USER_LOCALE_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_APP_USER_ACCOUNT_PROPERTY_ID\",\"value\":\"$(json_escape "$account_id")\",\"operation\":\"=\"}]}"
+    response_body=$(curl --silent --show-error --location --request GET "$RSM_ITEMS_GET_URL" --header "Authorization: $token" --header "Content-Type: application/json" --data "$payload" --max-time 20 2>/dev/null) || return 1
+    locale=$(json_extract_rsm_property "$response_body" "$RSM_APP_USER_LOCALE_PROPERTY_ID")
+    [ -n "$locale" ] || return 1
+    normalize_locale "$locale"
+}
+
+resolve_agent_locale() {
+    if [ -n "$AGENT_LOCALE" ]; then
+        AGENT_LOCALE=$(normalize_locale "$AGENT_LOCALE")
+        return 0
+    fi
+
+    AGENT_LOCALE=$(resolve_locale_from_rsm "$AGENT_TOKEN" 2>/dev/null || true)
+    AGENT_LOCALE=$(normalize_locale "$AGENT_LOCALE")
+}
+
 local_system_hostname() {
     hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown"
 }
@@ -798,7 +1060,7 @@ check_uuid_available() {
     response_file=$(make_private_temp_file "rsm_install_uuid_check_response")
     payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
 
-    info "Validating UUID in RSM..."
+    info "$(t validating_uuid)"
 
     set +e
     http_code=$(curl \
@@ -819,21 +1081,21 @@ check_uuid_available() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "Could not validate the UUID in RSM (curl exit: $exit_code)."
-        error "For safety, installation will not continue without confirming that the UUID is available."
+        error "$(t uuid_validate_failed) (curl exit: $exit_code)."
+        error "$(t uuid_validate_safety)"
         exit 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "RSM did not allow UUID validation (HTTP $http_code)."
-        error "For safety, installation will not continue without confirming that the UUID is available."
-        echo "Response: $response_body"
+        error "$(t uuid_validate_denied) (HTTP $http_code)."
+        error "$(t uuid_validate_safety)"
+        echo "$(t response): $response_body"
         exit 1
     fi
 
     if ! printf '%s' "$response_body" | grep -Fq "$UUID"; then
-        error "Invalid UUID: it does not exist in RSM."
-        error "The agent cannot be installed with a UUID that was not generated from Add New System."
+        error "$(t invalid_uuid_rsm)"
+        error "$(t uuid_not_generated)"
         echo ""
         echo "UUID: $UUID"
         exit 1
@@ -852,18 +1114,18 @@ check_uuid_available() {
     existing_fqdn=$(json_extract_rsm_property "$response_body" "$RSM_SYSTEM_FQDN_PROPERTY_ID")
 
     if [ -z "$existing_hostname" ] && [ -z "$existing_fqdn" ]; then
-        log "UUID reserved in RSM and available for installation"
+        log "$(t uuid_reserved)"
         return 0
     fi
 
     if identity_matches_local_system "$existing_hostname" "$existing_fqdn"; then
-        log "UUID already associated with this system in RSM; the agent will be reactivated and inventory updated"
+        log "$(t uuid_same_system)"
         return 0
     fi
 
     echo ""
-    error "This UUID already belongs to another system in RSM."
-    error "This agent cannot be installed on the local machine with that UUID."
+    error "$(t uuid_other_system)"
+    error "$(t uuid_other_system_local)"
     exit 1
 }
 
@@ -871,8 +1133,8 @@ check_existing_installation() {
     if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
         local manual_prefix=""
         [ "$RUN_AS_ROOT" = "1" ] && manual_prefix="sudo "
-        warn "An existing agent installation was found on this system."
-        warn "To install a new agent, uninstall the current one first:"
+        warn "$(t existing_agent)"
+        warn "$(t uninstall_current)"
         warn "  ${manual_prefix}bash $INSTALL_DIR/uninstall.sh"
         exit 1
     fi
@@ -898,9 +1160,9 @@ check_local_agent_installation() {
         fi
 
         if [ -n "$installed_uuid" ] && [ "$installed_uuid" = "$UUID" ]; then
-            error "This system already has an agent installed with this UUID."
+            error "$(t local_installed_same_uuid)"
         else
-            error "An agent is already installed on this system."
+            error "$(t existing_agent)"
             if [ -n "$installed_uuid" ]; then
                 echo "Currently installed UUID: $installed_uuid"
             fi
@@ -908,7 +1170,7 @@ check_local_agent_installation() {
         fi
 
         echo ""
-        echo "To reinstall the agent, uninstall the current agent first:"
+        echo "$(t uninstall_current)"
         if [ "$RUN_AS_ROOT" = "1" ]; then
             echo "  sudo bash $INSTALL_DIR/uninstall.sh"
         else
@@ -1257,7 +1519,7 @@ download_uninstaller() {
 write_agent_config() {
     local temporary_file
 
-    info "Saving local agent configuration..."
+    info "$(t config_saving)"
 
     temporary_file=$(mktemp "$DATA_DIR/config.env.XXXXXX")
     chmod 600 "$temporary_file"
@@ -1265,12 +1527,13 @@ write_agent_config() {
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
 UUID=$(shell_single_quote "$UUID")
 SYSTEM_ALIAS=$(shell_single_quote "$SYSTEM_ALIAS")
+AGENT_LOCALE=$(shell_single_quote "$AGENT_LOCALE")
 CONFIG_EOF
     chown root:root "$temporary_file" 2>/dev/null || true
     mv -f "$temporary_file" "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
 
-    log "Configuration saved: $CONFIG_FILE"
+    log "$(t config_saved): $CONFIG_FILE"
 }
 
 setup_automatic_execution() {
@@ -1401,23 +1664,23 @@ TIMER_EOF
 }
 
 test_agent() {
-    info "Running initial collection..."
+    info "$(t running_initial)"
 
     set +e
-    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" 2>&1 | tee -a "$LOG_FILE"
+    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" --locale "$AGENT_LOCALE" 2>&1 | tee -a "$LOG_FILE"
     local agent_status=${PIPESTATUS[0]}
     set -e
 
     if [ "$agent_status" -eq 0 ]; then
         if [ -f "$DATA_DIR/inventory.json" ]; then
             INVENTORY_SIZE=$(stat -c%s "$DATA_DIR/inventory.json" 2>/dev/null || stat -f%z "$DATA_DIR/inventory.json" 2>/dev/null)
-            log "Inventory generated successfully (${INVENTORY_SIZE} bytes)"
+            log "$(t inventory_ok) (${INVENTORY_SIZE} bytes)"
             return 0
         fi
     fi
 
-    error "Could not generate and send the inventory during the initial run"
-    info "Failure details were shown above."
+    error "$(t initial_failed)"
+    info "$(t failure_details)"
     return 1
 }
 
@@ -1427,22 +1690,22 @@ print_summary() {
 
     echo ""
     echo "============================================================================"
-    echo "  INSTALLATION COMPLETED"
+    printf '  %s\n' "$(t install_completed)"
     echo "============================================================================"
     echo ""
-    echo "Locations:"
+    echo "$(t locations)"
     echo "   - Agent:       $INSTALL_DIR/rs_agent.sh"
     echo "   - Inventory:   $DATA_DIR/inventory.json"
     echo "   - State:       $DATA_DIR/state.env"
     echo "   - Logs:        $LOG_FILE"
     echo ""
-    echo "Execution:"
-    echo "   - Automatic:   Daily at 3:00 AM ($SCHEDULER_TYPE)"
+    echo "$(t execution)"
+    echo "   - $(t automatic):   Daily at 3:00 AM ($SCHEDULER_TYPE)"
     echo "   - Recovery:    one pending execution when the system becomes operational again"
-    echo "   - Manual:      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>"
+    echo "   - $(t manual):      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS> --locale $AGENT_LOCALE"
     echo ""
     echo "Alias:"
-    echo "   - Current value: $SYSTEM_ALIAS"
+    echo "   - $(t current_alias): $SYSTEM_ALIAS"
     echo "   - This alias is saved in Firulai and can be changed from the interface."
     echo ""
     echo "View inventory:"
@@ -1455,7 +1718,7 @@ print_summary() {
     echo "   - System analysis agent for vulnerability detection"
     echo "   - Includes: OS, kernel, CPU, disk models, packages, critical software"
     echo ""
-    echo "Uninstall:"
+    echo "$(t uninstall)"
     echo "   ${manual_prefix}bash $INSTALL_DIR/uninstall.sh"
     echo ""
     echo "============================================================================"
@@ -1467,6 +1730,7 @@ print_summary() {
 # ============================================================================
 
 main() {
+    resolve_agent_locale
     banner
     
     # Verificaciones

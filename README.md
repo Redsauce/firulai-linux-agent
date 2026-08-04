@@ -7,7 +7,7 @@ Linux system analysis agent for vulnerability detection. It collects system info
 The external command remains the same shape as the UI-provided installer command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/experiment/non-root-install-from-main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
+curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
 ```
 
 If the installer is run as a regular user, it installs only for that user. If it is run as root, it asks whether to continue as a root/system install or re-run as a no-root user.
