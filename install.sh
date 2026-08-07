@@ -5,7 +5,7 @@
 # ============================================================================
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
+#   curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID>
 #
 
 set -e
@@ -16,7 +16,6 @@ set -e
 
 AGENT_TOKEN=${1:-""}
 UUID=${2:-""}
-SYSTEM_ALIAS=""
 SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-}"
 AGENT_LOCALE="${RS_AGENT_LOCALE:-}"
 
@@ -40,24 +39,24 @@ early_locale_prefix() {
 early_t() {
     local key="$1"
     case "$(early_locale_prefix):$key" in
-        es:usage) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        ca:usage) printf '%s' "Us: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        eu:usage) printf '%s' "Erabilera: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        gl:usage) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        fr:usage) printf '%s' "Utilisation : curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        de:usage) printf '%s' "Verwendung: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        it:usage) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        ja:usage) printf '%s' "使用方法: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        zh:usage) printf '%s' "用法: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        es:usage_locale) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <IDIOMA>]" ;;
-        ca:usage_locale) printf '%s' "Us: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <IDIOMA>]" ;;
-        eu:usage_locale) printf '%s' "Erabilera: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <HIZKUNTZA>]" ;;
-        gl:usage_locale) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <IDIOMA>]" ;;
-        fr:usage_locale) printf '%s' "Utilisation : curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <LANGUE>]" ;;
-        de:usage_locale) printf '%s' "Verwendung: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <SPRACHE>]" ;;
-        it:usage_locale) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <LINGUA>]" ;;
-        ja:usage_locale) printf '%s' "使用方法: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <言語>]" ;;
-        zh:usage_locale) printf '%s' "用法: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <语言>]" ;;
+        es:usage) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        ca:usage) printf '%s' "Us: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        eu:usage) printf '%s' "Erabilera: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        gl:usage) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        fr:usage) printf '%s' "Utilisation : curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        de:usage) printf '%s' "Verwendung: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        it:usage) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        ja:usage) printf '%s' "使用方法: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        zh:usage) printf '%s' "用法: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        es:usage_locale) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <IDIOMA>]" ;;
+        ca:usage_locale) printf '%s' "Us: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <IDIOMA>]" ;;
+        eu:usage_locale) printf '%s' "Erabilera: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <HIZKUNTZA>]" ;;
+        gl:usage_locale) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <IDIOMA>]" ;;
+        fr:usage_locale) printf '%s' "Utilisation : curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <LANGUE>]" ;;
+        de:usage_locale) printf '%s' "Verwendung: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <SPRACHE>]" ;;
+        it:usage_locale) printf '%s' "Uso: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <LINGUA>]" ;;
+        ja:usage_locale) printf '%s' "使用方法: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <言語>]" ;;
+        zh:usage_locale) printf '%s' "用法: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <语言>]" ;;
         es:alias_requires_value) printf '%s' "--alias requiere un valor" ;;
         ca:alias_requires_value) printf '%s' "--alias requereix un valor" ;;
         eu:alias_requires_value) printf '%s' "--alias aukerak balio bat behar du" ;;
@@ -445,8 +444,8 @@ early_t() {
         it:user_not_exists) printf '%s' "L'utente non esiste" ;;
         ja:user_not_exists) printf '%s' "ユーザーが存在しません" ;;
         zh:user_not_exists) printf '%s' "用户不存在" ;;
-        *:usage) printf '%s' "Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>" ;;
-        *:usage_locale) printf '%s' "Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        *:usage) printf '%s' "Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID>" ;;
+        *:usage_locale) printf '%s' "Usage: curl ... | bash -s -- <AGENT_TOKEN> <UUID> [--locale <LOCALE>]" ;;
         *:alias_requires_value) printf '%s' "--alias requires a value" ;;
         *:locale_requires_value) printf '%s' "--locale requires a value" ;;
         *:unknown_argument) printf '%s' "Unknown argument" ;;
@@ -507,7 +506,7 @@ while [ $# -gt 0 ]; do
                 echo "[ERROR] $(early_t alias_requires_value)"
                 exit 1
             fi
-            SYSTEM_ALIAS="$2"
+            # Backward-compatible no-op: aliases are now managed only from the UI.
             shift 2
             ;;
         --locale|--agent-locale)
@@ -847,9 +846,6 @@ reexec_as_no_root_user() {
     target_runtime_dir="/run/user/$target_uid"
 
     command_string="export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
-    if [ -n "$SYSTEM_ALIAS" ]; then
-        command_string="$command_string --alias $(early_shell_single_quote "$SYSTEM_ALIAS")"
-    fi
     if [ -n "$AGENT_LOCALE" ]; then
         command_string="$command_string --locale $(early_shell_single_quote "$AGENT_LOCALE")"
     fi
@@ -965,7 +961,6 @@ RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID="1751"
-RSM_SYSTEM_ALIAS_PROPERTY_ID="1827"
 RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE="Activo"
 RSM_ACCOUNT_AGENT_TOKEN_PROPERTY_ID="1790"
 RSM_APP_USER_AGENT_TOKEN_PROPERTY_ID="1821"
@@ -1074,30 +1069,6 @@ json_escape() {
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
     printf '%s' "$s"
-}
-
-require_system_alias() {
-    SYSTEM_ALIAS=$(trim_string "$SYSTEM_ALIAS")
-
-    if [ -z "$SYSTEM_ALIAS" ]; then
-        if [ -r /dev/tty ]; then
-            echo ""
-            info "$(t alias_needed)"
-            printf "%s" "$(t alias_prompt)" > /dev/tty
-            IFS= read -r SYSTEM_ALIAS < /dev/tty || SYSTEM_ALIAS=""
-            SYSTEM_ALIAS=$(trim_string "$SYSTEM_ALIAS")
-        fi
-    fi
-
-    if [ -z "$SYSTEM_ALIAS" ]; then
-        error "$(t alias_required)"
-        echo ""
-        echo "$(t alias_usage)"
-        echo "  curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>"
-        echo ""
-        echo "$(t alias_quotes)"
-        exit 1
-    fi
 }
 
 prepare_systemd_user_environment() {
@@ -1356,11 +1327,6 @@ t() {
         es_ES:root_mode) printf '%s' "Modo de instalacion root/sistema seleccionado; se usaran rutas del sistema." ;;
         es_ES:user_mode) printf '%s' "Modo de instalacion sin root seleccionado; el agente se instalara solo para el usuario actual." ;;
         es_ES:less_complete) printf '%s' "El inventario puede ser menos completo que en modo root si el sistema restringe algunos comandos." ;;
-        es_ES:alias_needed) printf '%s' "Este instalador necesita un alias para identificar el sistema en Firulai." ;;
-        es_ES:alias_prompt) printf '%s' "Alias del sistema: " ;;
-        es_ES:alias_required) printf '%s' "El alias del sistema es obligatorio." ;;
-        es_ES:alias_usage) printf '%s' "Ejecuta el instalador con la opcion --alias:" ;;
-        es_ES:alias_quotes) printf '%s' "Si el alias contiene espacios, ponlo entre comillas." ;;
         es_ES:validating_uuid) printf '%s' "Validando UUID en RSM..." ;;
         es_ES:uuid_validate_failed) printf '%s' "No se pudo validar el UUID en RSM" ;;
         es_ES:uuid_validate_safety) printf '%s' "Por seguridad, la instalacion no continuara sin confirmar que el UUID esta disponible." ;;
@@ -1386,7 +1352,6 @@ t() {
         es_ES:execution) printf '%s' "Ejecucion:" ;;
         es_ES:automatic) printf '%s' "Automatica" ;;
         es_ES:manual) printf '%s' "Manual" ;;
-        es_ES:current_alias) printf '%s' "Valor actual" ;;
         es_ES:uninstall) printf '%s' "Desinstalar:" ;;
         es_ES:no_interactive_privileged) printf '%s' "No hay ningun terminal interactivo disponible para solicitar acceso privilegiado." ;;
         es_ES:privileged_needed) printf '%s' "Esta accion necesita acceso privilegiado." ;;
@@ -1421,7 +1386,7 @@ t() {
         es_ES:rsm_status_safety) printf '%s' "Por seguridad, la instalacion no continuara sin poder actualizar el estado." ;;
         es_ES:root_existing) printf '%s' "Se ha encontrado una instalacion root existente en /opt/rs-agent o /var/lib/rs-agent." ;;
         es_ES:root_coexist) printf '%s' "La instalacion sin root coexistira con ella usando rutas del usuario actual." ;;
-        es_ES:test_uuid_alias) printf '%s' "Para comparar, usa un UUID/alias de prueba separado." ;;
+        es_ES:test_uuid_alias) printf '%s' "Para comparar, usa un UUID de prueba separado." ;;
         es_ES:current_installed_uuid) printf '%s' "UUID instalado actualmente" ;;
         es_ES:requested_uuid) printf '%s' "UUID solicitado" ;;
         es_ES:update_rsm_missing_uuid) printf '%s' "No se pudo actualizar RSM porque no se encontro el item del UUID." ;;
@@ -1496,8 +1461,6 @@ t() {
         es_ES:daily_at) printf '%s' "Diaria a las 03:00" ;;
         es_ES:recovery) printf '%s' "Recuperacion" ;;
         es_ES:recovery_detail) printf '%s' "una ejecucion pendiente cuando el sistema vuelve a estar operativo" ;;
-        es_ES:alias_title) printf '%s' "Alias:" ;;
-        es_ES:alias_saved) printf '%s' "Este alias se guarda en Firulai y puede modificarse desde la interfaz." ;;
         es_ES:view_inventory) printf '%s' "Ver inventario:" ;;
         es_ES:behavior_title) printf '%s' "Comportamiento:" ;;
         es_ES:no_python_jq) printf '%s' "Sin dependencia de Python ni jq (bash puro)" ;;
@@ -1513,11 +1476,6 @@ t() {
         ca_ES:root_mode) printf '%s' "Mode d'instal.lacio root/sistema seleccionat; s'usaran rutes del sistema." ;;
         ca_ES:user_mode) printf '%s' "Mode d'instal.lacio sense root seleccionat; l'agent s'instal.lara nomes per a l'usuari actual." ;;
         ca_ES:less_complete) printf '%s' "L'inventari pot ser menys complet que en mode root si el sistema restringeix algunes ordres." ;;
-        ca_ES:alias_needed) printf '%s' "Aquest instal.lador necessita un alias per identificar el sistema a Firulai." ;;
-        ca_ES:alias_prompt) printf '%s' "Alias del sistema: " ;;
-        ca_ES:alias_required) printf '%s' "L'alias del sistema es obligatori." ;;
-        ca_ES:alias_usage) printf '%s' "Executa l'instal.lador amb l'opcio --alias:" ;;
-        ca_ES:alias_quotes) printf '%s' "Si l'alias conte espais, posa'l entre cometes." ;;
         ca_ES:validating_uuid) printf '%s' "Validant UUID a RSM..." ;;
         ca_ES:uuid_validate_failed) printf '%s' "No s'ha pogut validar l'UUID a RSM" ;;
         ca_ES:uuid_validate_safety) printf '%s' "Per seguretat, la instal.lacio no continuara sense confirmar que l'UUID esta disponible." ;;
@@ -1543,7 +1501,6 @@ t() {
         ca_ES:execution) printf '%s' "Execucio:" ;;
         ca_ES:automatic) printf '%s' "Automatica" ;;
         ca_ES:manual) printf '%s' "Manual" ;;
-        ca_ES:current_alias) printf '%s' "Valor actual" ;;
         ca_ES:uninstall) printf '%s' "Desinstal.lar:" ;;
         ca_ES:no_interactive_cron_default) printf '%s' "No s'ha detectat cap terminal interactiu; s'usara cron d'usuari per defecte." ;;
         ca_ES:automatic_execution_setup) printf '%s' "Configuracio d'execucio automatica:" ;;
@@ -1575,8 +1532,6 @@ t() {
         ca_ES:activated) printf '%s' "Sistema marcat com a actiu a Firulai" ;;
         ca_ES:activation_denied) printf '%s' "RSM no permetia l'activació del sistema" ;;
         ca_ES:agent_downloaded) printf '%s' "Agent descarregat" ;;
-        ca_ES:alias_saved) printf '%s' "Aquest àlies es desa a Firulai i es pot canviar des de la interfície." ;;
-        ca_ES:alias_title) printf '%s' "Àlies:" ;;
         ca_ES:attempted_url) printf '%s' "URL intentat" ;;
         ca_ES:auto_config_failed) printf '%s' "No es pot completar la instal·lació amb l'execució automàtica." ;;
         ca_ES:auto_execution_config_failed) printf '%s' "No s'ha pogut configurar l'execució automàtica" ;;
@@ -1660,7 +1615,7 @@ t() {
         ca_ES:systemd_user_timer_configured) printf '%s' "systemd --user timer configurat a les 03:00" ;;
         ca_ES:systemd_user_try_cron) printf '%s' "No s'ha pogut habilitar systemd --user; En lloc d'això, es provarà el cron de l'usuari." ;;
         ca_ES:systemd_user_unavailable) printf '%s' "systemd --user encara no està disponible per a aquest usuari/sessió." ;;
-        ca_ES:test_uuid_alias) printf '%s' "Per comparar, utilitzeu un UUID/àlies de prova independent." ;;
+        ca_ES:test_uuid_alias) printf '%s' "Per comparar, utilitzeu un UUID de prova independent." ;;
         ca_ES:trying_su) printf '%s' "Provant root mitjançant su. su demana la contrasenya d'arrel i requereix que es permeti l'inici de sessió." ;;
         ca_ES:uninstall_download_failed) printf '%s' "No s'ha pogut descarregar el desinstal·lador de GitHub" ;;
         ca_ES:uninstaller_downloaded) printf '%s' "Desinstal·lador baixat" ;;
@@ -1676,13 +1631,6 @@ t() {
         eu_ES:activated) printf '%s' "Firulai-n aktibo gisa markatutako sistema" ;;
         eu_ES:activation_denied) printf '%s' "RSM-k ez zuen sistema aktibatzea onartzen" ;;
         eu_ES:agent_downloaded) printf '%s' "Agentea deskargatu da" ;;
-        eu_ES:alias_needed) printf '%s' "Instalatzaile honek alias bat behar du Firulai-n sistema identifikatzeko." ;;
-        eu_ES:alias_prompt) printf '%s' "Sistemaren ezizena: " ;;
-        eu_ES:alias_quotes) printf '%s' "Aliasak zuriuneak baditu, jarri komatxo artean." ;;
-        eu_ES:alias_required) printf '%s' "Sistemaren aliasa beharrezkoa da." ;;
-        eu_ES:alias_saved) printf '%s' "Alias ​​hau Firulai-n gordetzen da eta interfazetik alda daiteke." ;;
-        eu_ES:alias_title) printf '%s' "Ezizena:" ;;
-        eu_ES:alias_usage) printf '%s' "Exekutatu instalatzailea --alias aukerarekin:" ;;
         eu_ES:attempted_url) printf '%s' "URL saiakera" ;;
         eu_ES:auto_config_failed) printf '%s' "Ezin da osatu instalazioa exekuzio automatikoarekin." ;;
         eu_ES:auto_execution_config_failed) printf '%s' "Ezin izan da exekuzio automatikoa konfiguratu" ;;
@@ -1719,7 +1667,6 @@ t() {
         eu_ES:crontab_unavailable) printf '%s' "Ezin izan da crontab erabilgarri jarri. Jarri harremanetan Firulairekin laguntza behar baduzu." ;;
         eu_ES:curl_found) printf '%s' "kizkur aurkitu" ;;
         eu_ES:curl_missing) printf '%s' "curl ez dago instalatuta" ;;
-        eu_ES:current_alias) printf '%s' "Egungo balioa" ;;
         eu_ES:current_installed_uuid) printf '%s' "Une honetan instalatuta dagoen UUID" ;;
         eu_ES:daily_at) printf '%s' "Egunero goizeko 3:00etan" ;;
         eu_ES:dirs_created) printf '%s' "Sortutako direktorioak" ;;
@@ -1806,7 +1753,7 @@ t() {
         eu_ES:systemd_user_timer_configured) printf '%s' "systemd --user tenporizadorea 03:00etan konfiguratuta" ;;
         eu_ES:systemd_user_try_cron) printf '%s' "Ezin izan da gaitu systemd --user; erabiltzailea cron saiatuko da horren ordez." ;;
         eu_ES:systemd_user_unavailable) printf '%s' "systemd --user ez dago erabilgarri erabiltzaile/saio honetarako oraindik." ;;
-        eu_ES:test_uuid_alias) printf '%s' "Konparatzeko, erabili probaren UUID/alias bereizi bat." ;;
+        eu_ES:test_uuid_alias) printf '%s' "Konparatzeko, erabili probaren UUID bereizi bat." ;;
         eu_ES:trying_su) printf '%s' "Su bidez errotzen saiatzen. su root pasahitza eskatzen du eta root saioa baimentzea eskatzen du." ;;
         eu_ES:uninstall) printf '%s' "Desinstalatu:" ;;
         eu_ES:uninstall_current) printf '%s' "Agente berri bat instalatzeko, desinstalatu oraingoa lehenik:" ;;
@@ -1835,13 +1782,6 @@ t() {
         gl_ES:activated) printf '%s' "Sistema marcado como activo en Firulai" ;;
         gl_ES:activation_denied) printf '%s' "RSM non permitiu a activación do sistema" ;;
         gl_ES:agent_downloaded) printf '%s' "Axente descargado" ;;
-        gl_ES:alias_needed) printf '%s' "Este instalador necesita un alias para identificar o sistema en Firulai." ;;
-        gl_ES:alias_prompt) printf '%s' "Alias do sistema: " ;;
-        gl_ES:alias_quotes) printf '%s' "Se o alias contén espazos, engádeo entre comiñas." ;;
-        gl_ES:alias_required) printf '%s' "O alias do sistema é necesario." ;;
-        gl_ES:alias_saved) printf '%s' "Este alias gárdase en Firulai e pódese cambiar desde a interface." ;;
-        gl_ES:alias_title) printf '%s' "Alias:" ;;
-        gl_ES:alias_usage) printf '%s' "Executa o instalador coa opción --alias:" ;;
         gl_ES:attempted_url) printf '%s' "URL tentativa" ;;
         gl_ES:auto_config_failed) printf '%s' "Non se pode completar a instalación coa execución automática." ;;
         gl_ES:auto_execution_config_failed) printf '%s' "Non se puido configurar a execución automática" ;;
@@ -1878,7 +1818,6 @@ t() {
         gl_ES:crontab_unavailable) printf '%s' "Non se puido facer que crontab estea dispoñible. Contacta con Firulai se necesitas axuda." ;;
         gl_ES:curl_found) printf '%s' "rizo atopado" ;;
         gl_ES:curl_missing) printf '%s' "curl non está instalado" ;;
-        gl_ES:current_alias) printf '%s' "Valor actual" ;;
         gl_ES:current_installed_uuid) printf '%s' "UUID instalado actualmente" ;;
         gl_ES:daily_at) printf '%s' "Diariamente ás 3:00 AM" ;;
         gl_ES:dirs_created) printf '%s' "Directorios creados" ;;
@@ -1965,7 +1904,7 @@ t() {
         gl_ES:systemd_user_timer_configured) printf '%s' "systemd --temporizador de usuario configurado ás 03:00" ;;
         gl_ES:systemd_user_try_cron) printf '%s' "Non se puido activar systemd --user; no seu lugar probarase o cron do usuario." ;;
         gl_ES:systemd_user_unavailable) printf '%s' "systemd --user aínda non está dispoñible para este usuario/sesión." ;;
-        gl_ES:test_uuid_alias) printf '%s' "Para comparación, use un UUID/alias de proba separado." ;;
+        gl_ES:test_uuid_alias) printf '%s' "Para comparación, use un UUID de proba separado." ;;
         gl_ES:trying_su) printf '%s' "Probando root a través de su. su pide o contrasinal de root e require que se permita o inicio de sesión de root." ;;
         gl_ES:uninstall) printf '%s' "Desinstalar:" ;;
         gl_ES:uninstall_current) printf '%s' "Para instalar un novo axente, desinstale primeiro o actual:" ;;
@@ -1994,13 +1933,6 @@ t() {
         fr_FR:activated) printf '%s' "Système marqué comme actif à Firulai" ;;
         fr_FR:activation_denied) printf '%s' "RSM n'a pas autorisé l'activation du système" ;;
         fr_FR:agent_downloaded) printf '%s' "Agent téléchargé" ;;
-        fr_FR:alias_needed) printf '%s' "Ce programme d'installation a besoin d'un alias pour identifier le système dans Firulai." ;;
-        fr_FR:alias_prompt) printf '%s' "Alias système : " ;;
-        fr_FR:alias_quotes) printf '%s' "Si l'alias contient des espaces, placez-le entre guillemets." ;;
-        fr_FR:alias_required) printf '%s' "L'alias du système est requis." ;;
-        fr_FR:alias_saved) printf '%s' "Cet alias est enregistré dans Firulai et peut être modifié depuis l'interface." ;;
-        fr_FR:alias_title) printf '%s' "Alias:" ;;
-        fr_FR:alias_usage) printf '%s' "Exécutez le programme d'installation avec l'option --alias :" ;;
         fr_FR:attempted_url) printf '%s' "Tentative d'URL" ;;
         fr_FR:auto_config_failed) printf '%s' "Impossible de terminer l'installation avec une exécution automatique." ;;
         fr_FR:auto_execution_config_failed) printf '%s' "Impossible de configurer l'exécution automatique" ;;
@@ -2037,7 +1969,6 @@ t() {
         fr_FR:crontab_unavailable) printf '%s' "Impossible de rendre crontab disponible. Contactez Firulai si vous avez besoin d'aide." ;;
         fr_FR:curl_found) printf '%s' "boucle trouvée" ;;
         fr_FR:curl_missing) printf '%s' "curl n'est pas installé" ;;
-        fr_FR:current_alias) printf '%s' "Valeur actuelle" ;;
         fr_FR:current_installed_uuid) printf '%s' "UUID actuellement installé" ;;
         fr_FR:daily_at) printf '%s' "Tous les jours à 3h00" ;;
         fr_FR:dirs_created) printf '%s' "Répertoires créés" ;;
@@ -2124,7 +2055,7 @@ t() {
         fr_FR:systemd_user_timer_configured) printf '%s' "systemd --user timer configuré à 03h00" ;;
         fr_FR:systemd_user_try_cron) printf '%s' "Impossible d'activer systemd --user ; l'utilisateur cron sera essayé à la place." ;;
         fr_FR:systemd_user_unavailable) printf '%s' "systemd --user n'est pas encore disponible pour cet utilisateur/session." ;;
-        fr_FR:test_uuid_alias) printf '%s' "À des fins de comparaison, utilisez un UUID/alias de test distinct." ;;
+        fr_FR:test_uuid_alias) printf '%s' "À des fins de comparaison, utilisez un UUID de test distinct." ;;
         fr_FR:trying_su) printf '%s' "Essayer de rooter via su. su demande le mot de passe root et nécessite que la connexion root soit autorisée." ;;
         fr_FR:uninstall) printf '%s' "Désinstaller :" ;;
         fr_FR:uninstall_current) printf '%s' "Pour installer un nouvel agent, désinstallez d'abord l'agent actuel :" ;;
@@ -2153,13 +2084,6 @@ t() {
         de_DE:activated) printf '%s' "System in Firulai als aktiv markiert" ;;
         de_DE:activation_denied) printf '%s' "RSM erlaubte keine Systemaktivierung" ;;
         de_DE:agent_downloaded) printf '%s' "Agent heruntergeladen" ;;
-        de_DE:alias_needed) printf '%s' "Dieses Installationsprogramm benötigt einen Alias, um das System in Firulai zu identifizieren." ;;
-        de_DE:alias_prompt) printf '%s' "Systemalias: " ;;
-        de_DE:alias_quotes) printf '%s' "Wenn der Alias Leerzeichen enthält, schließen Sie ihn in Anführungszeichen ein." ;;
-        de_DE:alias_required) printf '%s' "Systemalias ist erforderlich." ;;
-        de_DE:alias_saved) printf '%s' "Dieser Alias ​​wird in Firulai gespeichert und kann über die Benutzeroberfläche geändert werden." ;;
-        de_DE:alias_title) printf '%s' "Alias:" ;;
-        de_DE:alias_usage) printf '%s' "Führen Sie das Installationsprogramm mit der Option --alias aus:" ;;
         de_DE:attempted_url) printf '%s' "Versuchte URL" ;;
         de_DE:auto_config_failed) printf '%s' "Die Installation kann nicht mit automatischer Ausführung abgeschlossen werden." ;;
         de_DE:auto_execution_config_failed) printf '%s' "Die automatische Ausführung konnte nicht konfiguriert werden" ;;
@@ -2196,7 +2120,6 @@ t() {
         de_DE:crontab_unavailable) printf '%s' "Crontab konnte nicht verfügbar gemacht werden. Kontaktieren Sie Firulai, wenn Sie Hilfe benötigen." ;;
         de_DE:curl_found) printf '%s' "Curl gefunden" ;;
         de_DE:curl_missing) printf '%s' "Curl ist nicht installiert" ;;
-        de_DE:current_alias) printf '%s' "Aktueller Wert" ;;
         de_DE:current_installed_uuid) printf '%s' "Derzeit installierte UUID" ;;
         de_DE:daily_at) printf '%s' "Täglich um 3:00 Uhr" ;;
         de_DE:dirs_created) printf '%s' "Verzeichnisse erstellt" ;;
@@ -2283,7 +2206,7 @@ t() {
         de_DE:systemd_user_timer_configured) printf '%s' "systemd --user timer konfiguriert um 03:00" ;;
         de_DE:systemd_user_try_cron) printf '%s' "Systemd --user konnte nicht aktiviert werden; Stattdessen wird der Benutzer cron ausprobiert." ;;
         de_DE:systemd_user_unavailable) printf '%s' "systemd --user ist für diesen Benutzer/diese Sitzung noch nicht verfügbar." ;;
-        de_DE:test_uuid_alias) printf '%s' "Verwenden Sie zum Vergleich eine separate Test-UUID/Alias." ;;
+        de_DE:test_uuid_alias) printf '%s' "Verwenden Sie zum Vergleich eine separate Test-UUID." ;;
         de_DE:trying_su) printf '%s' "Versuche es mit root über su. su fragt nach dem Root-Passwort und erfordert, dass die Root-Anmeldung zugelassen wird." ;;
         de_DE:uninstall) printf '%s' "Deinstallieren:" ;;
         de_DE:uninstall_current) printf '%s' "Um einen neuen Agenten zu installieren, deinstallieren Sie zuerst den aktuellen:" ;;
@@ -2312,13 +2235,6 @@ t() {
         it_IT:activated) printf '%s' "Sistema contrassegnato come attivo a Firulai" ;;
         it_IT:activation_denied) printf '%s' "RSM non ha consentito l'attivazione del sistema" ;;
         it_IT:agent_downloaded) printf '%s' "Agente scaricato" ;;
-        it_IT:alias_needed) printf '%s' "Questo programma di installazione necessita di un alias per identificare il sistema in Firulai." ;;
-        it_IT:alias_prompt) printf '%s' "Alias di sistema: " ;;
-        it_IT:alias_quotes) printf '%s' "Se l'alias contiene spazi, racchiuderlo tra virgolette." ;;
-        it_IT:alias_required) printf '%s' "È richiesto l'alias di sistema." ;;
-        it_IT:alias_saved) printf '%s' "Questo alias viene salvato in Firulai e può essere modificato dall'interfaccia." ;;
-        it_IT:alias_title) printf '%s' "Alias:" ;;
-        it_IT:alias_usage) printf '%s' "Esegui il programma di installazione con l'opzione --alias:" ;;
         it_IT:attempted_url) printf '%s' "URL tentato" ;;
         it_IT:auto_config_failed) printf '%s' "Impossibile completare l'installazione con l'esecuzione automatica." ;;
         it_IT:auto_execution_config_failed) printf '%s' "Impossibile configurare l'esecuzione automatica" ;;
@@ -2355,7 +2271,6 @@ t() {
         it_IT:crontab_unavailable) printf '%s' "Impossibile rendere disponibile crontab. Contatta Firulai se hai bisogno di aiuto." ;;
         it_IT:curl_found) printf '%s' "ricciolo trovato" ;;
         it_IT:curl_missing) printf '%s' "l'arricciatura non è installata" ;;
-        it_IT:current_alias) printf '%s' "Valore attuale" ;;
         it_IT:current_installed_uuid) printf '%s' "UUID attualmente installato" ;;
         it_IT:daily_at) printf '%s' "Tutti i giorni alle 3:00" ;;
         it_IT:dirs_created) printf '%s' "Directory create" ;;
@@ -2442,7 +2357,7 @@ t() {
         it_IT:systemd_user_timer_configured) printf '%s' "systemd --timer utente configurato alle 03:00" ;;
         it_IT:systemd_user_try_cron) printf '%s' "Impossibile abilitare systemd --user; verrà invece provato l'utente cron." ;;
         it_IT:systemd_user_unavailable) printf '%s' "systemd --user non è ancora disponibile per questo utente/sessione." ;;
-        it_IT:test_uuid_alias) printf '%s' "Per confronto, utilizzare un UUID/alias di test separato." ;;
+        it_IT:test_uuid_alias) printf '%s' "Per confronto, utilizzare un UUID di test separato." ;;
         it_IT:trying_su) printf '%s' "Provando il root tramite su. su richiede la password di root e richiede che sia consentito l'accesso di root." ;;
         it_IT:uninstall) printf '%s' "Disinstalla:" ;;
         it_IT:uninstall_current) printf '%s' "Per installare un nuovo agente, disinstalla prima quello corrente:" ;;
@@ -2471,13 +2386,6 @@ t() {
         ja_JP:activated) printf '%s' "Firulai でシステムがアクティブとしてマークされている" ;;
         ja_JP:activation_denied) printf '%s' "RSM はシステムのアクティベーションを許可しませんでした" ;;
         ja_JP:agent_downloaded) printf '%s' "エージェントがダウンロードされました" ;;
-        ja_JP:alias_needed) printf '%s' "このインストーラーには、Firulai でシステムを識別するためのエイリアスが必要です。" ;;
-        ja_JP:alias_prompt) printf '%s' "システム エイリアス: " ;;
-        ja_JP:alias_quotes) printf '%s' "エイリアスにスペースが含まれる場合は、引用符で囲みます。" ;;
-        ja_JP:alias_required) printf '%s' "システムエイリアスが必要です。" ;;
-        ja_JP:alias_saved) printf '%s' "このエイリアスは Firulai に保存され、インターフェースから変更できます。" ;;
-        ja_JP:alias_title) printf '%s' "エイリアス：" ;;
-        ja_JP:alias_usage) printf '%s' "--alias オプションを指定してインストーラーを実行します。" ;;
         ja_JP:attempted_url) printf '%s' "試行された URL" ;;
         ja_JP:auto_config_failed) printf '%s' "自動実行ではインストールを完了できません。" ;;
         ja_JP:auto_execution_config_failed) printf '%s' "自動実行を設定できませんでした" ;;
@@ -2514,7 +2422,6 @@ t() {
         ja_JP:crontab_unavailable) printf '%s' "crontab を使用可能にできませんでした。サポートが必要な場合は、Firulai にご連絡ください。" ;;
         ja_JP:curl_found) printf '%s' "カールが見つかりました" ;;
         ja_JP:curl_missing) printf '%s' "カールがインストールされていません" ;;
-        ja_JP:current_alias) printf '%s' "現在値" ;;
         ja_JP:current_installed_uuid) printf '%s' "現在インストールされている UUID" ;;
         ja_JP:daily_at) printf '%s' "毎日午前 3 時" ;;
         ja_JP:dirs_created) printf '%s' "作成されたディレクトリ" ;;
@@ -2601,7 +2508,7 @@ t() {
         ja_JP:systemd_user_timer_configured) printf '%s' "systemd --user タイマーは 03:00 に設定されています" ;;
         ja_JP:systemd_user_try_cron) printf '%s' "systemd --user を有効にできませんでした。代わりにユーザー cron が試行されます。" ;;
         ja_JP:systemd_user_unavailable) printf '%s' "systemd --user はこのユーザー/セッションではまだ使用できません。" ;;
-        ja_JP:test_uuid_alias) printf '%s' "比較するには、別のテスト UUID/エイリアスを使用します。" ;;
+        ja_JP:test_uuid_alias) printf '%s' "比較するには、別のテスト UUID を使用します。" ;;
         ja_JP:trying_su) printf '%s' "su経由でrootを試してみます。 su は root パスワードを要求し、root ログインを許可する必要があります。" ;;
         ja_JP:uninstall) printf '%s' "アンインストール:" ;;
         ja_JP:uninstall_current) printf '%s' "新しいエージェントをインストールするには、まず現在のエージェントをアンインストールします。" ;;
@@ -2630,13 +2537,6 @@ t() {
         zh_CN:activated) printf '%s' "系统在 Firulai 标记为活动状态" ;;
         zh_CN:activation_denied) printf '%s' "RSM 不允许系统激活" ;;
         zh_CN:agent_downloaded) printf '%s' "代理已下载" ;;
-        zh_CN:alias_needed) printf '%s' "此安装程序需要一个别名来识别 Firulai 中的系统。" ;;
-        zh_CN:alias_prompt) printf '%s' "系统别名： " ;;
-        zh_CN:alias_quotes) printf '%s' "如果别名包含空格，请将其用引号引起来。" ;;
-        zh_CN:alias_required) printf '%s' "需要系统别名。" ;;
-        zh_CN:alias_saved) printf '%s' "该别名保存在 Firulai 中，可以从界面进行更改。" ;;
-        zh_CN:alias_title) printf '%s' "别名：" ;;
-        zh_CN:alias_usage) printf '%s' "使用 --alias 选项运行安装程序：" ;;
         zh_CN:attempted_url) printf '%s' "尝试的网址" ;;
         zh_CN:auto_config_failed) printf '%s' "无法通过自动执行完成安装。" ;;
         zh_CN:auto_execution_config_failed) printf '%s' "无法配置自动执行" ;;
@@ -2673,7 +2573,6 @@ t() {
         zh_CN:crontab_unavailable) printf '%s' "无法使 crontab 可用。如果您需要帮助，请联系 Firulai。" ;;
         zh_CN:curl_found) printf '%s' "发现卷曲" ;;
         zh_CN:curl_missing) printf '%s' "未安装卷曲" ;;
-        zh_CN:current_alias) printf '%s' "当前值" ;;
         zh_CN:current_installed_uuid) printf '%s' "当前安装的UUID" ;;
         zh_CN:daily_at) printf '%s' "每天凌晨 3:00" ;;
         zh_CN:dirs_created) printf '%s' "已创建目录" ;;
@@ -2760,7 +2659,7 @@ t() {
         zh_CN:systemd_user_timer_configured) printf '%s' "systemd --用户计时器配置为 03:00" ;;
         zh_CN:systemd_user_try_cron) printf '%s' "无法启用 systemd --user；将尝试用户 cron。" ;;
         zh_CN:systemd_user_unavailable) printf '%s' "systemd --user 对此用户/会话尚不可用。" ;;
-        zh_CN:test_uuid_alias) printf '%s' "为了进行比较，请使用单独的测试 UUID/别名。" ;;
+        zh_CN:test_uuid_alias) printf '%s' "为了进行比较，请使用单独的测试 UUID。" ;;
         zh_CN:trying_su) printf '%s' "尝试通过 su root。 su 要求输入 root 密码并要求允许 root 登录。" ;;
         zh_CN:uninstall) printf '%s' "卸载：" ;;
         zh_CN:uninstall_current) printf '%s' "要安装新代理，请先卸载当前代理：" ;;
@@ -2790,11 +2689,6 @@ t() {
         *:root_mode) printf '%s' "Root/system installation mode selected; system paths will be used." ;;
         *:user_mode) printf '%s' "No-root installation mode selected; the agent will be installed only for the current user." ;;
         *:less_complete) printf '%s' "The inventory may be less complete than root mode if the system restricts some commands." ;;
-        *:alias_needed) printf '%s' "This installer needs an alias to identify the system in Firulai." ;;
-        *:alias_prompt) printf '%s' "System alias: " ;;
-        *:alias_required) printf '%s' "System alias is required." ;;
-        *:alias_usage) printf '%s' "Run the installer with the --alias option:" ;;
-        *:alias_quotes) printf '%s' "If the alias contains spaces, wrap it in quotes." ;;
         *:validating_uuid) printf '%s' "Validating UUID in RSM..." ;;
         *:uuid_validate_failed) printf '%s' "Could not validate the UUID in RSM" ;;
         *:uuid_validate_safety) printf '%s' "For safety, installation will not continue without confirming that the UUID is available." ;;
@@ -2820,7 +2714,6 @@ t() {
         *:execution) printf '%s' "Execution:" ;;
         *:automatic) printf '%s' "Automatic" ;;
         *:manual) printf '%s' "Manual" ;;
-        *:current_alias) printf '%s' "Current value" ;;
         *:uninstall) printf '%s' "Uninstall:" ;;
         *:no_interactive_cron_default) printf '%s' "No interactive terminal detected; user cron will be used by default." ;;
         *:automatic_execution_setup) printf '%s' "Automatic execution setup:" ;;
@@ -2867,8 +2760,6 @@ t() {
         *:activated) printf '%s' "System marked as active in Firulai" ;;
         *:activation_denied) printf '%s' "RSM did not allow system activation" ;;
         *:agent_downloaded) printf '%s' "Agent downloaded" ;;
-        *:alias_saved) printf '%s' "This alias is saved in Firulai and can be changed from the interface." ;;
-        *:alias_title) printf '%s' "Alias:" ;;
         *:attempted_url) printf '%s' "Attempted URL" ;;
         *:auto_config_failed) printf '%s' "Cannot complete installation with automatic execution." ;;
         *:auto_execution_config_failed) printf '%s' "Could not configure automatic execution" ;;
@@ -2952,7 +2843,7 @@ t() {
         *:systemd_user_timer_configured) printf '%s' "systemd --user timer configured at 03:00" ;;
         *:systemd_user_try_cron) printf '%s' "Could not enable systemd --user; user cron will be tried instead." ;;
         *:systemd_user_unavailable) printf '%s' "systemd --user is not available for this user/session yet." ;;
-        *:test_uuid_alias) printf '%s' "For comparison, use a separate test UUID/alias." ;;
+        *:test_uuid_alias) printf '%s' "For comparison, use a separate test UUID." ;;
         *:trying_su) printf '%s' "Trying root via su. su asks for the root password and requires root login to be allowed." ;;
         *:uninstall_download_failed) printf '%s' "Could not download the uninstaller from GitHub" ;;
         *:uninstaller_downloaded) printf '%s' "Uninstaller downloaded" ;;
@@ -3034,7 +2925,7 @@ identity_matches_local_system() {
 check_uuid_available() {
     local payload response_file http_code exit_code response_body
     response_file=$(make_private_temp_file "rsm_install_uuid_check_response")
-    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
+    payload="{\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":true,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$UUID\",\"operation\":\"=\"}]}"
 
     info "$(t validating_uuid)"
 
@@ -3165,7 +3056,7 @@ update_rsm_system_on_install() {
     fi
 
     response_file=$(make_private_temp_file "rsm_install_system_update_response")
-    payload="[{\"ID\":\"$RSM_SYSTEM_ITEM_ID\",\"$RSM_SYSTEM_ALIAS_PROPERTY_ID\":\"$(json_escape "$SYSTEM_ALIAS")\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE\"}]"
+    payload="[{\"ID\":\"$RSM_SYSTEM_ITEM_ID\",\"$RSM_SYSTEM_HOSTNAME_STATUS_PROPERTY_ID\":\"$RSM_SYSTEM_HOSTNAME_STATUS_ACTIVE_VALUE\"}]"
 
     info "$(t marking_active)"
 
@@ -3502,7 +3393,6 @@ write_agent_config() {
     cat > "$temporary_file" << CONFIG_EOF
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
 UUID=$(shell_single_quote "$UUID")
-SYSTEM_ALIAS=$(shell_single_quote "$SYSTEM_ALIAS")
 AGENT_LOCALE=$(shell_single_quote "$AGENT_LOCALE")
 CONFIG_EOF
     chown root:root "$temporary_file" 2>/dev/null || true
@@ -3643,7 +3533,7 @@ test_agent() {
     info "$(t running_initial)"
 
     set +e
-    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --alias "$SYSTEM_ALIAS" --locale "$AGENT_LOCALE" 2>&1 | tee -a "$LOG_FILE"
+    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --locale "$AGENT_LOCALE" 2>&1 | tee -a "$LOG_FILE"
     local agent_status=${PIPESTATUS[0]}
     set -e
 
@@ -3678,11 +3568,7 @@ print_summary() {
     echo "$(t execution)"
     echo "   - $(t automatic):   $(t daily_at) ($SCHEDULER_TYPE)"
     echo "   - $(t recovery):    $(t recovery_detail)"
-    echo "   - $(t manual):      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS> --locale $AGENT_LOCALE"
-    echo ""
-    echo "$(t alias_title)"
-    echo "   - $(t current_alias): $SYSTEM_ALIAS"
-    echo "   - $(t alias_saved)"
+    echo "   - $(t manual):      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --locale $AGENT_LOCALE"
     echo ""
     echo "$(t view_inventory)"
     echo "   cat $DATA_DIR/inventory.json"
@@ -3714,7 +3600,6 @@ main() {
     detect_distro
     check_dependencies
     init_private_tmp_dir
-    require_system_alias
     choose_scheduler_interactively
     validate_uuid_format "$UUID"
     check_local_agent_installation

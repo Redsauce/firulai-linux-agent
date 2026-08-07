@@ -7,7 +7,7 @@ Linux system analysis agent for vulnerability detection. It collects system info
 The external command remains the same shape as the UI-provided installer command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS>
+curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID>
 ```
 
 If the installer is run as a regular user, it installs only for that user. If it is run as root, it asks whether to continue as a root/system install or re-run as a no-root user.
@@ -17,7 +17,7 @@ If the installer is run as a regular user, it installs only for that user. If it
 The installer accepts the locale selected by the user in Firulai/RSM App user preferences:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --alias <ALIAS> --locale <LOCALE>
+curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/install.sh | bash -s -- <AGENT_TOKEN> <UUID> --locale <LOCALE>
 ```
 
 If `--locale` is not provided, the installer tries to resolve it from RSM using the provided token. The selected locale is stored in `config.env` as `AGENT_LOCALE` and is reused by:
@@ -45,7 +45,7 @@ By default, user-mode installation uses:
 | `${XDG_DATA_HOME:-~/.local/share}/rs-agent/rs_agent.sh` | Main agent |
 | `${XDG_DATA_HOME:-~/.local/share}/rs-agent/rs_agent_runner.sh` | Automatic runner |
 | `${XDG_DATA_HOME:-~/.local/share}/rs-agent/uninstall.sh` | Uninstaller |
-| `${XDG_STATE_HOME:-~/.local/state}/rs-agent/config.env` | Token, UUID, and alias |
+| `${XDG_STATE_HOME:-~/.local/state}/rs-agent/config.env` | Token and UUID |
 | `${XDG_STATE_HOME:-~/.local/state}/rs-agent/inventory.json` | Last inventory |
 | `${XDG_STATE_HOME:-~/.local/state}/rs-agent/state.env` | Last successful run |
 | `${XDG_STATE_HOME:-~/.local/state}/rs-agent/rs-agent.log` | Log file |
@@ -85,14 +85,18 @@ If there is no interactive terminal, the installer uses user cron by default and
 ## Manual Run
 
 ```bash
-bash ~/.local/share/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --alias <ALIAS>
+bash ~/.local/share/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
 ```
 
 ## Uninstall No-Root Instance
 
+Run the uninstaller as the same user that installed the no-root agent:
+
 ```bash
 bash ~/.local/share/rs-agent/uninstall.sh
 ```
+
+The `~` path is resolved for the user running the command. For example, if the agent was installed by `aps-no-root-test`, run `bash /home/aps-no-root-test/.local/share/rs-agent/uninstall.sh` or switch to that user first. Running the command as `root` would look for `/root/.local/share/rs-agent/uninstall.sh`.
 
 The no-root uninstaller only removes the current user's installation. It does not touch `/opt/rs-agent`, `/var/lib/rs-agent`, global systemd units, or an existing root installation.
 
@@ -100,7 +104,7 @@ The no-root uninstaller only removes the current user's installation. It does no
 
 The agent generates a JSON inventory with:
 
-- `system`: hostname, FQDN, UUID, alias, distribution, kernel, architecture, timezone, and agent version.
+- `system`: hostname, FQDN, UUID, distribution, kernel, architecture, timezone, and agent version.
 - `hardware`: CPU model and visible disks through `lscpu` and `lsblk`.
 - `components`: `dpkg`, `rpm`, `pip`, and `npm` components when available to the user.
 - `packages`: source packages derived from `dpkg-query` on Debian/Ubuntu.
@@ -113,7 +117,7 @@ For a server that already has the root agent:
 
 1. Keep the existing root installation untouched.
 2. Create a normal test user without sudo or special groups.
-3. Create a separate test UUID/alias in Firulai/RSM.
+3. Create a separate test UUID in Firulai/RSM.
 4. Log in as that user and run the no-root installer.
 5. Compare the root inventory with the no-root inventory locally and in RSM.
 6. Review counts for `dpkg`, `rpm`, `pip`, `npm`, hardware, and empty fields.

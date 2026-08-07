@@ -40,7 +40,6 @@ RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 AGENT_TOKEN=""
 UUID_VAL=""
-SYSTEM_ALIAS=""
 EXECUTION_TRIGGER="${RS_AGENT_TRIGGER:-manual}"
 AGENT_LOCALE="${RS_AGENT_LOCALE:-}"
 
@@ -77,13 +76,13 @@ t() {
         es_ES:state_updated) printf '%s' "Estado actualizado: ultima ejecucion correcta" ;;
         es_ES:no_root_mode) printf '%s' "INFO: Modo sin root; el inventario puede ser menos completo si el sistema restringe algunos comandos." ;;
         es_ES:invalid_uuid) printf '%s' "ERROR: UUID no valido" ;;
-        es_ES:usage) printf '%s' "Uso: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <IDIOMA>]" ;;
+        es_ES:usage) printf '%s' "Uso: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <IDIOMA>]" ;;
         es_ES:token_requires_value) printf '%s' "ERROR: --token requiere un valor" ;;
         es_ES:uuid_requires_value) printf '%s' "ERROR: --uuid requiere un valor" ;;
         es_ES:alias_requires_value) printf '%s' "ERROR: --alias requiere un valor" ;;
         es_ES:locale_requires_value) printf '%s' "ERROR: --locale requiere un valor" ;;
         es_ES:unknown_argument) printf '%s' "Argumento desconocido" ;;
-        es_ES:required_args) printf '%s' "ERROR: --token, --uuid y --alias son obligatorios" ;;
+        es_ES:required_args) printf '%s' "ERROR: --token y --uuid son obligatorios" ;;
         es_ES:validating_uuid) printf '%s' "Validando que el UUID no pertenece a otro sistema..." ;;
         es_ES:uuid_validate_failed) printf '%s' "ERROR: No se pudo validar el UUID antes de enviar el inventario" ;;
         es_ES:uuid_validate_safety) printf '%s' "Por seguridad, la instalacion no continuara sin confirmar que el UUID no pertenece a otro sistema." ;;
@@ -105,7 +104,6 @@ t() {
         es_ES:length) printf '%s' "Longitud" ;;
         es_ES:agent_token) printf '%s' "Token del agente" ;;
         es_ES:configured_hidden) printf '%s' "configurado; valor oculto" ;;
-        es_ES:alias_label) printf '%s' "Alias" ;;
         es_ES:method) printf '%s' "Metodo" ;;
         es_ES:endpoint) printf '%s' "Endpoint" ;;
         es_ES:flow) printf '%s' "Flujo" ;;
@@ -171,13 +169,13 @@ t() {
         ca_ES:state_updated) printf '%s' "Estat actualitzat: ultima execucio correcta" ;;
         ca_ES:no_root_mode) printf '%s' "INFO: Mode sense root; l'inventari pot ser menys complet si el sistema restringeix algunes ordres." ;;
         ca_ES:invalid_uuid) printf '%s' "ERROR: UUID no valid" ;;
-        ca_ES:usage) printf '%s' "Us: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <IDIOMA>]" ;;
+        ca_ES:usage) printf '%s' "Us: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <IDIOMA>]" ;;
         ca_ES:token_requires_value) printf '%s' "ERROR: --token requereix un valor" ;;
         ca_ES:uuid_requires_value) printf '%s' "ERROR: --uuid requereix un valor" ;;
         ca_ES:alias_requires_value) printf '%s' "ERROR: --alias requereix un valor" ;;
         ca_ES:locale_requires_value) printf '%s' "ERROR: --locale requereix un valor" ;;
         ca_ES:unknown_argument) printf '%s' "Argument desconegut" ;;
-        ca_ES:required_args) printf '%s' "ERROR: --token, --uuid i --alias son obligatoris" ;;
+        ca_ES:required_args) printf '%s' "ERROR: --token i --uuid son obligatoris" ;;
         ca_ES:validating_uuid) printf '%s' "Validant que l'UUID no pertany a un altre sistema..." ;;
         ca_ES:uuid_validate_failed) printf '%s' "ERROR: No s'ha pogut validar l'UUID abans d'enviar l'inventari" ;;
         ca_ES:uuid_validate_safety) printf '%s' "Per seguretat, la instal.lacio no continuara sense confirmar que l'UUID no pertany a un altre sistema." ;;
@@ -199,7 +197,6 @@ t() {
         ca_ES:length) printf '%s' "Longitud" ;;
         ca_ES:agent_token) printf '%s' "Token de l'agent" ;;
         ca_ES:configured_hidden) printf '%s' "configurat; valor ocult" ;;
-        ca_ES:alias_label) printf '%s' "Alias" ;;
         ca_ES:method) printf '%s' "Metode" ;;
         ca_ES:endpoint) printf '%s' "Endpoint" ;;
         ca_ES:flow) printf '%s' "Flux" ;;
@@ -254,7 +251,6 @@ t() {
         ca_ES:file) printf '%s' "Fitxer" ;;
         ca_ES:size) printf '%s' "Mida" ;;
         eu_ES:agent_token) printf '%s' "Agentearen tokena" ;;
-        eu_ES:alias_label) printf '%s' "Ezizena" ;;
         eu_ES:alias_requires_value) printf '%s' "ERROREA: --alias balio bat behar du" ;;
         eu_ES:already_running) printf '%s' "INFO: beste agente bat martxan dago jada; eskaera hau saltatu egiten da." ;;
         eu_ES:authorization_header) printf '%s' "Baimenaren goiburua" ;;
@@ -304,7 +300,7 @@ t() {
         eu_ES:private_dir_failed) printf '%s' "ERROREA: Ezin izan da direktorio pribatu seguru bat sortu" ;;
         eu_ES:python_packages) printf '%s' "Python paketeak" ;;
         eu_ES:request_to_send) printf '%s' "Bidali beharreko eskaera:" ;;
-        eu_ES:required_args) printf '%s' "ERROREA: --token, --uuid eta --alias behar dira" ;;
+        eu_ES:required_args) printf '%s' "ERROREA: --token eta --uuid behar dira" ;;
         eu_ES:response) printf '%s' "Erantzuna" ;;
         eu_ES:response_body_bytes) printf '%s' "Erantzunaren gorputzaren byteak" ;;
         eu_ES:response_body_file) printf '%s' "Erantzun-organoa" ;;
@@ -335,7 +331,7 @@ t() {
         eu_ES:unsafe_symlink) printf '%s' "ERROREA: Bide ez-segurua: esteka sinbolikoa da" ;;
         eu_ES:update_completed) printf '%s' "Eguneraketa osatu da. Agentea berrabiarazten..." ;;
         eu_ES:update_failed) printf '%s' "Errore bat gertatu da eguneratzea deskargatzean" ;;
-        eu_ES:usage) printf '%s' "Erabilera: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        eu_ES:usage) printf '%s' "Erabilera: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         eu_ES:uuid_not_generated) printf '%s' "Ezin da inbentarioa Gehitu sistema berritik sortu ez den UUID batekin bidali." ;;
         eu_ES:uuid_other_system) printf '%s' "ERROREA: UUID hau RSMko beste sistema batekoa da jada." ;;
         eu_ES:uuid_other_system_local) printf '%s' "Agente hau ezin da instalatu UUID horrekin makina lokalean." ;;
@@ -347,7 +343,6 @@ t() {
         eu_ES:uuid_validate_safety) printf '%s' "Segurtasunagatik, instalazioak ez du jarraituko UUIDa beste sistema batekoa ez dela baieztatu gabe." ;;
         eu_ES:validating_uuid) printf '%s' "UUID beste sistema batekoa ez dela balioztatzea..." ;;
         gl_ES:agent_token) printf '%s' "Token de axente" ;;
-        gl_ES:alias_label) printf '%s' "Alias" ;;
         gl_ES:alias_requires_value) printf '%s' "ERRO: --alias require un valor" ;;
         gl_ES:already_running) printf '%s' "INFORMACIÓN: Xa está en marcha outra execución do axente; esta solicitude omítase." ;;
         gl_ES:authorization_header) printf '%s' "Cabeceira de autorización" ;;
@@ -397,7 +392,7 @@ t() {
         gl_ES:private_dir_failed) printf '%s' "ERRO: non se puido crear un directorio privado seguro" ;;
         gl_ES:python_packages) printf '%s' "Paquetes Python" ;;
         gl_ES:request_to_send) printf '%s' "Solicitude a enviar:" ;;
-        gl_ES:required_args) printf '%s' "ERRO: son necesarios --token, --uuid e --alias" ;;
+        gl_ES:required_args) printf '%s' "ERRO: son necesarios --token e --uuid" ;;
         gl_ES:response) printf '%s' "Resposta" ;;
         gl_ES:response_body_bytes) printf '%s' "Bytes do corpo da resposta" ;;
         gl_ES:response_body_file) printf '%s' "Corpo de resposta" ;;
@@ -428,7 +423,7 @@ t() {
         gl_ES:unsafe_symlink) printf '%s' "ERRO: camiño non seguro: é unha ligazón simbólica" ;;
         gl_ES:update_completed) printf '%s' "Actualización completada. Axente de reinicio..." ;;
         gl_ES:update_failed) printf '%s' "Produciuse un erro ao descargar a actualización" ;;
-        gl_ES:usage) printf '%s' "Uso: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        gl_ES:usage) printf '%s' "Uso: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         gl_ES:uuid_not_generated) printf '%s' "Non se pode enviar o inventario cun UUID que non se xerou desde Engadir novo sistema." ;;
         gl_ES:uuid_other_system) printf '%s' "ERRO: este UUID xa pertence a outro sistema en RSM." ;;
         gl_ES:uuid_other_system_local) printf '%s' "Este axente non se pode instalar na máquina local con ese UUID." ;;
@@ -440,7 +435,6 @@ t() {
         gl_ES:uuid_validate_safety) printf '%s' "Por seguridade, a instalación non continuará sen confirmar que o UUID non pertence a outro sistema." ;;
         gl_ES:validating_uuid) printf '%s' "Validando que o UUID non pertence a outro sistema..." ;;
         fr_FR:agent_token) printf '%s' "Jeton d'agent" ;;
-        fr_FR:alias_label) printf '%s' "Alias" ;;
         fr_FR:alias_requires_value) printf '%s' "ERREUR : --alias nécessite une valeur" ;;
         fr_FR:already_running) printf '%s' "INFO : Une autre exécution d'agent est déjà en cours ; cette demande est ignorée." ;;
         fr_FR:authorization_header) printf '%s' "En-tête d'autorisation" ;;
@@ -490,7 +484,7 @@ t() {
         fr_FR:private_dir_failed) printf '%s' "ERREUR : Impossible de créer un répertoire privé sécurisé" ;;
         fr_FR:python_packages) printf '%s' "Paquets Python" ;;
         fr_FR:request_to_send) printf '%s' "Demande à envoyer :" ;;
-        fr_FR:required_args) printf '%s' "ERREUR : --token, --uuid et --alias sont requis" ;;
+        fr_FR:required_args) printf '%s' "ERREUR : --token et --uuid sont requis" ;;
         fr_FR:response) printf '%s' "Réponse" ;;
         fr_FR:response_body_bytes) printf '%s' "Octets du corps de la réponse" ;;
         fr_FR:response_body_file) printf '%s' "Corps de réponse" ;;
@@ -521,7 +515,7 @@ t() {
         fr_FR:unsafe_symlink) printf '%s' "ERREUR : Chemin non sécurisé : est un lien symbolique" ;;
         fr_FR:update_completed) printf '%s' "Mise à jour terminée. Agent de redémarrage..." ;;
         fr_FR:update_failed) printf '%s' "Erreur de téléchargement de la mise à jour" ;;
-        fr_FR:usage) printf '%s' "Utilisation : bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        fr_FR:usage) printf '%s' "Utilisation : bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         fr_FR:uuid_not_generated) printf '%s' "L'inventaire ne peut pas être envoyé avec un UUID qui n'a pas été généré à partir de l'ajout d'un nouveau système." ;;
         fr_FR:uuid_other_system) printf '%s' "ERREUR : cet UUID appartient déjà à un autre système dans RSM." ;;
         fr_FR:uuid_other_system_local) printf '%s' "Cet agent ne peut pas être installé sur la machine locale avec cet UUID." ;;
@@ -533,7 +527,6 @@ t() {
         fr_FR:uuid_validate_safety) printf '%s' "Pour des raisons de sécurité, l'installation ne continuera pas sans confirmer que l'UUID n'appartient pas à un autre système." ;;
         fr_FR:validating_uuid) printf '%s' "Vérifier que l'UUID n'appartient pas à un autre système..." ;;
         de_DE:agent_token) printf '%s' "Agent-Token" ;;
-        de_DE:alias_label) printf '%s' "Alias" ;;
         de_DE:alias_requires_value) printf '%s' "FEHLER: --alias erfordert einen Wert" ;;
         de_DE:already_running) printf '%s' "INFO: Eine weitere Agentenausführung ist bereits im Gange; Diese Anfrage wird übersprungen." ;;
         de_DE:authorization_header) printf '%s' "Autorisierungsheader" ;;
@@ -583,7 +576,7 @@ t() {
         de_DE:private_dir_failed) printf '%s' "FEHLER: Es konnte kein sicheres privates Verzeichnis erstellt werden" ;;
         de_DE:python_packages) printf '%s' "Python-Pakete" ;;
         de_DE:request_to_send) printf '%s' "Zu sendende Anfrage:" ;;
-        de_DE:required_args) printf '%s' "FEHLER: --token, --uuid und --alias sind erforderlich" ;;
+        de_DE:required_args) printf '%s' "FEHLER: --token und --uuid sind erforderlich" ;;
         de_DE:response) printf '%s' "Antwort" ;;
         de_DE:response_body_bytes) printf '%s' "Antworttextbytes" ;;
         de_DE:response_body_file) printf '%s' "Antwortkörper" ;;
@@ -614,7 +607,7 @@ t() {
         de_DE:unsafe_symlink) printf '%s' "FEHLER: Unsicherer Pfad: ist ein symbolischer Link" ;;
         de_DE:update_completed) printf '%s' "Aktualisierung abgeschlossen. Agent wird neu gestartet..." ;;
         de_DE:update_failed) printf '%s' "Fehler beim Herunterladen des Updates" ;;
-        de_DE:usage) printf '%s' "Verwendung: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        de_DE:usage) printf '%s' "Verwendung: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         de_DE:uuid_not_generated) printf '%s' "Inventar kann nicht mit einer UUID gesendet werden, die nicht durch „Neues System hinzufügen“ generiert wurde." ;;
         de_DE:uuid_other_system) printf '%s' "FEHLER: Diese UUID gehört bereits zu einem anderen System in RSM." ;;
         de_DE:uuid_other_system_local) printf '%s' "Dieser Agent kann mit dieser UUID nicht auf dem lokalen Computer installiert werden." ;;
@@ -626,7 +619,6 @@ t() {
         de_DE:uuid_validate_safety) printf '%s' "Aus Sicherheitsgründen wird die Installation nicht fortgesetzt, ohne zu bestätigen, dass die UUID nicht zu einem anderen System gehört." ;;
         de_DE:validating_uuid) printf '%s' "Es wird überprüft, ob die UUID nicht zu einem anderen System gehört ..." ;;
         it_IT:agent_token) printf '%s' "Gettone dell'agente" ;;
-        it_IT:alias_label) printf '%s' "Alias" ;;
         it_IT:alias_requires_value) printf '%s' "ERRORE: --alias richiede un valore" ;;
         it_IT:already_running) printf '%s' "INFORMAZIONI: un'altra esecuzione dell'agente è già in corso; questa richiesta viene saltata." ;;
         it_IT:authorization_header) printf '%s' "Intestazione dell'autorizzazione" ;;
@@ -676,7 +668,7 @@ t() {
         it_IT:private_dir_failed) printf '%s' "ERRORE: impossibile creare una directory privata sicura" ;;
         it_IT:python_packages) printf '%s' "Pacchetti Python" ;;
         it_IT:request_to_send) printf '%s' "Richiesta da inviare:" ;;
-        it_IT:required_args) printf '%s' "ERRORE: --token, --uuid e --alias sono obbligatori" ;;
+        it_IT:required_args) printf '%s' "ERRORE: --token e --uuid sono obbligatori" ;;
         it_IT:response) printf '%s' "Risposta" ;;
         it_IT:response_body_bytes) printf '%s' "Byte del corpo della risposta" ;;
         it_IT:response_body_file) printf '%s' "Corpo della risposta" ;;
@@ -707,7 +699,7 @@ t() {
         it_IT:unsafe_symlink) printf '%s' "ERRORE: percorso non sicuro: è un collegamento simbolico" ;;
         it_IT:update_completed) printf '%s' "Aggiornamento completato. Riavvio dell'agente..." ;;
         it_IT:update_failed) printf '%s' "Errore durante il download dell'aggiornamento" ;;
-        it_IT:usage) printf '%s' "Utilizzo: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        it_IT:usage) printf '%s' "Utilizzo: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         it_IT:uuid_not_generated) printf '%s' "Non è possibile inviare l'inventario con un UUID che non è stato generato da Aggiungi nuovo sistema." ;;
         it_IT:uuid_other_system) printf '%s' "ERRORE: questo UUID appartiene già a un altro sistema in RSM." ;;
         it_IT:uuid_other_system_local) printf '%s' "Questo agente non può essere installato sul computer locale con quell'UUID." ;;
@@ -719,7 +711,6 @@ t() {
         it_IT:uuid_validate_safety) printf '%s' "Per motivi di sicurezza, l'installazione non proseguirà senza la conferma che l'UUID non appartiene a un altro sistema." ;;
         it_IT:validating_uuid) printf '%s' "Verifica che l'UUID non appartenga a un altro sistema..." ;;
         ja_JP:agent_token) printf '%s' "エージェントトークン" ;;
-        ja_JP:alias_label) printf '%s' "エイリアス" ;;
         ja_JP:alias_requires_value) printf '%s' "エラー: --alias には値が必要です" ;;
         ja_JP:already_running) printf '%s' "情報: 別のエージェントの実行がすでに進行中です。このリクエストはスキップされます。" ;;
         ja_JP:authorization_header) printf '%s' "認可ヘッダー" ;;
@@ -769,7 +760,7 @@ t() {
         ja_JP:private_dir_failed) printf '%s' "エラー: 安全なプライベート ディレクトリを作成できませんでした" ;;
         ja_JP:python_packages) printf '%s' "Python パッケージ" ;;
         ja_JP:request_to_send) printf '%s' "送信するリクエスト:" ;;
-        ja_JP:required_args) printf '%s' "エラー: --token、--uuid、および --alias が必要です" ;;
+        ja_JP:required_args) printf '%s' "エラー: --token と --uuid が必要です" ;;
         ja_JP:response) printf '%s' "応答" ;;
         ja_JP:response_body_bytes) printf '%s' "応答本文のバイト数" ;;
         ja_JP:response_body_file) printf '%s' "レスポンスボディ" ;;
@@ -800,7 +791,7 @@ t() {
         ja_JP:unsafe_symlink) printf '%s' "エラー: 安全でないパス: はシンボリック リンクです" ;;
         ja_JP:update_completed) printf '%s' "アップデートが完了しました。エージェントを再起動しています..." ;;
         ja_JP:update_failed) printf '%s' "アップデートのダウンロード中にエラーが発生しました" ;;
-        ja_JP:usage) printf '%s' "使用法: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        ja_JP:usage) printf '%s' "使用法: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         ja_JP:uuid_not_generated) printf '%s' "新しいシステムの追加から生成されていない UUID を使用してインベントリを送信することはできません。" ;;
         ja_JP:uuid_other_system) printf '%s' "エラー: この UUID はすでに RSM の別のシステムに属しています。" ;;
         ja_JP:uuid_other_system_local) printf '%s' "このエージェントは、その UUID ではローカル マシンにインストールできません。" ;;
@@ -812,7 +803,6 @@ t() {
         ja_JP:uuid_validate_safety) printf '%s' "安全のため、UUID が別のシステムに属していないことを確認しない限り、インストールは続行されません。" ;;
         ja_JP:validating_uuid) printf '%s' "UUID が別のシステムに属していないことを検証しています..." ;;
         zh_CN:agent_token) printf '%s' "代理令牌" ;;
-        zh_CN:alias_label) printf '%s' "别名" ;;
         zh_CN:alias_requires_value) printf '%s' "错误：--alias 需要一个值" ;;
         zh_CN:already_running) printf '%s' "信息：另一个代理运行已经在进行中；该请求被跳过。" ;;
         zh_CN:authorization_header) printf '%s' "授权标头" ;;
@@ -862,7 +852,7 @@ t() {
         zh_CN:private_dir_failed) printf '%s' "错误：无法创建安全的私有目录" ;;
         zh_CN:python_packages) printf '%s' "Python 包" ;;
         zh_CN:request_to_send) printf '%s' "需要发送的请求：" ;;
-        zh_CN:required_args) printf '%s' "错误：需要 --token、--uuid 和 --alias" ;;
+        zh_CN:required_args) printf '%s' "错误：需要 --token 和 --uuid" ;;
         zh_CN:response) printf '%s' "回应" ;;
         zh_CN:response_body_bytes) printf '%s' "响应主体字节" ;;
         zh_CN:response_body_file) printf '%s' "响应体" ;;
@@ -893,7 +883,7 @@ t() {
         zh_CN:unsafe_symlink) printf '%s' "错误：不安全路径：是符号链接" ;;
         zh_CN:update_completed) printf '%s' "更新完成。正在重启代理..." ;;
         zh_CN:update_failed) printf '%s' "下载更新时出错" ;;
-        zh_CN:usage) printf '%s' "用法：bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        zh_CN:usage) printf '%s' "用法：bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         zh_CN:uuid_not_generated) printf '%s' "无法使用不是从“添加新系统”生成的 UUID 发送清单。" ;;
         zh_CN:uuid_other_system) printf '%s' "错误：此 UUID 已属于 RSM 中的另一个系统。" ;;
         zh_CN:uuid_other_system_local) printf '%s' "该代理无法安装在具有该 UUID 的本地计算机上。" ;;
@@ -916,13 +906,13 @@ t() {
         *:state_updated) printf '%s' "State updated: last successful run" ;;
         *:no_root_mode) printf '%s' "INFO: No-root mode; inventory may be less complete if the system restricts some commands." ;;
         *:invalid_uuid) printf '%s' "ERROR: invalid UUID" ;;
-        *:usage) printf '%s' "Usage: bash rs_agent.sh --token <TOKEN> --uuid <UUID> --alias <ALIAS> [--locale <LOCALE>]" ;;
+        *:usage) printf '%s' "Usage: bash rs_agent.sh --token <TOKEN> --uuid <UUID> [--locale <LOCALE>]" ;;
         *:token_requires_value) printf '%s' "ERROR: --token requires a value" ;;
         *:uuid_requires_value) printf '%s' "ERROR: --uuid requires a value" ;;
         *:alias_requires_value) printf '%s' "ERROR: --alias requires a value" ;;
         *:locale_requires_value) printf '%s' "ERROR: --locale requires a value" ;;
         *:unknown_argument) printf '%s' "Unknown argument" ;;
-        *:required_args) printf '%s' "ERROR: --token, --uuid, and --alias are required" ;;
+        *:required_args) printf '%s' "ERROR: --token and --uuid are required" ;;
         *:validating_uuid) printf '%s' "Validating that the UUID does not belong to another system..." ;;
         *:uuid_validate_failed) printf '%s' "ERROR: Could not validate the UUID before sending inventory" ;;
         *:uuid_validate_safety) printf '%s' "For safety, installation will not continue without confirming that the UUID does not belong to another system." ;;
@@ -944,7 +934,6 @@ t() {
         *:length) printf '%s' "Length" ;;
         *:agent_token) printf '%s' "Agent token" ;;
         *:configured_hidden) printf '%s' "configured; value hidden" ;;
-        *:alias_label) printf '%s' "Alias" ;;
         *:method) printf '%s' "Method" ;;
         *:endpoint) printf '%s' "Endpoint" ;;
         *:flow) printf '%s' "Flow" ;;
@@ -1149,7 +1138,7 @@ parse_args() {
                 ;;
             --alias)
                 [ $# -ge 2 ] || { echo "$(t alias_requires_value)"; exit 1; }
-                SYSTEM_ALIAS="$2"
+                # Backward-compatible no-op: aliases are now managed only from the UI.
                 shift 2
                 ;;
             --locale|--agent-locale)
@@ -1162,7 +1151,7 @@ parse_args() {
     done
     AGENT_LOCALE=$(normalize_locale "$AGENT_LOCALE")
 
-    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ] || [ -z "$SYSTEM_ALIAS" ]; then
+    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
         echo "$(t required_args)"
         exit 1
     fi
@@ -1291,11 +1280,10 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","alias":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
-        "$(json_escape "$SYSTEM_ALIAS")" \
         "$(json_escape "$os_name")" \
         "$(json_escape "$os_version")" \
         "$(json_escape "$distro_id")" \
@@ -1545,7 +1533,7 @@ download_update() {
     if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
         chmod +x "$script_path"
         echo "$(t update_completed)"
-        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --alias "$SYSTEM_ALIAS" --locale "$AGENT_LOCALE"
+        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --locale "$AGENT_LOCALE"
     else
         echo "$(t update_failed)"
         [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
@@ -1587,7 +1575,6 @@ send_to_rsm() {
     echo "$(t rsm_configuration)"
     echo "   - URL:   $RSM_API_URL"
     echo "   - $(t agent_token): <$(t configured_hidden)>"
-    echo "   - $(t alias_label): $SYSTEM_ALIAS"
     echo "   - Debug: ${RS_AGENT_DEBUG:-0}"
     echo ""
     echo "$(t request_to_send)"
@@ -1791,7 +1778,6 @@ main() {
         echo "$(t check)"
         echo "   - $(t agent_token): <$(t configured_hidden)>"
         echo "   - UUID:  $UUID_VAL"
-        echo "   - $(t alias_label): $SYSTEM_ALIAS"
         echo "   - URL:   $RSM_API_URL"
         echo "   - $(t network)"
         exit 1
