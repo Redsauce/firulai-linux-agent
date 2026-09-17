@@ -786,7 +786,7 @@ reexec_as_no_root_user() {
     target_uid=$(id -u "$target_user")
     target_runtime_dir="/run/user/$target_uid"
 
-    command_string="export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
+    command_string="export RS_AGENT_GITHUB_RAW_URL=$(early_shell_single_quote "$GITHUB_RAW_URL"); export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
     if [ -n "$AGENT_LOCALE" ]; then
         command_string="$command_string --locale $(early_shell_single_quote "$AGENT_LOCALE")"
     fi
@@ -893,7 +893,7 @@ RUNNER_FILE="$INSTALL_DIR/rs_agent_runner.sh"
 SCHEDULER_TYPE=""
 
 # Semantic lifecycle endpoint shared with the Windows agent.
-RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
+RSM_API_URL=""
 
 # ============================================================================
 # COLORES
@@ -2762,6 +2762,19 @@ local_system_fqdn() {
     hostname -f 2>/dev/null || hostname 2>/dev/null || echo "unknown"
 }
 
+load_api_module() {
+    API_MODULE_FILE=$(make_private_temp_file "api_endpoint") || return 1
+    if ! curl -fsSL --max-time 20 "$GITHUB_RAW_URL/api_endpoint.sh" -o "$API_MODULE_FILE" ||
+        ! bash -n "$API_MODULE_FILE"; then
+        rm -f "$API_MODULE_FILE"
+        return 1
+    fi
+    . "$API_MODULE_FILE" || return 1
+    # Validation can redirect before the final config.env exists.
+    RSM_SETTINGS_FILE=$(make_private_temp_file "api_settings") || return 1
+    rsm_load_base
+}
+
 check_uuid_available() {
     local payload response_file http_code exit_code response_body validation_result
     response_file=$(make_private_temp_file "rsm_install_uuid_check_response") || return 0
@@ -2770,14 +2783,11 @@ check_uuid_available() {
     info "$(t validating_uuid)"
 
     set +e
-    http_code=$(curl \
+    http_code=$(rsm_request \
         --silent \
         --show-error \
         --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location \
         --request POST \
-        "$RSM_API_URL" \
         --header "Authorization: $AGENT_TOKEN" \
         --form-string "RStrigger=validateSystemInstallation" \
         --form-string "RSdata=$payload" \
@@ -2894,14 +2904,11 @@ update_rsm_system_on_install() {
     info "$(t marking_active)"
 
     set +e
-    http_code=$(curl \
+    http_code=$(rsm_request \
         --silent \
         --show-error \
         --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location \
         --request POST \
-        "$RSM_API_URL" \
         --header "Authorization: $AGENT_TOKEN" \
         --form-string "RStrigger=changeSystemStatus" \
         --form-string "RSdata=$payload" \
@@ -3225,16 +3232,24 @@ download_uninstaller() {
 }
 
 write_agent_config() {
-    local temporary_file
+    local temporary_file auto_update=1
+
+    # A test branch must not be replaced by the stable updater on its first run.
+    if [ "${GITHUB_RAW_URL%/}" != "https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main" ]; then
+        auto_update=0
+    fi
 
     info "$(t config_saving)"
 
+    rsm_load_base
     temporary_file=$(mktemp "$DATA_DIR/config.env.XXXXXX")
     chmod 600 "$temporary_file"
     cat > "$temporary_file" << CONFIG_EOF
 AGENT_TOKEN=$(shell_single_quote "$AGENT_TOKEN")
 UUID=$(shell_single_quote "$UUID")
 AGENT_LOCALE=$(shell_single_quote "$AGENT_LOCALE")
+RSM_BASE_URL=$(shell_single_quote "$RSM_BASE_URL")
+AGENT_AUTO_UPDATE=$(shell_single_quote "$auto_update")
 CONFIG_EOF
     chown root:root "$temporary_file" 2>/dev/null || true
     mv -f "$temporary_file" "$CONFIG_FILE"
@@ -3446,15 +3461,20 @@ main() {
     check_local_agent_installation
     warn_about_parallel_root_installation
     check_automatic_execution_prerequisites
+    load_api_module
     check_uuid_available
     update_rsm_system_on_install
     
     # Instalacion
     create_directories
+    install -m 644 "$API_MODULE_FILE" "$INSTALL_DIR/api_endpoint.sh"
+    rm -f "$API_MODULE_FILE"
     download_agent
     download_runner
     download_uninstaller
     write_agent_config
+    rm -f "$RSM_SETTINGS_FILE"
+    unset RSM_SETTINGS_FILE
     
     # Prueba
     echo ""

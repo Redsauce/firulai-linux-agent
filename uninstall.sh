@@ -30,7 +30,7 @@ else
 fi
 
 CONFIG_FILE="$DATA_DIR/config.env"
-RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
+RSM_API_URL=""
 AGENT_TOKEN=""
 UUID_VAL=""
 AGENT_LOCALE="${RS_AGENT_LOCALE:-}"
@@ -544,14 +544,11 @@ mark_system_disconnected_in_rsm() {
     local_fqdn=$(hostname -f 2>/dev/null || printf '%s' "$local_hostname")
     payload="{\"uuid\":\"$(json_escape "$UUID_VAL")\",\"action\":\"disconnect\",\"hostname\":\"$(json_escape "$local_hostname")\",\"fqdn\":\"$(json_escape "$local_fqdn")\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
 
-    http_code=$(curl \
+    http_code=$(rsm_request \
         --silent \
         --show-error \
         --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location \
         --request POST \
-        "$RSM_API_URL" \
         --header "Authorization: $AGENT_TOKEN" \
         --form-string "RStrigger=changeSystemStatus" \
         --form-string "RSdata=$payload" \
@@ -636,6 +633,8 @@ remove_local_files() {
 
 main() {
     load_config
+    . "$(dirname -- "${BASH_SOURCE[0]}")/api_endpoint.sh" || exit 1
+    rsm_load_base || exit 1
     check_root
     parse_args "$@"
     if ! init_private_tmp_dir; then

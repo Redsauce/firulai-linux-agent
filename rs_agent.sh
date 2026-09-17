@@ -33,7 +33,8 @@ fi
 
 OUTPUT_FILE="inventory.json"
 STATE_FILE="$OUTPUT_DIR/state.env"
-RSM_API_URL="https://rsm1.redsauce.net/AppController/commands_RSM/api/api.php"
+CONFIG_FILE="$OUTPUT_DIR/config.env"
+RSM_API_URL=""
 AGENT_TOKEN=""
 UUID_VAL=""
 EXECUTION_TRIGGER="${RS_AGENT_TRIGGER:-manual}"
@@ -1549,7 +1550,31 @@ collect_gem_packages() {
 
 # ============ AUTO UPDATE ============
 
+load_api_module() {
+    local module_dir module_file temporary uninstall_tmp
+    module_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) || return 1
+    module_file="$module_dir/api_endpoint.sh"
+    # Old updaters deliver only rs_agent.sh. Bootstrap the new dependencies.
+    if [ ! -f "$module_file" ]; then
+        temporary=$(mktemp "$module_dir/api_endpoint.XXXXXX") || return 1
+        uninstall_tmp=$(mktemp "$module_dir/uninstall.XXXXXX") || { rm -f "$temporary"; return 1; }
+        if ! curl -fsSL --max-time 20 "${GITHUB_AGENT_URL%/*}/api_endpoint.sh" -o "$temporary" ||
+            ! curl -fsSL --max-time 20 "${GITHUB_AGENT_URL%/*}/uninstall.sh" -o "$uninstall_tmp" ||
+            ! bash -n "$temporary" || ! bash -n "$uninstall_tmp" ||
+            ! chmod 644 "$temporary" || ! chmod 755 "$uninstall_tmp" ||
+            ! mv -f "$temporary" "$module_file" || ! mv -f "$uninstall_tmp" "$module_dir/uninstall.sh"; then
+            rm -f "$temporary" "$uninstall_tmp"
+            return 1
+        fi
+    fi
+    . "$module_file" || return 1
+    rsm_load_base
+}
+
 check_for_updates() {
+    if [ -r "$CONFIG_FILE" ] && grep -q "^AGENT_AUTO_UPDATE='0'$" "$CONFIG_FILE"; then
+        return 0
+    fi
     command -v curl &>/dev/null || return 0
 
     local response latest_version
@@ -1569,18 +1594,25 @@ check_for_updates() {
 
 download_update() {
     local script_path="$INSTALL_DIR/rs_agent.sh"
-    local backup_path="${script_path}.backup"
-
+    local script_tmp module_tmp uninstall_tmp
+    script_tmp=$(mktemp "$INSTALL_DIR/rs_agent.XXXXXX") || return 1
+    module_tmp=$(mktemp "$INSTALL_DIR/api_endpoint.XXXXXX") || { rm -f "$script_tmp"; return 1; }
+    uninstall_tmp=$(mktemp "$INSTALL_DIR/uninstall.XXXXXX") || { rm -f "$script_tmp" "$module_tmp"; return 1; }
     echo "$(t downloading_update)"
-    [ -f "$script_path" ] && cp "$script_path" "$backup_path"
-
-    if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_path"; then
-        chmod +x "$script_path"
+    if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_tmp" &&
+        curl -fsSL --max-time 10 "${GITHUB_AGENT_URL%/*}/api_endpoint.sh" -o "$module_tmp" &&
+        curl -fsSL --max-time 10 "${GITHUB_AGENT_URL%/*}/uninstall.sh" -o "$uninstall_tmp" &&
+        bash -n "$script_tmp" && bash -n "$module_tmp" && bash -n "$uninstall_tmp" &&
+        chmod 755 "$script_tmp" "$uninstall_tmp" && chmod 644 "$module_tmp"; then
+        cp "$script_path" "${script_path}.backup" &&
+            mv -f "$module_tmp" "$INSTALL_DIR/api_endpoint.sh" &&
+            mv -f "$uninstall_tmp" "$INSTALL_DIR/uninstall.sh" &&
+            mv -f "$script_tmp" "$script_path" || { rm -f "$script_tmp" "$module_tmp" "$uninstall_tmp"; return 1; }
         echo "$(t update_completed)"
         exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --locale "$AGENT_LOCALE"
     else
+        rm -f "$script_tmp" "$module_tmp" "$uninstall_tmp"
         echo "$(t update_failed)"
-        [ -f "$backup_path" ] && mv "$backup_path" "$script_path"
     fi
 }
 
@@ -1642,8 +1674,6 @@ send_to_rsm() {
         --show-error
         --output "$response_file"
         --dump-header "$response_headers_file"
-        --write-out "%{http_code}"
-        --location "$RSM_API_URL"
         --header "Authorization: $AGENT_TOKEN"
         --form "RStrigger=newServerData"
         --form "RSdata=<$inventory_json_path;type=application/json"
@@ -1655,15 +1685,14 @@ send_to_rsm() {
         curl_args=(--verbose "${curl_args[@]}")
     fi
 
-    local http_code
+    local http_code exit_code=0
     if [ "${RS_AGENT_DEBUG:-0}" = "1" ]; then
-        http_code=$(curl "${curl_args[@]}" 2>"$curl_trace_file")
+        http_code=$(rsm_request "${curl_args[@]}" 2>"$curl_trace_file") || exit_code=$?
         sed -i "s/$AGENT_TOKEN/<AGENT_TOKEN>/g" "$curl_trace_file" 2>/dev/null || true
         chmod 600 "$curl_trace_file" 2>/dev/null || true
     else
-        http_code=$(curl "${curl_args[@]}")
+        http_code=$(rsm_request "${curl_args[@]}") || exit_code=$?
     fi
-    local exit_code=$?
     local response_body
     response_body=$(cat "$response_file" 2>/dev/null || true)
     chmod 600 "$response_file" "$response_headers_file" 2>/dev/null || true
@@ -1723,6 +1752,7 @@ main() {
         exit 1
     fi
     echo "$(t trigger): $EXECUTION_TRIGGER"
+    load_api_module || exit 1
     check_for_updates
     if ! ensure_private_directory "$OUTPUT_DIR"; then
         exit 1
