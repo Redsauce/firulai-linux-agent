@@ -1,12 +1,25 @@
 #!/bin/bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
-. ./api_endpoint.sh
-mode="${1:---offline}"
-case "$mode" in --offline|--live) ;; *) echo 'Usage: bash scripts/test_api_redirects.sh [--live]' >&2; exit 2 ;; esac
+mode=--offline
+module_file="$(dirname "$0")/../api_endpoint.sh"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --offline|--live) mode="$1"; shift ;;
+        --module)
+            [ "$#" -ge 2 ] || { echo '--module requires a path' >&2; exit 2; }
+            module_file="$2"; shift 2 ;;
+        *) echo 'Usage: bash test_api_redirects.sh [--live] [--module /path/api_endpoint.sh]' >&2; exit 2 ;;
+    esac
+done
+[ -r "$module_file" ] || { echo "Cannot read module: $module_file" >&2; exit 1; }
+module_file="$(cd -- "$(dirname -- "$module_file")" && pwd)/$(basename -- "$module_file")"
+. "$module_file"
+# Never inherit a real installation's persistence destination.
+unset RSM_SETTINGS_FILE
 test_dir=$(mktemp -d)
 trap 'rm -f "$test_dir/config.env" "$test_dir/body" "$test_dir/calls"; rmdir "$test_dir"' EXIT
 CONFIG_FILE="$test_dir/config.env"
+printf 'Modulo bajo prueba: %s\nConfiguracion temporal: %s\n' "$module_file" "$CONFIG_FILE"
 initial='https://rsm1.invalid/AppController/'
 destination='https://httpbingo.org/anything/rsm2/AppController/'
 body_file="$test_dir/body"
