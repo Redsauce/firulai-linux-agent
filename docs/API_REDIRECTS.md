@@ -30,16 +30,17 @@ procesos, sustituyendo recolectores por datos ficticios y adaptando solo el orig
 al endpoint de simulacion HTTPBingo. Conserva archivos y logs en la ruta que imprime.
 No demuestra el funcionamiento de los receptores reales de RSM.
 
-## Instalar desde la rama de pruebas
+## Instalar una version concreta para pruebas
 
 Usar un contenedor limpio y credenciales de un equipo de pruebas:
 
 ```bash
-export RS_AGENT_GITHUB_RAW_URL='https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/test/api-base-redirects'
+export RS_AGENT_GITHUB_RAW_URL='https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/09b11a7'
 curl -fsSL "$RS_AGENT_GITHUB_RAW_URL/install.sh" | bash -s -- 'TOKEN' 'UUID' --locale es_ES
 ```
 
-Todos los archivos vienen de la rama. Una fuente distinta de main guarda
+Todos los archivos vienen del commit indicado; el enlace sobrevive al borrado
+de la rama de pruebas. Para la instalacion normal usar main. Una fuente distinta de main guarda
 `AGENT_AUTO_UPDATE='0'` para evitar volver a main automaticamente. La instalacion
 normal mantiene las actualizaciones. Instalar se comunica con la API real; no
 provoca una redireccion por si mismo. Los actualizadores antiguos descargan el
