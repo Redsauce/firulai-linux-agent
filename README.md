@@ -176,3 +176,7 @@ grep -o '"manager":"npm"' ~/.local/state/rs-agent/inventory.json | wc -l
 - `mktemp`
 - `flock` (`util-linux`)
 - `systemd --user` or `cron` for automatic execution
+
+## Base de la API y redirecciones
+
+Consulta [la guia de configuracion y pruebas](docs/API_REDIRECTS.md).
