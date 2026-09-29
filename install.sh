@@ -19,6 +19,7 @@ UUID=${2:-""}
 SCHEDULER_CHOICE="${RS_AGENT_SCHEDULER:-}"
 AGENT_LOCALE="${RS_AGENT_LOCALE:-}"
 UUID_VALIDATION_RESULT=""
+LOCAL_AGENT_RETRY=0
 
 early_locale_prefix() {
     local value
@@ -2998,28 +2999,8 @@ check_local_agent_installation() {
 
         if [ -n "$installed_uuid" ] && [ "$installed_uuid" = "$UUID" ]; then
             warn "$(t local_installed_same_uuid)"
-
-            # A previous attempt may have installed the local files before its
-            # first inventory finished in RSM. Re-running the same installation
-            # must recover that upload instead of stopping before any event is
-            # sent and leaving the provisional System stuck indefinitely.
-            if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
-                info "$(t running_initial)"
-                set +e
-                RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \
-                    --token "$AGENT_TOKEN" \
-                    --uuid "$UUID" \
-                    --locale "$AGENT_LOCALE"
-                local retry_status=$?
-                set -e
-
-                if [ "$retry_status" -eq 0 ]; then
-                    log "$(t install_success)"
-                    exit 0
-                fi
-
-                error "$(t initial_failed)"
-            fi
+            LOCAL_AGENT_RETRY=1
+            return 0
         else
             error "$(t existing_agent)"
             if [ -n "$installed_uuid" ]; then
@@ -3037,6 +3018,40 @@ check_local_agent_installation() {
         fi
         exit 1
     fi
+}
+
+retry_local_agent_installation() {
+    [ "$LOCAL_AGENT_RETRY" = "1" ] || return 0
+
+    # Never execute an existing local agent until RSM has confirmed that its
+    # UUID still exists, remains covered, targets Linux and belongs to this
+    # machine. This preserves safe recovery without accepting deleted UUIDs.
+    if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
+        info "$(t running_initial)"
+        set +e
+        RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \
+            --token "$AGENT_TOKEN" \
+            --uuid "$UUID" \
+            --locale "$AGENT_LOCALE"
+        local retry_status=$?
+        set -e
+
+        if [ "$retry_status" -eq 0 ]; then
+            log "$(t install_success)"
+            exit 0
+        fi
+
+        error "$(t initial_failed)"
+    fi
+
+    echo ""
+    echo "$(t uninstall_current)"
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        echo "  sudo bash $INSTALL_DIR/uninstall.sh"
+    else
+        echo "  bash $INSTALL_DIR/uninstall.sh"
+    fi
+    exit 1
 }
 
 update_rsm_system_on_install() {
@@ -3616,19 +3631,21 @@ main() {
     
     # Verificaciones
     check_root
+    # Inspect the machine before performing distribution, dependency or RSM
+    # work. A different local installation must stop the process immediately.
+    check_local_agent_installation
     detect_distro
     check_dependencies
     init_private_tmp_dir
-    choose_scheduler_interactively
     validate_uuid_format "$UUID"
     load_api_module
     check_uuid_exists_in_rsm
-    # Validate remotely before using any existing local agent. Otherwise a
-    # retry with files left from an older installation could submit inventory
-    # for a System that has already been deleted in Firulai.
     check_uuid_available
-    check_local_agent_installation
+    retry_local_agent_installation
     warn_about_parallel_root_installation
+    # Ask about cron/systemd only after every local and remote installation
+    # validation has succeeded.
+    choose_scheduler_interactively
     check_automatic_execution_prerequisites
     update_rsm_system_on_install
     
