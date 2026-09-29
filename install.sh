@@ -535,8 +535,6 @@ fi
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
 GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main}"
-FIRULAI_API_URL="${FIRULAI_API_URL:-https://firulai.redsauce.net}"
-FIRULAI_INSTALLATION_VALIDATION_URL="${FIRULAI_API_URL%/}/api/agents/installations/validate"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -788,7 +786,7 @@ reexec_as_no_root_user() {
     target_uid=$(id -u "$target_user")
     target_runtime_dir="/run/user/$target_uid"
 
-    command_string="export RS_AGENT_GITHUB_RAW_URL=$(early_shell_single_quote "$GITHUB_RAW_URL"); export FIRULAI_API_URL=$(early_shell_single_quote "$FIRULAI_API_URL"); export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
+    command_string="export RS_AGENT_GITHUB_RAW_URL=$(early_shell_single_quote "$GITHUB_RAW_URL"); export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
     if [ -n "$AGENT_LOCALE" ]; then
         command_string="$command_string --locale $(early_shell_single_quote "$AGENT_LOCALE")"
     fi
@@ -2787,53 +2785,9 @@ load_api_module() {
     rsm_load_base
 }
 
-check_uuid_exists_synchronously() {
-    local payload response_file http_code exit_code response_body
-    response_file=$(make_private_temp_file "firulai_install_uuid_check_response") || exit 1
-    payload="{\"uuid\":\"$(json_escape "$UUID")\"}"
-
-    set +e
-    http_code=$(curl \
-        --silent \
-        --show-error \
-        --output "$response_file" \
-        --write-out '%{http_code}' \
-        --location \
-        --request POST \
-        "$FIRULAI_INSTALLATION_VALIDATION_URL" \
-        --header "Authorization: Bearer $AGENT_TOKEN" \
-        --header "Content-Type: application/json" \
-        --data "$payload" \
-        --max-time 20)
-    exit_code=$?
-    set -e
-    response_body=$(cat "$response_file" 2>/dev/null || true)
-    rm -f "$response_file"
-
-    if [ "$exit_code" -ne 0 ]; then
-        error "$(t uuid_validate_failed) (curl exit: $exit_code)."
-        exit 1
-    fi
-    if [ "$http_code" = "404" ]; then
-        if printf '%s' "$response_body" | grep -Eq '"error"[[:space:]]*:[[:space:]]*"not_found"|"exists"[[:space:]]*:[[:space:]]*false'; then
-            error "$(t rsm_item_missing)"
-            error "$(t uuid_conflict_hint)"
-            exit 1
-        fi
-        # Keep compatibility while the synchronous Firulai route is rolling
-        # out. A generic application 404 is not evidence that the UUID itself
-        # is missing; the existing RSM validation below remains authoritative.
-        return 0
-    fi
-    if [ "$http_code" != "200" ] || ! printf '%s' "$response_body" | grep -Eq '"exists"[[:space:]]*:[[:space:]]*true'; then
-        error "$(t uuid_validate_denied) (HTTP $http_code)."
-        exit 1
-    fi
-}
-
 check_uuid_available() {
     local payload response_file http_code exit_code response_body validation_result
-    response_file=$(make_private_temp_file "rsm_install_uuid_check_response") || exit 1
+    response_file=$(make_private_temp_file "rsm_install_uuid_check_response") || return 0
     payload="{\"uuid\":\"$(json_escape "$UUID")\",\"hostname\":\"$(json_escape "$(local_system_hostname)")\",\"fqdn\":\"$(json_escape "$(local_system_fqdn)")\",\"platform\":\"linux\",\"locale\":\"$(json_escape "$AGENT_LOCALE")\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
 
     info "$(t validating_uuid)"
@@ -2855,27 +2809,24 @@ check_uuid_available() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        error "$(t uuid_validate_failed) (curl exit: $exit_code)."
-        exit 1
+        warn "$(t uuid_validate_failed) (curl exit: $exit_code)."
+        return 0
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        error "$(t uuid_validate_denied) (HTTP $http_code)."
-        echo "$(t response): $response_body"
-        exit 1
+        warn "$(t uuid_validate_denied) (HTTP $http_code)."
+        return 0
     fi
 
     if rsm_response_has_api_error "$response_body"; then
-        error "$(t uuid_validate_denied)."
-        echo "$(t response): $response_body"
-        exit 1
+        warn "$(t uuid_validate_denied)."
+        return 0
     fi
 
     validation_result=$(printf '%s' "$response_body" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
     if [ -n "$(printf '%s' "$response_body" | tr -d '[:space:]')" ] && [ -z "$validation_result" ]; then
-        error "$(t uuid_validate_denied)."
-        echo "$(t response): $response_body"
-        exit 1
+        warn "$(t uuid_validate_denied)."
+        return 0
     fi
     UUID_VALIDATION_RESULT="$validation_result"
     case "$validation_result" in
@@ -2883,9 +2834,7 @@ check_uuid_available() {
             return 0
             ;;
         not_found)
-            error "$(t rsm_item_missing)"
-            error "$(t uuid_conflict_hint)"
-            exit 1
+            return 0
             ;;
         different_system)
             error "$(t uuid_other_system)"
@@ -3564,7 +3513,6 @@ main() {
     init_private_tmp_dir
     choose_scheduler_interactively
     validate_uuid_format "$UUID"
-    check_uuid_exists_synchronously
     load_api_module
     # Validate remotely before using any existing local agent. Otherwise a
     # retry with files left from an older installation could submit inventory

@@ -40,15 +40,11 @@ bash -n install.sh rs_agent.sh rs_agent_runner.sh uninstall.sh
 
 Linux uses the same receiver events as the Windows agent:
 
-Before dispatching those asynchronous events, the Linux installer calls the
-Firulai installation-validation endpoint synchronously. A deleted or unknown
-UUID, an invalid Agent Token, or an unavailable validation service stops the
-installation before existing local files can be reused or new files created.
-
 - `validateSystemInstallation` receives UUID, hostname, FQDN, locale and the
   Agent Token during installation. `available` and `same_system` continue;
-  `not_found` and `different_system` stop installation before local state is
-  created when the result is available synchronously.
+  `not_found` continues without changing local state, while `different_system`
+  stops installation before local state is created when the result is
+  available synchronously.
   Events are normally asynchronous, so Vulnwatcher owns the final decision and
   blocks inventory writes. It resolves System Client relation `1785`, then
   queries Account Details by Client `1883` and reads email property `1881`.
