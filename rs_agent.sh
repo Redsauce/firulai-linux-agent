@@ -1730,6 +1730,14 @@ send_to_rsm() {
         return 1
     fi
 
+    if rsm_response_has_api_error "$response_body" || \
+       printf '%s' "$response_body" | grep -qE '"error"[[:space:]]*:'; then
+        echo ""
+        echo "$(t send_failed)"
+        echo "$(t response): $response_body"
+        return 1
+    fi
+
     echo ""
     printf '%s (%d KB)\n' "$(t inventory_sent)" "$(( ${#inventory_json} / 1024 ))"
     return 0

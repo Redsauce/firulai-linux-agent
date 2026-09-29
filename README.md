@@ -40,10 +40,15 @@ bash -n install.sh rs_agent.sh rs_agent_runner.sh uninstall.sh
 
 Linux uses the same receiver events as the Windows agent:
 
+Before dispatching those asynchronous events, the Linux installer calls the
+Firulai installation-validation endpoint synchronously. A deleted or unknown
+UUID, an invalid Agent Token, or an unavailable validation service stops the
+installation before existing local files can be reused or new files created.
+
 - `validateSystemInstallation` receives UUID, hostname, FQDN, locale and the
   Agent Token during installation. `available` and `same_system` continue;
-  `not_found` continues silently, while `different_system` stops installation
-  before local state is created when the result is available synchronously.
+  `not_found` and `different_system` stop installation before local state is
+  created when the result is available synchronously.
   Events are normally asynchronous, so Vulnwatcher owns the final decision and
   blocks inventory writes. It resolves System Client relation `1785`, then
   queries Account Details by Client `1883` and reads email property `1881`.
@@ -51,6 +56,13 @@ Linux uses the same receiver events as the Windows agent:
 - `changeSystemStatus` receives UUID, hostname, FQDN and `action=disconnect`
   during uninstall. RSM is updated only when that identity matches the System.
 - `newServerData` receives the initial and recurring semantic inventory.
+
+If an installation with the same UUID is run again after the local agent files
+were created, the installer first validates that the UUID still exists in
+Firulai and then runs the existing agent with trigger
+`installer-retry`. This recovers the initial `newServerData` delivery instead
+of stopping locally before RSM receives any new event. A different local UUID
+is still rejected and must be uninstalled explicitly.
 
 The Linux scripts contain no RSM property identifiers and do not call the item get/update endpoints directly. RSM mappings and stored status values belong to the receiver scripts.
 
@@ -180,3 +192,8 @@ grep -o '"manager":"npm"' ~/.local/state/rs-agent/inventory.json | wc -l
 ## Base de la API y redirecciones
 
 Consulta [la guia de configuracion y pruebas](docs/API_REDIRECTS.md).
+
+RSM puede devolver errores de autenticacion o permisos dentro de un documento
+`RSError` aunque el estado HTTP sea `200`. El instalador, el agente y el
+desinstalador consideran esa respuesta un fallo: no confirman el envio ni
+continuan una instalacion cuando el evento no ha sido aceptado.

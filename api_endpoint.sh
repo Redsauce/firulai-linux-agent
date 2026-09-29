@@ -33,6 +33,13 @@ rsm_save_base() {
     fi
 }
 
+# RSM may report authentication, authorization or routing failures inside an
+# XML envelope while still returning HTTP 200. Callers must reject that body
+# explicitly instead of treating the status code as proof that an event exists.
+rsm_response_has_api_error() {
+    printf '%s' "${1:-}" | grep -qiE '<RSError([[:space:]>])|RSerrorMessage|RSerrorCode|ACCESS[[:space:]]+DENIED'
+}
+
 # Test harnesses override this transport boundary, never production settings.
 rsm_curl() { curl "$@"; }
 

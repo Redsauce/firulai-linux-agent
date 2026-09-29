@@ -535,6 +535,8 @@ fi
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
 GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main}"
+FIRULAI_API_URL="${FIRULAI_API_URL:-https://firulai.redsauce.net}"
+FIRULAI_INSTALLATION_VALIDATION_URL="${FIRULAI_API_URL%/}/api/agents/installations/validate"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -786,7 +788,7 @@ reexec_as_no_root_user() {
     target_uid=$(id -u "$target_user")
     target_runtime_dir="/run/user/$target_uid"
 
-    command_string="export RS_AGENT_GITHUB_RAW_URL=$(early_shell_single_quote "$GITHUB_RAW_URL"); export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
+    command_string="export RS_AGENT_GITHUB_RAW_URL=$(early_shell_single_quote "$GITHUB_RAW_URL"); export FIRULAI_API_URL=$(early_shell_single_quote "$FIRULAI_API_URL"); export RS_AGENT_SCHEDULER=$(early_shell_single_quote "$SCHEDULER_CHOICE"); export XDG_RUNTIME_DIR=$(early_shell_single_quote "$target_runtime_dir"); export DBUS_SESSION_BUS_ADDRESS=$(early_shell_single_quote "unix:path=$target_runtime_dir/bus"); curl -fsSL $(early_shell_single_quote "$GITHUB_RAW_URL/install.sh") | bash -s -- $(early_shell_single_quote "$AGENT_TOKEN") $(early_shell_single_quote "$UUID")"
     if [ -n "$AGENT_LOCALE" ]; then
         command_string="$command_string --locale $(early_shell_single_quote "$AGENT_LOCALE")"
     fi
@@ -1229,6 +1231,7 @@ t() {
         es_ES:uuid_same_system) printf '%s' "UUID ya asociado con este sistema en RSM; el agente se reactivara y el inventario se actualizara" ;;
         es_ES:uuid_other_system) printf '%s' "Este UUID ya pertenece a otro sistema en RSM." ;;
         es_ES:uuid_other_system_local) printf '%s' "Este agente no se puede instalar en la maquina local con ese UUID." ;;
+        es_ES:capacity_exceeded) printf '%s' "No hay capacidad para otra maquina Linux. Amplia la capacidad en Firulai antes de instalar el agente." ;;
         es_ES:local_installed_same_uuid) printf '%s' "Este sistema ya tiene un agente instalado con este UUID." ;;
         es_ES:existing_agent) printf '%s' "Ya existe una instalacion del agente en este sistema." ;;
         es_ES:uninstall_current) printf '%s' "Para instalar un agente nuevo, desinstala primero el actual:" ;;
@@ -1378,6 +1381,7 @@ t() {
         ca_ES:uuid_same_system) printf '%s' "UUID ja associat amb aquest sistema a RSM; l'agent es reactivara i l'inventari s'actualitzara" ;;
         ca_ES:uuid_other_system) printf '%s' "Aquest UUID ja pertany a un altre sistema a RSM." ;;
         ca_ES:uuid_other_system_local) printf '%s' "Aquest agent no es pot instal.lar a la maquina local amb aquest UUID." ;;
+        ca_ES:capacity_exceeded) printf '%s' "No hi ha capacitat per a una altra maquina Linux. Amplia la capacitat a Firulai abans d'instal.lar l'agent." ;;
         ca_ES:local_installed_same_uuid) printf '%s' "Aquest sistema ja te un agent instal.lat amb aquest UUID." ;;
         ca_ES:existing_agent) printf '%s' "Ja existeix una instal.lacio de l'agent en aquest sistema." ;;
         ca_ES:uninstall_current) printf '%s' "Per instal.lar un agent nou, desinstal.la primer l'actual:" ;;
@@ -1662,6 +1666,7 @@ t() {
         eu_ES:uuid_not_generated) printf '%s' "Agentea ezin da Gehitu Sistema Berritik sortu ez den UUID batekin instalatu." ;;
         eu_ES:uuid_other_system) printf '%s' "UUID hau RSMko beste sistema batekoa da jada." ;;
         eu_ES:uuid_other_system_local) printf '%s' "Agente hau ezin da instalatu UUID horrekin makina lokalean." ;;
+        eu_ES:capacity_exceeded) printf '%s' "Ez dago beste Linux makina baterako gaitasunik. Handitu gaitasuna Firulain agentea instalatu aurretik." ;;
         eu_ES:uuid_reserved) printf '%s' "UUID RSMn gordeta dago eta instalatzeko eskuragarri" ;;
         eu_ES:uuid_same_system) printf '%s' "Sistema honekin dagoeneko lotuta dagoen UUID RSMn; agentea berriro aktibatu eta inbentarioa eguneratuko da" ;;
         eu_ES:uuid_validate_denied) printf '%s' "RSM-k ez du baimendu UUID baliozkotzea" ;;
@@ -1813,6 +1818,7 @@ t() {
         gl_ES:uuid_not_generated) printf '%s' "Non se pode instalar o axente cun UUID que non se xerou desde Engadir novo sistema." ;;
         gl_ES:uuid_other_system) printf '%s' "Este UUID xa pertence a outro sistema en RSM." ;;
         gl_ES:uuid_other_system_local) printf '%s' "Este axente non se pode instalar na máquina local con ese UUID." ;;
+        gl_ES:capacity_exceeded) printf '%s' "Non hai capacidade para outra máquina Linux. Amplía a capacidade en Firulai antes de instalar o axente." ;;
         gl_ES:uuid_reserved) printf '%s' "UUID reservado en RSM e dispoñible para a instalación" ;;
         gl_ES:uuid_same_system) printf '%s' "UUID xa asociado a este sistema en RSM; reactivarase o axente e actualizarase o inventario" ;;
         gl_ES:uuid_validate_denied) printf '%s' "RSM non permitiu a validación UUID" ;;
@@ -1964,6 +1970,7 @@ t() {
         fr_FR:uuid_not_generated) printf '%s' "L'agent ne peut pas être installé avec un UUID qui n'a pas été généré à partir de l'ajout d'un nouveau système." ;;
         fr_FR:uuid_other_system) printf '%s' "Cet UUID appartient déjà à un autre système dans RSM." ;;
         fr_FR:uuid_other_system_local) printf '%s' "Cet agent ne peut pas être installé sur la machine locale avec cet UUID." ;;
+        fr_FR:capacity_exceeded) printf '%s' "La capacité ne permet pas d'ajouter une autre machine Linux. Augmentez la capacité dans Firulai avant d'installer l'agent." ;;
         fr_FR:uuid_reserved) printf '%s' "UUID réservé dans RSM et disponible pour l'installation" ;;
         fr_FR:uuid_same_system) printf '%s' "UUID déjà associé à ce système dans RSM ; l'agent sera réactivé et l'inventaire mis à jour" ;;
         fr_FR:uuid_validate_denied) printf '%s' "RSM n'a pas autorisé la validation de l'UUID" ;;
@@ -2115,6 +2122,7 @@ t() {
         de_DE:uuid_not_generated) printf '%s' "Der Agent kann nicht mit einer UUID installiert werden, die nicht durch „Neues System hinzufügen“ generiert wurde." ;;
         de_DE:uuid_other_system) printf '%s' "Diese UUID gehört bereits zu einem anderen System in RSM." ;;
         de_DE:uuid_other_system_local) printf '%s' "Dieser Agent kann mit dieser UUID nicht auf dem lokalen Computer installiert werden." ;;
+        de_DE:capacity_exceeded) printf '%s' "Es ist keine Kapazität für einen weiteren Linux-Rechner verfügbar. Erweitern Sie die Kapazität in Firulai, bevor Sie den Agenten installieren." ;;
         de_DE:uuid_reserved) printf '%s' "UUID ist im RSM reserviert und für die Installation verfügbar" ;;
         de_DE:uuid_same_system) printf '%s' "UUID ist diesem System in RSM bereits zugeordnet; Der Agent wird reaktiviert und der Bestand aktualisiert" ;;
         de_DE:uuid_validate_denied) printf '%s' "RSM hat keine UUID-Validierung zugelassen" ;;
@@ -2266,6 +2274,7 @@ t() {
         it_IT:uuid_not_generated) printf '%s' "Non è possibile installare l'agente con un UUID che non è stato generato da Aggiungi nuovo sistema." ;;
         it_IT:uuid_other_system) printf '%s' "Questo UUID appartiene già a un altro sistema in RSM." ;;
         it_IT:uuid_other_system_local) printf '%s' "Questo agente non può essere installato sul computer locale con quell'UUID." ;;
+        it_IT:capacity_exceeded) printf '%s' "Non c'è capacità per un'altra macchina Linux. Aumenta la capacità in Firulai prima di installare l'agente." ;;
         it_IT:uuid_reserved) printf '%s' "UUID riservato in RSM e disponibile per l'installazione" ;;
         it_IT:uuid_same_system) printf '%s' "UUID già associato a questo sistema in RSM; l'agente verrà riattivato e l'inventario aggiornato" ;;
         it_IT:uuid_validate_denied) printf '%s' "RSM non ha consentito la convalida UUID" ;;
@@ -2417,6 +2426,7 @@ t() {
         ja_JP:uuid_not_generated) printf '%s' "新しいシステムの追加から生成されていない UUID を使用してエージェントをインストールすることはできません。" ;;
         ja_JP:uuid_other_system) printf '%s' "この UUID はすでに RSM 内の別のシステムに属しています。" ;;
         ja_JP:uuid_other_system_local) printf '%s' "このエージェントは、その UUID ではローカル マシンにインストールできません。" ;;
+        ja_JP:capacity_exceeded) printf '%s' "別の Linux マシンを追加する容量がありません。エージェントをインストールする前に Firulai で容量を増やしてください。" ;;
         ja_JP:uuid_reserved) printf '%s' "RSM で予約されており、インストールに使用できる UUID" ;;
         ja_JP:uuid_same_system) printf '%s' "UUID はすでに RSM でこのシステムに関連付けられています。エージェントが再アクティブ化され、インベントリが更新されます" ;;
         ja_JP:uuid_validate_denied) printf '%s' "RSM は UUID 検証を許可しませんでした" ;;
@@ -2568,6 +2578,7 @@ t() {
         zh_CN:uuid_not_generated) printf '%s' "无法使用不是从“添加新系统”生成的 UUID 安装代理。" ;;
         zh_CN:uuid_other_system) printf '%s' "该 UUID 已属于 RSM 中的另一个系统。" ;;
         zh_CN:uuid_other_system_local) printf '%s' "该代理无法安装在具有该 UUID 的本地计算机上。" ;;
+        zh_CN:capacity_exceeded) printf '%s' "没有容量添加另一台 Linux 计算机。请先在 Firulai 中扩展容量，然后再安装代理。" ;;
         zh_CN:uuid_reserved) printf '%s' "RSM 中保留并可供安装的 UUID" ;;
         zh_CN:uuid_same_system) printf '%s' "UUID 已在 RSM 中与该系统关联；代理将被重新激活并更新库存" ;;
         zh_CN:uuid_validate_denied) printf '%s' "RSM 不允许 UUID 验证" ;;
@@ -2591,6 +2602,7 @@ t() {
         *:uuid_same_system) printf '%s' "UUID already associated with this system in RSM; the agent will be reactivated and inventory updated" ;;
         *:uuid_other_system) printf '%s' "This UUID already belongs to another system in RSM." ;;
         *:uuid_other_system_local) printf '%s' "This agent cannot be installed on the local machine with that UUID." ;;
+        *:capacity_exceeded) printf '%s' "There is no capacity for another Linux machine. Increase capacity in Firulai before installing the agent." ;;
         *:local_installed_same_uuid) printf '%s' "This system already has an agent installed with this UUID." ;;
         *:existing_agent) printf '%s' "An existing agent installation was found on this system." ;;
         *:uninstall_current) printf '%s' "To install a new agent, uninstall the current one first:" ;;
@@ -2775,10 +2787,49 @@ load_api_module() {
     rsm_load_base
 }
 
+check_uuid_exists_synchronously() {
+    local payload response_file http_code exit_code response_body
+    response_file=$(make_private_temp_file "firulai_install_uuid_check_response") || exit 1
+    payload="{\"uuid\":\"$(json_escape "$UUID")\"}"
+
+    info "$(t validating_uuid)"
+    set +e
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location \
+        --request POST \
+        "$FIRULAI_INSTALLATION_VALIDATION_URL" \
+        --header "Authorization: Bearer $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    set -e
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
+
+    if [ "$exit_code" -ne 0 ]; then
+        error "$(t uuid_validate_failed) (curl exit: $exit_code)."
+        exit 1
+    fi
+    if [ "$http_code" = "404" ]; then
+        error "$(t rsm_item_missing)"
+        error "$(t uuid_conflict_hint)"
+        exit 1
+    fi
+    if [ "$http_code" != "200" ] || ! printf '%s' "$response_body" | grep -Eq '"exists"[[:space:]]*:[[:space:]]*true'; then
+        error "$(t uuid_validate_denied) (HTTP $http_code)."
+        exit 1
+    fi
+}
+
 check_uuid_available() {
     local payload response_file http_code exit_code response_body validation_result
-    response_file=$(make_private_temp_file "rsm_install_uuid_check_response") || return 0
-    payload="{\"uuid\":\"$(json_escape "$UUID")\",\"hostname\":\"$(json_escape "$(local_system_hostname)")\",\"fqdn\":\"$(json_escape "$(local_system_fqdn)")\",\"locale\":\"$(json_escape "$AGENT_LOCALE")\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
+    response_file=$(make_private_temp_file "rsm_install_uuid_check_response") || exit 1
+    payload="{\"uuid\":\"$(json_escape "$UUID")\",\"hostname\":\"$(json_escape "$(local_system_hostname)")\",\"fqdn\":\"$(json_escape "$(local_system_fqdn)")\",\"platform\":\"linux\",\"locale\":\"$(json_escape "$AGENT_LOCALE")\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
 
     info "$(t validating_uuid)"
 
@@ -2799,27 +2850,45 @@ check_uuid_available() {
     rm -f "$response_file"
 
     if [ "$exit_code" -ne 0 ]; then
-        warn "$(t uuid_validate_failed) (curl exit: $exit_code)."
-        return 0
+        error "$(t uuid_validate_failed) (curl exit: $exit_code)."
+        exit 1
     fi
 
     if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-        warn "$(t uuid_validate_denied) (HTTP $http_code)."
-        return 0
+        error "$(t uuid_validate_denied) (HTTP $http_code)."
+        echo "$(t response): $response_body"
+        exit 1
+    fi
+
+    if rsm_response_has_api_error "$response_body"; then
+        error "$(t uuid_validate_denied)."
+        echo "$(t response): $response_body"
+        exit 1
     fi
 
     validation_result=$(printf '%s' "$response_body" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    if [ -n "$(printf '%s' "$response_body" | tr -d '[:space:]')" ] && [ -z "$validation_result" ]; then
+        error "$(t uuid_validate_denied)."
+        echo "$(t response): $response_body"
+        exit 1
+    fi
     UUID_VALIDATION_RESULT="$validation_result"
     case "$validation_result" in
         available|same_system)
             return 0
             ;;
         not_found)
-            return 0
+            error "$(t rsm_item_missing)"
+            error "$(t uuid_conflict_hint)"
+            exit 1
             ;;
         different_system)
             error "$(t uuid_other_system)"
             error "$(t uuid_other_system_local)"
+            exit 1
+            ;;
+        capacity_exceeded)
+            error "$(t capacity_exceeded)"
             exit 1
             ;;
         "")
@@ -2866,7 +2935,29 @@ check_local_agent_installation() {
         fi
 
         if [ -n "$installed_uuid" ] && [ "$installed_uuid" = "$UUID" ]; then
-            error "$(t local_installed_same_uuid)"
+            warn "$(t local_installed_same_uuid)"
+
+            # A previous attempt may have installed the local files before its
+            # first inventory finished in RSM. Re-running the same installation
+            # must recover that upload instead of stopping before any event is
+            # sent and leaving the provisional System stuck indefinitely.
+            if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
+                info "$(t running_initial)"
+                set +e
+                RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \
+                    --token "$AGENT_TOKEN" \
+                    --uuid "$UUID" \
+                    --locale "$AGENT_LOCALE"
+                local retry_status=$?
+                set -e
+
+                if [ "$retry_status" -eq 0 ]; then
+                    log "$(t install_success)"
+                    exit 0
+                fi
+
+                error "$(t initial_failed)"
+            fi
         else
             error "$(t existing_agent)"
             if [ -n "$installed_uuid" ]; then
@@ -2889,9 +2980,9 @@ check_local_agent_installation() {
 update_rsm_system_on_install() {
     local payload response_file http_code exit_code response_body
 
-    # A UUID unknown to RSM is deliberately ignored: do not follow the silent
-    # validation result with an activation request that would report an error.
-    if [ "$UUID_VALIDATION_RESULT" = "not_found" ] || [ -z "$UUID_VALIDATION_RESULT" ]; then
+    # The Events Handler can acknowledge an accepted asynchronous request with
+    # an empty body. An explicit not_found result has already stopped install.
+    if [ -z "$UUID_VALIDATION_RESULT" ]; then
         return 0
     fi
 
@@ -2899,7 +2990,7 @@ update_rsm_system_on_install() {
         error "$(t activate_failed)"
         exit 1
     }
-    payload="{\"uuid\":\"$(json_escape "$UUID")\",\"action\":\"activate\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
+    payload="{\"uuid\":\"$(json_escape "$UUID")\",\"action\":\"activate\",\"platform\":\"linux\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
 
     info "$(t marking_active)"
 
@@ -2930,8 +3021,18 @@ update_rsm_system_on_install() {
         exit 1
     fi
 
+    if rsm_response_has_api_error "$response_body"; then
+        error "$(t activation_denied)."
+        echo "$(t response): $response_body"
+        exit 1
+    fi
+
     if [ -n "$(printf '%s' "$response_body" | tr -d '[:space:]')" ] && \
        ! printf '%s' "$response_body" | grep -Eq '"updated"[[:space:]]*:[[:space:]]*true'; then
+        if printf '%s' "$response_body" | grep -Eq '"error"[[:space:]]*:[[:space:]]*"capacity_exceeded"'; then
+            error "$(t capacity_exceeded)"
+            exit 1
+        fi
         error "$(t activate_failed)"
         echo "$(t response): $response_body"
         exit 1
@@ -3458,11 +3559,15 @@ main() {
     init_private_tmp_dir
     choose_scheduler_interactively
     validate_uuid_format "$UUID"
+    check_uuid_exists_synchronously
+    load_api_module
+    # Validate remotely before using any existing local agent. Otherwise a
+    # retry with files left from an older installation could submit inventory
+    # for a System that has already been deleted in Firulai.
+    check_uuid_available
     check_local_agent_installation
     warn_about_parallel_root_installation
     check_automatic_execution_prerequisites
-    load_api_module
-    check_uuid_available
     update_rsm_system_on_install
     
     # Instalacion

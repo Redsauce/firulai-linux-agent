@@ -569,6 +569,12 @@ mark_system_disconnected_in_rsm() {
         return 1
     fi
 
+    if rsm_response_has_api_error "$response_body"; then
+        error "$(t mark_denied)"
+        echo "$(t response): $response_body"
+        return 1
+    fi
+
     if [ -z "$(printf '%s' "$response_body" | tr -d '[:space:]')" ]; then
         log "$(t marked)"
         return 0

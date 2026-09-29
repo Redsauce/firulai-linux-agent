@@ -14,6 +14,10 @@ done
 [ -r "$module_file" ] || { echo "Cannot read module: $module_file" >&2; exit 1; }
 module_file="$(cd -- "$(dirname -- "$module_file")" && pwd)/$(basename -- "$module_file")"
 . "$module_file"
+
+rsm_response_has_api_error '<?xml version="1.0"?><RSError><rows><row><column name="RSerrorMessage">ACCESS DENIED</column><column name="RSerrorCode">-6</column></row></rows></RSError>'
+! rsm_response_has_api_error ''
+! rsm_response_has_api_error '{"updated":true}'
 # Never inherit a real installation's persistence destination.
 unset RSM_SETTINGS_FILE
 test_dir=$(mktemp -d)
