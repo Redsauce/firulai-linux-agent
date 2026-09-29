@@ -40,6 +40,14 @@ bash -n install.sh rs_agent.sh rs_agent_runner.sh uninstall.sh
 
 Linux uses the same receiver events as the Windows agent:
 
+Before dispatching those events, the installer performs a synchronous,
+read-only lookup of System item type `191` by UUID property `1780` through the
+production RSM API. A reserved record with empty hostname (`1749`) and FQDN
+(`1750`) can be installed; a populated record is accepted only when one of
+those identities matches the local machine. Installation stops before touching
+local agent state when the UUID no longer exists, belongs to another machine,
+or the lookup cannot be verified.
+
 - `validateSystemInstallation` receives UUID, hostname, FQDN, locale and the
   Agent Token during installation. `available` and `same_system` continue;
   `not_found` continues without changing local state, while `different_system`

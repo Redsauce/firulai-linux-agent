@@ -535,6 +535,10 @@ fi
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
 GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main}"
+RSM_SYSTEM_ITEM_TYPE_ID="191"
+RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
+RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
+RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -2785,6 +2789,75 @@ load_api_module() {
     rsm_load_base
 }
 
+check_uuid_exists_in_rsm() {
+    local payload response_file http_code exit_code response_body items_url
+    local uuid_match_count stored_hostname stored_fqdn current_hostname current_fqdn
+    response_file=$(make_private_temp_file "rsm_install_uuid_lookup_response") || exit 1
+    items_url="${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php"
+    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$(json_escape "$UUID")\",\"operation\":\"=\"}]}"
+
+    info "$(t validating_uuid)"
+    set +e
+    http_code=$(curl \
+        --silent \
+        --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --location \
+        --request POST \
+        "$items_url" \
+        --header "Authorization: $AGENT_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$payload" \
+        --max-time 20)
+    exit_code=$?
+    set -e
+    response_body=$(cat "$response_file" 2>/dev/null || true)
+    rm -f "$response_file"
+
+    if [ "$exit_code" -ne 0 ]; then
+        error "$(t uuid_validate_failed) (curl exit: $exit_code)."
+        exit 1
+    fi
+    if [ "$http_code" != "200" ]; then
+        error "$(t uuid_validate_denied) (HTTP $http_code)."
+        exit 1
+    fi
+    if rsm_response_has_api_error "$response_body"; then
+        error "$(t uuid_validate_denied)."
+        exit 1
+    fi
+    uuid_match_count=$(printf '%s' "$response_body" | grep -Eio "\"$RSM_SYSTEM_UUID_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"$UUID\"" | wc -l | tr -d '[:space:]')
+    if [ "$uuid_match_count" = "0" ]; then
+        error "$(t rsm_item_missing)"
+        error "$(t uuid_conflict_hint)"
+        exit 1
+    fi
+    if [ "$uuid_match_count" != "1" ]; then
+        error "$(t uuid_validate_denied): ambiguous_uuid"
+        exit 1
+    fi
+
+    stored_hostname=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
+    stored_fqdn=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_FQDN_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
+    if [ -z "$stored_hostname" ] && [ -z "$stored_fqdn" ]; then
+        return 0
+    fi
+
+    current_hostname=$(local_system_hostname | tr '[:upper:]' '[:lower:]')
+    current_fqdn=$(local_system_fqdn | tr '[:upper:]' '[:lower:]')
+    if [ "$stored_hostname" = "$current_hostname" ] || \
+       [ "$stored_hostname" = "$current_fqdn" ] || \
+       [ "$stored_fqdn" = "$current_hostname" ] || \
+       [ "$stored_fqdn" = "$current_fqdn" ]; then
+        return 0
+    fi
+
+    error "$(t uuid_other_system)"
+    error "$(t uuid_other_system_local)"
+    exit 1
+}
+
 check_uuid_available() {
     local payload response_file http_code exit_code response_body validation_result
     response_file=$(make_private_temp_file "rsm_install_uuid_check_response") || return 0
@@ -3514,6 +3587,7 @@ main() {
     choose_scheduler_interactively
     validate_uuid_format "$UUID"
     load_api_module
+    check_uuid_exists_in_rsm
     # Validate remotely before using any existing local agent. Otherwise a
     # retry with files left from an older installation could submit inventory
     # for a System that has already been deleted in Firulai.
