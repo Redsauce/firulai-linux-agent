@@ -46,8 +46,17 @@ expect_allowed() {
 
 expect_blocked() {
     MOCK_RESPONSE="$1"
-    if (check_uuid_exists_in_rsm) >/dev/null 2>&1; then
+    local output status
+    set +e
+    output=$(check_uuid_exists_in_rsm 2>&1)
+    status=$?
+    set -e
+    if [ "$status" -eq 0 ]; then
         echo "Expected reservation to be blocked: $2" >&2
+        exit 1
+    fi
+    if [ -n "${3:-}" ] && ! printf '%s' "$output" | grep -Fq "$3"; then
+        echo "Expected '$3' when blocking: $2" >&2
         exit 1
     fi
 }
@@ -55,7 +64,7 @@ expect_blocked() {
 expect_allowed '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Linux","1972":"covered"}]' 'new covered Linux reservation'
 expect_allowed '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"linux-host","1750":"linux-host.example.test","1752":"Linux","1972":"covered"}]' 'same-machine reactivation'
 expect_blocked '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Linux","1972":"uncovered"}]' 'uncovered reservation'
-expect_blocked '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Windows","1972":"covered"}]' 'Windows reservation'
+expect_blocked '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Windows","1972":"covered"}]' 'Windows reservation' 'uuid_occupied'
 expect_blocked '[]' 'missing reservation'
 
 echo 'PASS: UUID reservations require one covered Linux System and preserve same-machine reactivation.'
