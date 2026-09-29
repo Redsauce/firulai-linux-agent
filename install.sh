@@ -2792,7 +2792,6 @@ check_uuid_exists_synchronously() {
     response_file=$(make_private_temp_file "firulai_install_uuid_check_response") || exit 1
     payload="{\"uuid\":\"$(json_escape "$UUID")\"}"
 
-    info "$(t validating_uuid)"
     set +e
     http_code=$(curl \
         --silent \
@@ -2816,9 +2815,15 @@ check_uuid_exists_synchronously() {
         exit 1
     fi
     if [ "$http_code" = "404" ]; then
-        error "$(t rsm_item_missing)"
-        error "$(t uuid_conflict_hint)"
-        exit 1
+        if printf '%s' "$response_body" | grep -Eq '"error"[[:space:]]*:[[:space:]]*"not_found"|"exists"[[:space:]]*:[[:space:]]*false'; then
+            error "$(t rsm_item_missing)"
+            error "$(t uuid_conflict_hint)"
+            exit 1
+        fi
+        # Keep compatibility while the synchronous Firulai route is rolling
+        # out. A generic application 404 is not evidence that the UUID itself
+        # is missing; the existing RSM validation below remains authoritative.
+        return 0
     fi
     if [ "$http_code" != "200" ] || ! printf '%s' "$response_body" | grep -Eq '"exists"[[:space:]]*:[[:space:]]*true'; then
         error "$(t uuid_validate_denied) (HTTP $http_code)."
