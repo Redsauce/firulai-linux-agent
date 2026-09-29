@@ -539,6 +539,8 @@ RSM_SYSTEM_ITEM_TYPE_ID="191"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
+RSM_SYSTEM_OS_PROPERTY_ID="1752"
+RSM_SYSTEM_COVERAGE_PROPERTY_ID="1972"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -1234,6 +1236,8 @@ t() {
         es_ES:uuid_other_system) printf '%s' "Este UUID ya pertenece a otro sistema en RSM." ;;
         es_ES:uuid_other_system_local) printf '%s' "Este agente no se puede instalar en la maquina local con ese UUID." ;;
         es_ES:capacity_exceeded) printf '%s' "No hay capacidad para otra maquina Linux. Amplia la capacidad en Firulai antes de instalar el agente." ;;
+        es_ES:coverage_not_allowed) printf '%s' "El sistema no tiene cobertura activa y no se puede instalar." ;;
+        es_ES:platform_not_linux) printf '%s' "Este UUID esta reservado para una maquina Windows, no para Linux." ;;
         es_ES:local_installed_same_uuid) printf '%s' "Este sistema ya tiene un agente instalado con este UUID." ;;
         es_ES:existing_agent) printf '%s' "Ya existe una instalacion del agente en este sistema." ;;
         es_ES:uninstall_current) printf '%s' "Para instalar un agente nuevo, desinstala primero el actual:" ;;
@@ -1384,6 +1388,8 @@ t() {
         ca_ES:uuid_other_system) printf '%s' "Aquest UUID ja pertany a un altre sistema a RSM." ;;
         ca_ES:uuid_other_system_local) printf '%s' "Aquest agent no es pot instal.lar a la maquina local amb aquest UUID." ;;
         ca_ES:capacity_exceeded) printf '%s' "No hi ha capacitat per a una altra maquina Linux. Amplia la capacitat a Firulai abans d'instal.lar l'agent." ;;
+        ca_ES:coverage_not_allowed) printf '%s' "El sistema no te cobertura activa i no es pot instal.lar." ;;
+        ca_ES:platform_not_linux) printf '%s' "Aquest UUID esta reservat per a una maquina Windows, no per a Linux." ;;
         ca_ES:local_installed_same_uuid) printf '%s' "Aquest sistema ja te un agent instal.lat amb aquest UUID." ;;
         ca_ES:existing_agent) printf '%s' "Ja existeix una instal.lacio de l'agent en aquest sistema." ;;
         ca_ES:uninstall_current) printf '%s' "Per instal.lar un agent nou, desinstal.la primer l'actual:" ;;
@@ -1669,6 +1675,8 @@ t() {
         eu_ES:uuid_other_system) printf '%s' "UUID hau RSMko beste sistema batekoa da jada." ;;
         eu_ES:uuid_other_system_local) printf '%s' "Agente hau ezin da instalatu UUID horrekin makina lokalean." ;;
         eu_ES:capacity_exceeded) printf '%s' "Ez dago beste Linux makina baterako gaitasunik. Handitu gaitasuna Firulain agentea instalatu aurretik." ;;
+        eu_ES:coverage_not_allowed) printf '%s' "Sistemak ez du estaldura aktiborik eta ezin da instalatu." ;;
+        eu_ES:platform_not_linux) printf '%s' "UUID hau Windows makina baterako erreserbatuta dago, ez Linuxerako." ;;
         eu_ES:uuid_reserved) printf '%s' "UUID RSMn gordeta dago eta instalatzeko eskuragarri" ;;
         eu_ES:uuid_same_system) printf '%s' "Sistema honekin dagoeneko lotuta dagoen UUID RSMn; agentea berriro aktibatu eta inbentarioa eguneratuko da" ;;
         eu_ES:uuid_validate_denied) printf '%s' "RSM-k ez du baimendu UUID baliozkotzea" ;;
@@ -1821,6 +1829,8 @@ t() {
         gl_ES:uuid_other_system) printf '%s' "Este UUID xa pertence a outro sistema en RSM." ;;
         gl_ES:uuid_other_system_local) printf '%s' "Este axente non se pode instalar na máquina local con ese UUID." ;;
         gl_ES:capacity_exceeded) printf '%s' "Non hai capacidade para outra máquina Linux. Amplía a capacidade en Firulai antes de instalar o axente." ;;
+        gl_ES:coverage_not_allowed) printf '%s' "O sistema non ten cobertura activa e non se pode instalar." ;;
+        gl_ES:platform_not_linux) printf '%s' "Este UUID está reservado para unha máquina Windows, non para Linux." ;;
         gl_ES:uuid_reserved) printf '%s' "UUID reservado en RSM e dispoñible para a instalación" ;;
         gl_ES:uuid_same_system) printf '%s' "UUID xa asociado a este sistema en RSM; reactivarase o axente e actualizarase o inventario" ;;
         gl_ES:uuid_validate_denied) printf '%s' "RSM non permitiu a validación UUID" ;;
@@ -1973,6 +1983,8 @@ t() {
         fr_FR:uuid_other_system) printf '%s' "Cet UUID appartient déjà à un autre système dans RSM." ;;
         fr_FR:uuid_other_system_local) printf '%s' "Cet agent ne peut pas être installé sur la machine locale avec cet UUID." ;;
         fr_FR:capacity_exceeded) printf '%s' "La capacité ne permet pas d'ajouter une autre machine Linux. Augmentez la capacité dans Firulai avant d'installer l'agent." ;;
+        fr_FR:coverage_not_allowed) printf '%s' "Le système ne dispose pas d'une couverture active et ne peut pas être installé." ;;
+        fr_FR:platform_not_linux) printf '%s' "Cet UUID est réservé à une machine Windows, pas à Linux." ;;
         fr_FR:uuid_reserved) printf '%s' "UUID réservé dans RSM et disponible pour l'installation" ;;
         fr_FR:uuid_same_system) printf '%s' "UUID déjà associé à ce système dans RSM ; l'agent sera réactivé et l'inventaire mis à jour" ;;
         fr_FR:uuid_validate_denied) printf '%s' "RSM n'a pas autorisé la validation de l'UUID" ;;
@@ -2125,6 +2137,8 @@ t() {
         de_DE:uuid_other_system) printf '%s' "Diese UUID gehört bereits zu einem anderen System in RSM." ;;
         de_DE:uuid_other_system_local) printf '%s' "Dieser Agent kann mit dieser UUID nicht auf dem lokalen Computer installiert werden." ;;
         de_DE:capacity_exceeded) printf '%s' "Es ist keine Kapazität für einen weiteren Linux-Rechner verfügbar. Erweitern Sie die Kapazität in Firulai, bevor Sie den Agenten installieren." ;;
+        de_DE:coverage_not_allowed) printf '%s' "Das System hat keine aktive Abdeckung und kann nicht installiert werden." ;;
+        de_DE:platform_not_linux) printf '%s' "Diese UUID ist für einen Windows-Rechner reserviert, nicht für Linux." ;;
         de_DE:uuid_reserved) printf '%s' "UUID ist im RSM reserviert und für die Installation verfügbar" ;;
         de_DE:uuid_same_system) printf '%s' "UUID ist diesem System in RSM bereits zugeordnet; Der Agent wird reaktiviert und der Bestand aktualisiert" ;;
         de_DE:uuid_validate_denied) printf '%s' "RSM hat keine UUID-Validierung zugelassen" ;;
@@ -2277,6 +2291,8 @@ t() {
         it_IT:uuid_other_system) printf '%s' "Questo UUID appartiene già a un altro sistema in RSM." ;;
         it_IT:uuid_other_system_local) printf '%s' "Questo agente non può essere installato sul computer locale con quell'UUID." ;;
         it_IT:capacity_exceeded) printf '%s' "Non c'è capacità per un'altra macchina Linux. Aumenta la capacità in Firulai prima di installare l'agente." ;;
+        it_IT:coverage_not_allowed) printf '%s' "Il sistema non dispone di copertura attiva e non può essere installato." ;;
+        it_IT:platform_not_linux) printf '%s' "Questo UUID è riservato a una macchina Windows, non a Linux." ;;
         it_IT:uuid_reserved) printf '%s' "UUID riservato in RSM e disponibile per l'installazione" ;;
         it_IT:uuid_same_system) printf '%s' "UUID già associato a questo sistema in RSM; l'agente verrà riattivato e l'inventario aggiornato" ;;
         it_IT:uuid_validate_denied) printf '%s' "RSM non ha consentito la convalida UUID" ;;
@@ -2429,6 +2445,8 @@ t() {
         ja_JP:uuid_other_system) printf '%s' "この UUID はすでに RSM 内の別のシステムに属しています。" ;;
         ja_JP:uuid_other_system_local) printf '%s' "このエージェントは、その UUID ではローカル マシンにインストールできません。" ;;
         ja_JP:capacity_exceeded) printf '%s' "別の Linux マシンを追加する容量がありません。エージェントをインストールする前に Firulai で容量を増やしてください。" ;;
+        ja_JP:coverage_not_allowed) printf '%s' "このシステムには有効なカバレッジがないため、インストールできません。" ;;
+        ja_JP:platform_not_linux) printf '%s' "この UUID は Linux ではなく Windows マシン用に予約されています。" ;;
         ja_JP:uuid_reserved) printf '%s' "RSM で予約されており、インストールに使用できる UUID" ;;
         ja_JP:uuid_same_system) printf '%s' "UUID はすでに RSM でこのシステムに関連付けられています。エージェントが再アクティブ化され、インベントリが更新されます" ;;
         ja_JP:uuid_validate_denied) printf '%s' "RSM は UUID 検証を許可しませんでした" ;;
@@ -2581,6 +2599,8 @@ t() {
         zh_CN:uuid_other_system) printf '%s' "该 UUID 已属于 RSM 中的另一个系统。" ;;
         zh_CN:uuid_other_system_local) printf '%s' "该代理无法安装在具有该 UUID 的本地计算机上。" ;;
         zh_CN:capacity_exceeded) printf '%s' "没有容量添加另一台 Linux 计算机。请先在 Firulai 中扩展容量，然后再安装代理。" ;;
+        zh_CN:coverage_not_allowed) printf '%s' "该系统没有有效覆盖，无法安装。" ;;
+        zh_CN:platform_not_linux) printf '%s' "此 UUID 为 Windows 计算机保留，不适用于 Linux。" ;;
         zh_CN:uuid_reserved) printf '%s' "RSM 中保留并可供安装的 UUID" ;;
         zh_CN:uuid_same_system) printf '%s' "UUID 已在 RSM 中与该系统关联；代理将被重新激活并更新库存" ;;
         zh_CN:uuid_validate_denied) printf '%s' "RSM 不允许 UUID 验证" ;;
@@ -2605,6 +2625,8 @@ t() {
         *:uuid_other_system) printf '%s' "This UUID already belongs to another system in RSM." ;;
         *:uuid_other_system_local) printf '%s' "This agent cannot be installed on the local machine with that UUID." ;;
         *:capacity_exceeded) printf '%s' "There is no capacity for another Linux machine. Increase capacity in Firulai before installing the agent." ;;
+        *:coverage_not_allowed) printf '%s' "The system does not have active coverage and cannot be installed." ;;
+        *:platform_not_linux) printf '%s' "This UUID is reserved for a Windows machine, not Linux." ;;
         *:local_installed_same_uuid) printf '%s' "This system already has an agent installed with this UUID." ;;
         *:existing_agent) printf '%s' "An existing agent installation was found on this system." ;;
         *:uninstall_current) printf '%s' "To install a new agent, uninstall the current one first:" ;;
@@ -2791,10 +2813,11 @@ load_api_module() {
 
 check_uuid_exists_in_rsm() {
     local payload response_file http_code exit_code response_body items_url
-    local uuid_match_count stored_hostname stored_fqdn current_hostname current_fqdn
+    local uuid_match_count stored_hostname stored_fqdn stored_os stored_coverage
+    local current_hostname current_fqdn
     response_file=$(make_private_temp_file "rsm_install_uuid_lookup_response") || exit 1
     items_url="${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php"
-    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$(json_escape "$UUID")\",\"operation\":\"=\"}]}"
+    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_OS_PROPERTY_ID\",\"$RSM_SYSTEM_COVERAGE_PROPERTY_ID\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$(json_escape "$UUID")\",\"operation\":\"=\"}]}"
 
     info "$(t validating_uuid)"
     set +e
@@ -2835,6 +2858,18 @@ check_uuid_exists_in_rsm() {
     fi
     if [ "$uuid_match_count" != "1" ]; then
         error "$(t uuid_validate_denied): ambiguous_uuid"
+        exit 1
+    fi
+
+    stored_coverage=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_COVERAGE_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
+    if [ "$stored_coverage" != "covered" ]; then
+        error "$(t coverage_not_allowed)"
+        exit 1
+    fi
+
+    stored_os=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_OS_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
+    if [ "$stored_os" != "linux" ]; then
+        error "$(t platform_not_linux)"
         exit 1
     fi
 
