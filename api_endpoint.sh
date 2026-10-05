@@ -77,3 +77,28 @@ rsm_request() {
         esac
     done
 }
+
+# Synchronous preflight for an already-installed agent. Return 0 for exactly
+# one System, 2 when missing, 3 when ambiguous, and 4 when RSM cannot be read.
+# Keep this separate from newServerData: that trigger acknowledges the queue,
+# not the later inventory result.
+rsm_check_system_uuid() {
+    local uuid="$1" token="$2" url payload response status body count
+    rsm_load_base || return 4
+    url="${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php"
+    payload="{\"itemTypeID\":\"191\",\"propertyIDs\":[\"1780\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"1780\",\"value\":\"$uuid\",\"operation\":\"=\"}]}"
+    response=$(rsm_curl --silent --show-error --location --max-redirs 5 \
+        --proto '=https' --proto-redir '=https' --request POST "$url" \
+        --header "Authorization: $token" --header 'Content-Type: application/json' \
+        --data "$payload" --max-time 20 --write-out $'\n%{http_code}') || return 4
+    status="${response##*$'\n'}"
+    body="${response%$'\n'*}"
+    [ "$status" = "200" ] && [ -n "$body" ] || return 4
+    if rsm_response_has_api_error "$body" || printf '%s' "$body" | grep -qE '"error"[[:space:]]*:'; then
+        return 4
+    fi
+    count=$(printf '%s' "$body" | grep -Eio "\"1780\"[[:space:]]*:[[:space:]]*\"$uuid\"" | wc -l | tr -d '[:space:]')
+    [ "$count" = "1" ] && return 0
+    [ "$count" = "0" ] && return 2
+    return 3
+}

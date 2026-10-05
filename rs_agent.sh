@@ -1761,6 +1761,21 @@ main() {
     fi
     echo "$(t trigger): $EXECUTION_TRIGGER"
     load_api_module || exit 1
+    if ! declare -F rsm_check_system_uuid >/dev/null; then
+        echo "$(t uuid_validate_failed): missing API module support" >&2
+        exit 1
+    fi
+    if rsm_check_system_uuid "$UUID_VAL" "$AGENT_TOKEN"; then
+        :
+    else
+        uuid_check_status=$?
+        case "$uuid_check_status" in
+            2) echo "$(t invalid_uuid_rsm)" >&2 ;;
+            3) echo "$(t uuid_validate_failed): ambiguous UUID" >&2 ;;
+            *) echo "$(t uuid_validate_failed)" >&2 ;;
+        esac
+        exit 1
+    fi
     check_for_updates
     if ! ensure_private_directory "$OUTPUT_DIR"; then
         exit 1
