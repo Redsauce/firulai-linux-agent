@@ -62,6 +62,16 @@ normalize_locale() {
 t() {
     local key="$1"
     case "$(normalize_locale "$AGENT_LOCALE"):$key" in
+        es_ES:runtime_not_allowed) printf '%s' "ERROR: El sistema debe estar activo y tener cobertura para enviar el inventario." ;;
+        ca_ES:runtime_not_allowed) printf '%s' "ERROR: El sistema ha d'estar actiu i tenir cobertura per enviar l'inventari." ;;
+        eu_ES:runtime_not_allowed) printf '%s' "ERROREA: Sistemak aktibo eta estaldurarekin egon behar du inbentarioa bidaltzeko." ;;
+        gl_ES:runtime_not_allowed) printf '%s' "ERRO: O sistema debe estar activo e ter cobertura para enviar o inventario." ;;
+        fr_FR:runtime_not_allowed) printf '%s' "ERREUR : Le système doit être actif et couvert pour envoyer l'inventaire." ;;
+        de_DE:runtime_not_allowed) printf '%s' "FEHLER: Das System muss aktiv sein und eine Abdeckung haben, um das Inventar zu senden." ;;
+        it_IT:runtime_not_allowed) printf '%s' "ERRORE: Il sistema deve essere attivo e coperto per inviare l'inventario." ;;
+        ja_JP:runtime_not_allowed) printf '%s' "エラー: インベントリを送信するには、システムが有効でカバレッジを持つ必要があります。" ;;
+        zh_CN:runtime_not_allowed) printf '%s' "错误：系统必须处于活动状态并具有覆盖才能发送清单。" ;;
+        *:runtime_not_allowed) printf '%s' "ERROR: The system must be active and covered to send inventory." ;;
         es_ES:flock_missing) printf '%s' "ERROR: flock no esta disponible; instala el paquete util-linux." ;;
         es_ES:already_running) printf '%s' "INFO: Ya hay otra ejecucion del agente en curso; se omite esta solicitud." ;;
         es_ES:unsafe_symlink) printf '%s' "ERROR: Ruta no segura: es un enlace simbolico" ;;
@@ -85,7 +95,7 @@ t() {
         es_ES:uuid_validate_safety) printf '%s' "Por seguridad, la instalacion no continuara sin confirmar que el UUID no pertenece a otro sistema." ;;
         es_ES:uuid_validate_denied) printf '%s' "ERROR: RSM no permitio validar el UUID antes de enviar el inventario" ;;
         es_ES:response) printf '%s' "Respuesta" ;;
-        es_ES:invalid_uuid_rsm) printf '%s' "ERROR: UUID invalido: no existe en RSM." ;;
+        es_ES:invalid_uuid_rsm) printf '%s' "No se ha podido validar el sistema. Comprueba el UUID y el token e inténtalo de nuevo." ;;
         es_ES:uuid_not_generated) printf '%s' "El inventario no se puede enviar con un UUID que no se haya generado desde Add New System." ;;
         es_ES:uuid_reserved) printf '%s' "UUID reservado en RSM y listo para instalar" ;;
         es_ES:uuid_same_system) printf '%s' "UUID ya asociado con este sistema; se actualizara su inventario" ;;
@@ -178,7 +188,7 @@ t() {
         ca_ES:uuid_validate_safety) printf '%s' "Per seguretat, la instal.lacio no continuara sense confirmar que l'UUID no pertany a un altre sistema." ;;
         ca_ES:uuid_validate_denied) printf '%s' "ERROR: RSM no ha permes validar l'UUID abans d'enviar l'inventari" ;;
         ca_ES:response) printf '%s' "Resposta" ;;
-        ca_ES:invalid_uuid_rsm) printf '%s' "ERROR: UUID no valid: no existeix a RSM." ;;
+        ca_ES:invalid_uuid_rsm) printf '%s' "No s'ha pogut validar el sistema. Comprova l'UUID i el token i torna-ho a provar." ;;
         ca_ES:uuid_not_generated) printf '%s' "L'inventari no es pot enviar amb un UUID que no s'hagi generat des d'Add New System." ;;
         ca_ES:uuid_reserved) printf '%s' "UUID reservat a RSM i preparat per instal.lar" ;;
         ca_ES:uuid_same_system) printf '%s' "UUID ja associat amb aquest sistema; se n'actualitzara l'inventari" ;;
@@ -280,7 +290,7 @@ t() {
         eu_ES:http_code) printf '%s' "HTTP kodea" ;;
         eu_ES:http_result) printf '%s' "HTTP emaitza:" ;;
         eu_ES:invalid_uuid) printf '%s' "ERROREA: UUID baliogabea" ;;
-        eu_ES:invalid_uuid_rsm) printf '%s' "ERROREA: UUID baliogabea: ez dago RSMn." ;;
+        eu_ES:invalid_uuid_rsm) printf '%s' "Ezin izan da sistema balioztatu. Egiaztatu UUIDa eta tokena eta saiatu berriro." ;;
         eu_ES:inventory_sent) printf '%s' "Inbentarioa behar bezala bidali da" ;;
         eu_ES:inventory_success) printf '%s' "Inbentarioa bildu eta behar bezala bidali da" ;;
         eu_ES:inventory_temp_failed) printf '%s' "ERROREA: ezin izan da aldi baterako inbentarioa sortu" ;;
@@ -372,7 +382,7 @@ t() {
         gl_ES:http_code) printf '%s' "Código HTTP" ;;
         gl_ES:http_result) printf '%s' "Resultado HTTP:" ;;
         gl_ES:invalid_uuid) printf '%s' "ERRO: UUID non válido" ;;
-        gl_ES:invalid_uuid_rsm) printf '%s' "ERRO: UUID non válido: non existe en RSM." ;;
+        gl_ES:invalid_uuid_rsm) printf '%s' "Non se puido validar o sistema. Comproba o UUID e o token e téntao de novo." ;;
         gl_ES:inventory_sent) printf '%s' "Inventario enviado correctamente" ;;
         gl_ES:inventory_success) printf '%s' "Inventario recompilado e enviado correctamente" ;;
         gl_ES:inventory_temp_failed) printf '%s' "ERRO: non se puido crear o inventario temporal" ;;
@@ -464,7 +474,7 @@ t() {
         fr_FR:http_code) printf '%s' "Code HTTP" ;;
         fr_FR:http_result) printf '%s' "Résultat HTTP :" ;;
         fr_FR:invalid_uuid) printf '%s' "ERREUR : UUID invalide" ;;
-        fr_FR:invalid_uuid_rsm) printf '%s' "ERREUR : UUID invalide : il n'existe pas dans RSM." ;;
+        fr_FR:invalid_uuid_rsm) printf '%s' "Impossible de valider le système. Vérifiez l'UUID et le jeton, puis réessayez." ;;
         fr_FR:inventory_sent) printf '%s' "Inventaire envoyé avec succès" ;;
         fr_FR:inventory_success) printf '%s' "Inventaire collecté et envoyé avec succès" ;;
         fr_FR:inventory_temp_failed) printf '%s' "ERREUR : Impossible de créer un inventaire temporaire dans" ;;
@@ -556,7 +566,7 @@ t() {
         de_DE:http_code) printf '%s' "HTTP-Code" ;;
         de_DE:http_result) printf '%s' "HTTP-Ergebnis:" ;;
         de_DE:invalid_uuid) printf '%s' "FEHLER: Ungültige UUID" ;;
-        de_DE:invalid_uuid_rsm) printf '%s' "FEHLER: Ungültige UUID: Sie existiert nicht in RSM." ;;
+        de_DE:invalid_uuid_rsm) printf '%s' "Das System konnte nicht validiert werden. Prüfen Sie UUID und Token und versuchen Sie es erneut." ;;
         de_DE:inventory_sent) printf '%s' "Inventar erfolgreich gesendet" ;;
         de_DE:inventory_success) printf '%s' "Inventar wurde erfolgreich erfasst und versendet" ;;
         de_DE:inventory_temp_failed) printf '%s' "FEHLER: Das temporäre Inventar konnte nicht erstellt werden" ;;
@@ -648,7 +658,7 @@ t() {
         it_IT:http_code) printf '%s' "Codice HTTP" ;;
         it_IT:http_result) printf '%s' "Risultato HTTP:" ;;
         it_IT:invalid_uuid) printf '%s' "ERRORE: UUID non valido" ;;
-        it_IT:invalid_uuid_rsm) printf '%s' "ERRORE: UUID non valido: non esiste in RSM." ;;
+        it_IT:invalid_uuid_rsm) printf '%s' "Impossibile convalidare il sistema. Controlla UUID e token e riprova." ;;
         it_IT:inventory_sent) printf '%s' "Inventario inviato con successo" ;;
         it_IT:inventory_success) printf '%s' "Inventario raccolto e inviato correttamente" ;;
         it_IT:inventory_temp_failed) printf '%s' "ERRORE: impossibile creare un inventario temporaneo in" ;;
@@ -740,7 +750,7 @@ t() {
         ja_JP:http_code) printf '%s' "HTTPコード" ;;
         ja_JP:http_result) printf '%s' "HTTP 結果:" ;;
         ja_JP:invalid_uuid) printf '%s' "エラー: 無効な UUID" ;;
-        ja_JP:invalid_uuid_rsm) printf '%s' "エラー: 無効な UUID: RSM に存在しません。" ;;
+        ja_JP:invalid_uuid_rsm) printf '%s' "システムを検証できませんでした。UUID とトークンを確認して再試行してください。" ;;
         ja_JP:inventory_sent) printf '%s' "在庫は正常に送信されました" ;;
         ja_JP:inventory_success) printf '%s' "在庫が正常に収集され、送信されました" ;;
         ja_JP:inventory_temp_failed) printf '%s' "エラー: に一時在庫を作成できませんでした" ;;
@@ -832,7 +842,7 @@ t() {
         zh_CN:http_code) printf '%s' "HTTP 代码" ;;
         zh_CN:http_result) printf '%s' "HTTP 结果：" ;;
         zh_CN:invalid_uuid) printf '%s' "错误：UUID 无效" ;;
-        zh_CN:invalid_uuid_rsm) printf '%s' "错误：UUID 无效：RSM 中不存在。" ;;
+        zh_CN:invalid_uuid_rsm) printf '%s' "无法验证系统。请检查 UUID 和令牌，然后重试。" ;;
         zh_CN:inventory_sent) printf '%s' "库存发送成功" ;;
         zh_CN:inventory_success) printf '%s' "库存已收集并已成功发送" ;;
         zh_CN:inventory_temp_failed) printf '%s' "错误：无法创建临时库存" ;;
@@ -915,7 +925,7 @@ t() {
         *:uuid_validate_safety) printf '%s' "For safety, installation will not continue without confirming that the UUID does not belong to another system." ;;
         *:uuid_validate_denied) printf '%s' "ERROR: RSM did not allow UUID validation before sending inventory" ;;
         *:response) printf '%s' "Response" ;;
-        *:invalid_uuid_rsm) printf '%s' "ERROR: Invalid UUID: it does not exist in RSM." ;;
+        *:invalid_uuid_rsm) printf '%s' "Could not validate the system. Check the UUID and token and try again." ;;
         *:uuid_not_generated) printf '%s' "Inventory cannot be sent with a UUID that was not generated from Add New System." ;;
         *:uuid_reserved) printf '%s' "UUID reserved in RSM and ready to install" ;;
         *:uuid_same_system) printf '%s' "UUID already associated with this system; its inventory will be updated" ;;
@@ -1620,6 +1630,7 @@ download_update() {
 
 send_to_rsm() {
     local inventory_json="$1"
+    validate_runtime_system || return 1
     local inventory_json_path
     local response_file
     local response_headers_file
@@ -1743,6 +1754,25 @@ send_to_rsm() {
     return 0
 }
 
+validate_runtime_system() {
+    local check_status
+    if [ "${RSM_RUNTIME_ELIGIBILITY_VERSION:-0}" != "1" ]; then
+        echo "$(t uuid_validate_failed): api_endpoint.sh" >&2
+        return 1
+    fi
+    if rsm_check_system_uuid "$UUID_VAL" "$AGENT_TOKEN"; then
+        return 0
+    else
+        check_status=$?
+    fi
+    case "$check_status" in
+        2) echo "$(t invalid_uuid_rsm)" >&2 ;;
+        5|6) echo "$(t runtime_not_allowed)" >&2 ;;
+        *) echo "$(t uuid_validate_failed)" >&2 ;;
+    esac
+    return 1
+}
+
 # ============ MAIN ============
 
 main() {
@@ -1761,6 +1791,11 @@ main() {
     fi
     echo "$(t trigger): $EXECUTION_TRIGGER"
     load_api_module || exit 1
+    if ! declare -F rsm_check_system_uuid >/dev/null; then
+        echo "$(t uuid_validate_failed): missing API module support" >&2
+        exit 1
+    fi
+    validate_runtime_system || exit 1
     check_for_updates
     if ! ensure_private_directory "$OUTPUT_DIR"; then
         exit 1

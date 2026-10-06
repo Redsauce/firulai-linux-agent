@@ -38,6 +38,15 @@ bash -n install.sh rs_agent.sh rs_agent_runner.sh uninstall.sh
 
 ## Semantic Lifecycle
 
+Before collection and again before upload, the installed agent synchronously
+checks that its UUID exists exactly once, is active and is covered. Account 6956
+retains its temporary coverage exception only. Rejected runs do not send
+inventory or record success. The updated agent requires the matching
+`api_endpoint.sh` module; an older module fails closed.
+
+After requesting activation, the installer waits for RSM to confirm it before
+starting inventory. This also applies when retrying an existing installation.
+
 Linux uses the same receiver events as the Windows agent:
 
 Before dispatching those events, the installer performs a synchronous,
