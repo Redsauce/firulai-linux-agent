@@ -3027,6 +3027,10 @@ retry_local_agent_installation() {
     # UUID still exists, remains covered, targets Linux and belongs to this
     # machine. This preserves safe recovery without accepting deleted UUIDs.
     if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
+        # A successful inventory upload does not reactivate a disconnected
+        # System. The local retry must request the same lifecycle transition
+        # as a fresh installation before reporting again.
+        update_rsm_system_on_install
         info "$(t running_initial)"
         set +e
         RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \
@@ -3058,10 +3062,8 @@ update_rsm_system_on_install() {
     local payload response_file http_code exit_code response_body
 
     # The Events Handler can acknowledge an accepted asynchronous request with
-    # an empty body. An explicit not_found result has already stopped install.
-    if [ -z "$UUID_VALIDATION_RESULT" ]; then
-        return 0
-    fi
+    # an empty body. The synchronous UUID lookup already confirmed identity,
+    # so an empty validation result must not skip the activation request.
 
     response_file=$(make_private_temp_file "rsm_install_system_update_response") || {
         error "$(t activate_failed)"
