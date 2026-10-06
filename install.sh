@@ -3027,6 +3027,12 @@ retry_local_agent_installation() {
     # machine. This preserves safe recovery without accepting deleted UUIDs.
     if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
         update_rsm_system_on_install
+        # Reinstalling the same UUID must run the downloaded version, while
+        # retaining the existing state, credentials and scheduler configuration.
+        install -m 644 "$API_MODULE_FILE" "$INSTALL_DIR/api_endpoint.sh" || exit 1
+        download_agent
+        download_runner
+        download_uninstaller
         info "$(t running_initial)"
         set +e
         RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \

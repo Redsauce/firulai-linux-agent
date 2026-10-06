@@ -1592,8 +1592,8 @@ check_for_updates() {
 
     # Extract "tag_name" from JSON without jq: find the "tag_name":"vX.Y.Z" pattern
     latest_version=$(printf '%s' "$response" \
-        | grep -o '"tag_name":"[^"]*"' \
-        | sed 's/"tag_name":"v\?//;s/"//')
+        | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | sed -E 's/.*:[[:space:]]*"v?([^"]*)".*/\1/')
 
     [ -z "$latest_version" ] && return 0
     [ "$latest_version" = "$AGENT_VERSION" ] && return 0

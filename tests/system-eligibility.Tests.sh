@@ -89,4 +89,32 @@ case "$lookup_output" in
     *) echo 'Expected generic validation failure' >&2; exit 1 ;;
 esac
 passed=$((passed+1))
+# Same-UUID reinstall refreshes executable files but keeps existing state.
+upgrade_fixture=$(mktemp -d)
+INSTALL_DIR="$upgrade_fixture"
+API_MODULE_FILE="$upgrade_fixture/module-candidate"
+printf 'RSM_RUNTIME_ELIGIBILITY_VERSION=1\n' > "$API_MODULE_FILE"
+printf '#!/bin/bash\necho old-version\n' > "$INSTALL_DIR/rs_agent.sh"
+printf 'preserved-state\n' > "$INSTALL_DIR/state.env"
+LOCAL_AGENT_RETRY=1
+source <(awk '/^retry_local_agent_installation\(\) \{$/{capture=1} capture{print} capture && /^}$/{capture=0}' "$test_dir/../install.sh")
+update_rsm_system_on_install() { :; }
+download_agent() { printf '#!/bin/bash\necho candidate-version\n' > "$INSTALL_DIR/rs_agent.sh"; }
+download_runner() { :; }
+download_uninstaller() { :; }
+log() { :; }
+if ! upgrade_output=$(retry_local_agent_installation); then exit 1; fi
+[ "$upgrade_output" = "candidate-version" ] || exit 1
+[ "$(cat "$INSTALL_DIR/state.env")" = "preserved-state" ] || exit 1
+grep -q '^RSM_RUNTIME_ELIGIBILITY_VERSION=1$' "$INSTALL_DIR/api_endpoint.sh" || exit 1
+passed=$((passed+1))
+# GitHub returns formatted JSON; a future release must still be detected.
+CONFIG_FILE="$upgrade_fixture/no-config"
+curl() { printf '{"tag_name": "0.4.2"}'; }
+download_update() { printf 'update-detected'; }
+update_output=$(check_for_updates)
+case "$update_output" in *update-detected*) ;; *) exit 1 ;; esac
+passed=$((passed+1))
+rm -f "$upgrade_fixture/rs_agent.sh" "$upgrade_fixture/api_endpoint.sh" "$upgrade_fixture/module-candidate" "$upgrade_fixture/state.env"
+rmdir "$upgrade_fixture"
 printf '%s Linux eligibility checks passed.\n' "$passed"
