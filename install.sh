@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # Firulai Inventory Agent - One-liner installer
-# Version 0.2.4 - Missed execution recovery with systemd/cron
+# Version 0.2.5 - Validate activation before initial inventory
 # ============================================================================
 #
 # Usage:
@@ -969,7 +969,7 @@ make_private_temp_file() {
 banner() {
     echo ""
     echo "============================================================================"
-    printf '  Firulai Inventory Agent - %s v0.2.4\n' "$(t installer_title)"
+    printf '  Firulai Inventory Agent - %s v0.2.5\n' "$(t installer_title)"
     printf '  %s\n' "$(t banner_subtitle)"
     echo "============================================================================"
     echo ""
@@ -1283,7 +1283,7 @@ t() {
         es_ES:mktemp_missing_install) printf '%s' "mktemp no esta instalado" ;;
         es_ES:mktemp_found) printf '%s' "mktemp encontrado" ;;
         es_ES:invalid_uuid_local) printf '%s' "no es un UUID valido" ;;
-        es_ES:rsm_item_missing) printf '%s' "No se pudo localizar el item de RSM asociado al UUID." ;;
+        es_ES:rsm_item_missing) printf '%s' "No se ha podido validar el sistema. Comprueba el UUID y el token e inténtalo de nuevo." ;;
         es_ES:rsm_status_safety) printf '%s' "Por seguridad, la instalacion no continuara sin poder actualizar el estado." ;;
         es_ES:root_existing) printf '%s' "Se ha encontrado una instalacion root existente en /opt/rs-agent o /var/lib/rs-agent." ;;
         es_ES:root_coexist) printf '%s' "La instalacion sin root coexistira con ella usando rutas del usuario actual." ;;
@@ -1496,7 +1496,7 @@ t() {
         ca_ES:root_cron_configured) printf '%s' "Cron de root configurat amb execució diària i recuperació automàtica" ;;
         ca_ES:root_crontab_failed) printf '%s' "No s'ha pogut actualitzar el crontab root" ;;
         ca_ES:root_existing) printf '%s' "S'ha trobat una instal·lació arrel existent a /opt/rs-agent o /var/lib/rs-agent." ;;
-        ca_ES:rsm_item_missing) printf '%s' "No s'ha pogut localitzar l'element RSM associat a l'UUID." ;;
+        ca_ES:rsm_item_missing) printf '%s' "No s'ha pogut validar el sistema. Comprova l'UUID i el token i torna-ho a provar." ;;
         ca_ES:rsm_manages_changes) printf '%s' "RSM detecta i gestiona els canvis" ;;
         ca_ES:rsm_status_safety) printf '%s' "Per seguretat, la instal·lació no continuarà sense poder actualitzar l'estat." ;;
         ca_ES:runner_downloaded) printf '%s' "Runner descarregat" ;;
@@ -1625,7 +1625,7 @@ t() {
         eu_ES:root_crontab_failed) printf '%s' "Ezin izan da root crontab eguneratu" ;;
         eu_ES:root_existing) printf '%s' "Lehendik dagoen root instalazio bat aurkitu da /opt/rs-agent edo /var/lib/rs-agent-en." ;;
         eu_ES:root_mode) printf '%s' "Erro/sistemaren instalazio modua hautatuta; sistemaren bideak erabiliko dira." ;;
-        eu_ES:rsm_item_missing) printf '%s' "Ezin izan da UUIDarekin lotutako RSM elementua aurkitu." ;;
+        eu_ES:rsm_item_missing) printf '%s' "Ezin izan da sistema balioztatu. Egiaztatu UUIDa eta tokena eta saiatu berriro." ;;
         eu_ES:rsm_manages_changes) printf '%s' "RSM-k aldaketak hautematen eta kudeatzen ditu" ;;
         eu_ES:rsm_status_safety) printf '%s' "Segurtasunagatik, instalazioak ez du jarraituko egoera eguneratu gabe." ;;
         eu_ES:runner_downloaded) printf '%s' "Korrikalari deskargatu da" ;;
@@ -1779,7 +1779,7 @@ t() {
         gl_ES:root_crontab_failed) printf '%s' "Non se puido actualizar o root crontab" ;;
         gl_ES:root_existing) printf '%s' "Atopouse unha instalación raíz existente en /opt/rs-agent ou /var/lib/rs-agent." ;;
         gl_ES:root_mode) printf '%s' "Modo de instalación raíz/sistema seleccionado; utilizaranse as rutas do sistema." ;;
-        gl_ES:rsm_item_missing) printf '%s' "Non se puido localizar o elemento RSM asociado co UUID." ;;
+        gl_ES:rsm_item_missing) printf '%s' "Non se puido validar o sistema. Comproba o UUID e o token e téntao de novo." ;;
         gl_ES:rsm_manages_changes) printf '%s' "RSM detecta e xestiona os cambios" ;;
         gl_ES:rsm_status_safety) printf '%s' "Por seguridade, a instalación non continuará sen poder actualizar o estado." ;;
         gl_ES:runner_downloaded) printf '%s' "Runner descargado" ;;
@@ -1933,7 +1933,7 @@ t() {
         fr_FR:root_crontab_failed) printf '%s' "Impossible de mettre à jour la crontab racine" ;;
         fr_FR:root_existing) printf '%s' "Une installation racine existante a été trouvée dans /opt/rs-agent ou /var/lib/rs-agent." ;;
         fr_FR:root_mode) printf '%s' "Mode d'installation racine/système sélectionné ; les chemins du système seront utilisés." ;;
-        fr_FR:rsm_item_missing) printf '%s' "Impossible de localiser l'élément RSM associé à l'UUID." ;;
+        fr_FR:rsm_item_missing) printf '%s' "Impossible de valider le système. Vérifiez l'UUID et le jeton, puis réessayez." ;;
         fr_FR:rsm_manages_changes) printf '%s' "RSM détecte et gère les changements" ;;
         fr_FR:rsm_status_safety) printf '%s' "Pour des raisons de sécurité, l'installation ne continuera pas sans pouvoir mettre à jour l'état." ;;
         fr_FR:runner_downloaded) printf '%s' "Coureur téléchargé" ;;
@@ -2087,7 +2087,7 @@ t() {
         de_DE:root_crontab_failed) printf '%s' "Root-Crontab konnte nicht aktualisiert werden" ;;
         de_DE:root_existing) printf '%s' "Eine vorhandene Root-Installation wurde in /opt/rs-agent oder /var/lib/rs-agent gefunden." ;;
         de_DE:root_mode) printf '%s' "Root-/Systeminstallationsmodus ausgewählt; Es werden Systempfade verwendet." ;;
-        de_DE:rsm_item_missing) printf '%s' "Das mit der UUID verknüpfte RSM-Element konnte nicht gefunden werden." ;;
+        de_DE:rsm_item_missing) printf '%s' "Das System konnte nicht validiert werden. Prüfen Sie UUID und Token und versuchen Sie es erneut." ;;
         de_DE:rsm_manages_changes) printf '%s' "RSM erkennt und verwaltet Änderungen" ;;
         de_DE:rsm_status_safety) printf '%s' "Aus Sicherheitsgründen wird die Installation nicht fortgesetzt, ohne dass der Status aktualisiert werden kann." ;;
         de_DE:runner_downloaded) printf '%s' "Runner heruntergeladen" ;;
@@ -2241,7 +2241,7 @@ t() {
         it_IT:root_crontab_failed) printf '%s' "Impossibile aggiornare crontab root" ;;
         it_IT:root_existing) printf '%s' "È stata trovata un'installazione root esistente in /opt/rs-agent o /var/lib/rs-agent." ;;
         it_IT:root_mode) printf '%s' "Modalità di installazione root/sistema selezionata; verranno utilizzati i percorsi di sistema." ;;
-        it_IT:rsm_item_missing) printf '%s' "Impossibile individuare l'elemento RSM associato all'UUID." ;;
+        it_IT:rsm_item_missing) printf '%s' "Impossibile convalidare il sistema. Controlla UUID e token e riprova." ;;
         it_IT:rsm_manages_changes) printf '%s' "RSM rileva e gestisce le modifiche" ;;
         it_IT:rsm_status_safety) printf '%s' "Per motivi di sicurezza, l'installazione non proseguirà senza la possibilità di aggiornare lo stato." ;;
         it_IT:runner_downloaded) printf '%s' "Scaricato il corridore" ;;
@@ -2395,7 +2395,7 @@ t() {
         ja_JP:root_crontab_failed) printf '%s' "ルートの crontab を更新できませんでした" ;;
         ja_JP:root_existing) printf '%s' "既存のルート インストールが /opt/rs-agent または /var/lib/rs-agent に見つかりました。" ;;
         ja_JP:root_mode) printf '%s' "ルート/システム インストール モードが選択されています。システムパスが使用されます。" ;;
-        ja_JP:rsm_item_missing) printf '%s' "UUID に関連付けられた RSM アイテムが見つかりませんでした。" ;;
+        ja_JP:rsm_item_missing) printf '%s' "システムを検証できませんでした。UUID とトークンを確認して再試行してください。" ;;
         ja_JP:rsm_manages_changes) printf '%s' "RSM は変更を検出して管理します" ;;
         ja_JP:rsm_status_safety) printf '%s' "安全のため、ステータスを更新できない限りインストールは続行されません。" ;;
         ja_JP:runner_downloaded) printf '%s' "ランナーをダウンロードしました" ;;
@@ -2549,7 +2549,7 @@ t() {
         zh_CN:root_crontab_failed) printf '%s' "无法更新 root crontab" ;;
         zh_CN:root_existing) printf '%s' "在 /opt/rs-agent 或 /var/lib/rs-agent 中找到了现有的 root 安装。" ;;
         zh_CN:root_mode) printf '%s' "选择root/系统安装模式；将使用系统路径。" ;;
-        zh_CN:rsm_item_missing) printf '%s' "无法找到与 UUID 关联的 RSM 项目。" ;;
+        zh_CN:rsm_item_missing) printf '%s' "无法验证系统。请检查 UUID 和令牌，然后重试。" ;;
         zh_CN:rsm_manages_changes) printf '%s' "RSM 检测并管理变更" ;;
         zh_CN:rsm_status_safety) printf '%s' "为了安全起见，如果无法更新状态，安装将不会继续。" ;;
         zh_CN:runner_downloaded) printf '%s' "跑步者下载" ;;
@@ -2748,7 +2748,7 @@ t() {
         *:root_cron_configured) printf '%s' "Root cron configured with daily execution and automatic recovery" ;;
         *:root_crontab_failed) printf '%s' "Could not update root crontab" ;;
         *:root_existing) printf '%s' "An existing root installation was found in /opt/rs-agent or /var/lib/rs-agent." ;;
-        *:rsm_item_missing) printf '%s' "Could not locate the RSM item associated with the UUID." ;;
+        *:rsm_item_missing) printf '%s' "Could not validate the system. Check the UUID and token and try again." ;;
         *:rsm_manages_changes) printf '%s' "RSM detects and manages changes" ;;
         *:rsm_status_safety) printf '%s' "For safety, installation will not continue without being able to update the status." ;;
         *:runner_downloaded) printf '%s' "Runner downloaded" ;;
@@ -2854,7 +2854,6 @@ check_uuid_exists_in_rsm() {
     uuid_match_count=$(printf '%s' "$response_body" | grep -Eio "\"$RSM_SYSTEM_UUID_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"$UUID\"" | wc -l | tr -d '[:space:]')
     if [ "$uuid_match_count" = "0" ]; then
         error "$(t rsm_item_missing)"
-        error "$(t uuid_conflict_hint)"
         exit 1
     fi
     if [ "$uuid_match_count" != "1" ]; then
@@ -3027,6 +3026,7 @@ retry_local_agent_installation() {
     # UUID still exists, remains covered, targets Linux and belongs to this
     # machine. This preserves safe recovery without accepting deleted UUIDs.
     if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
+        update_rsm_system_on_install
         info "$(t running_initial)"
         set +e
         RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \
@@ -3059,9 +3059,6 @@ update_rsm_system_on_install() {
 
     # The Events Handler can acknowledge an accepted asynchronous request with
     # an empty body. An explicit not_found result has already stopped install.
-    if [ -z "$UUID_VALIDATION_RESULT" ]; then
-        return 0
-    fi
 
     response_file=$(make_private_temp_file "rsm_install_system_update_response") || {
         error "$(t activate_failed)"
@@ -3115,7 +3112,20 @@ update_rsm_system_on_install() {
         exit 1
     fi
 
-    log "$(t activated)"
+    # Do not start inventory until the asynchronous activation has taken effect.
+    local activation_attempt activation_check_status
+    for ((activation_attempt=0; activation_attempt<30; activation_attempt++)); do
+        if rsm_check_system_uuid "$UUID" "$AGENT_TOKEN"; then
+            log "$(t activated)"
+            return 0
+        else
+            activation_check_status=$?
+        fi
+        [ "$activation_check_status" = "5" ] || break
+        sleep 1
+    done
+    error "$(t activate_failed)"
+    exit 1
 }
 
 cron_daemon_active() {

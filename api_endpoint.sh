@@ -1,6 +1,7 @@
 #!/bin/bash
 # Shared by installation, inventory and uninstallation. No test URLs here.
 RSM_API_PATH='commands_RSM/api/api.php'
+RSM_RUNTIME_ELIGIBILITY_VERSION=1
 
 rsm_valid_base() {
     [[ "$1" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?/$ ]]
@@ -79,14 +80,15 @@ rsm_request() {
 }
 
 # Synchronous preflight for an already-installed agent. Return 0 for exactly
-# one System, 2 when missing, 3 when ambiguous, and 4 when RSM cannot be read.
+# one active, covered System; 2 when missing, 3 when ambiguous, 4 when unreadable,
+# 5 when inactive, and 6 when uncovered. Account 6956 bypasses coverage only.
 # Keep this separate from newServerData: that trigger acknowledges the queue,
 # not the later inventory result.
 rsm_check_system_uuid() {
-    local uuid="$1" token="$2" url payload response status body count
+    local uuid="$1" token="$2" url payload response status body count lifecycle coverage account
     rsm_load_base || return 4
     url="${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php"
-    payload="{\"itemTypeID\":\"191\",\"propertyIDs\":[\"1780\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"1780\",\"value\":\"$uuid\",\"operation\":\"=\"}]}"
+    payload="{\"itemTypeID\":\"191\",\"propertyIDs\":[\"1780\",\"1751\",\"1972\",\"1785\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"1780\",\"value\":\"$uuid\",\"operation\":\"=\"}]}"
     response=$(rsm_curl --silent --show-error --location --max-redirs 5 \
         --proto '=https' --proto-redir '=https' --request POST "$url" \
         --header "Authorization: $token" --header 'Content-Type: application/json' \
@@ -98,7 +100,13 @@ rsm_check_system_uuid() {
         return 4
     fi
     count=$(printf '%s' "$body" | grep -Eio "\"1780\"[[:space:]]*:[[:space:]]*\"$uuid\"" | wc -l | tr -d '[:space:]')
-    [ "$count" = "1" ] && return 0
     [ "$count" = "0" ] && return 2
-    return 3
+    [ "$count" = "1" ] || return 3
+    lifecycle=$(printf '%s' "$body" | sed -n 's/.*"1751"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tr '[:upper:]' '[:lower:]')
+    case "$lifecycle" in activo|active|connected) ;; *) return 5 ;; esac
+    coverage=$(printf '%s' "$body" | sed -n 's/.*"1972"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tr '[:upper:]' '[:lower:]')
+    account=$(printf '%s' "$body" | sed -n 's/.*"1785"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    [ -n "$account" ] || return 4
+    [ "$account" = "6956" ] || [ "$coverage" = "covered" ] || return 6
+    return 0
 }
