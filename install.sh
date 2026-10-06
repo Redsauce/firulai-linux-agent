@@ -542,6 +542,7 @@ RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
 RSM_SYSTEM_UUID_PROPERTY_ID="1780"
 RSM_SYSTEM_OS_PROPERTY_ID="1752"
 RSM_SYSTEM_COVERAGE_PROPERTY_ID="1972"
+RSM_SYSTEM_CLIENT_PROPERTY_ID="1785"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -2814,11 +2815,11 @@ load_api_module() {
 
 check_uuid_exists_in_rsm() {
     local payload response_file http_code exit_code response_body items_url
-    local uuid_match_count stored_hostname stored_fqdn stored_os stored_coverage
+    local uuid_match_count stored_hostname stored_fqdn stored_os stored_coverage stored_client
     local current_hostname current_fqdn
     response_file=$(make_private_temp_file "rsm_install_uuid_lookup_response") || exit 1
     items_url="${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php"
-    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_OS_PROPERTY_ID\",\"$RSM_SYSTEM_COVERAGE_PROPERTY_ID\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$(json_escape "$UUID")\",\"operation\":\"=\"}]}"
+    payload="{\"itemTypeID\":\"$RSM_SYSTEM_ITEM_TYPE_ID\",\"propertyIDs\":[\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\",\"$RSM_SYSTEM_FQDN_PROPERTY_ID\",\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"$RSM_SYSTEM_OS_PROPERTY_ID\",\"$RSM_SYSTEM_COVERAGE_PROPERTY_ID\",\"$RSM_SYSTEM_CLIENT_PROPERTY_ID\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"$RSM_SYSTEM_UUID_PROPERTY_ID\",\"value\":\"$(json_escape "$UUID")\",\"operation\":\"=\"}]}"
 
     info "$(t validating_uuid)"
     set +e
@@ -2862,16 +2863,18 @@ check_uuid_exists_in_rsm() {
     fi
 
     stored_coverage=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_COVERAGE_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
-    if [ "$stored_coverage" != "covered" ]; then
+    stored_client=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_CLIENT_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1)
+    if [ "$stored_coverage" != "covered" ] && [ "$stored_client" != "6956" ]; then
         error "$(t coverage_not_allowed)"
         exit 1
     fi
 
     stored_os=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_OS_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
-    if [ "$stored_os" != "linux" ]; then
-        error "$(t uuid_occupied)"
-        exit 1
-    fi
+    case "$stored_os" in
+        *windows*) error "$(t uuid_occupied)"; exit 1 ;;
+        linux|*linux*|ubuntu*|debian*|rhel*|centos*|fedora*|rocky*|alma*|suse*|opensuse*|arch*|gentoo*|raspbian*) ;;
+        *) error "$(t uuid_occupied)"; exit 1 ;;
+    esac
 
     stored_hostname=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_HOSTNAME_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
     stored_fqdn=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_FQDN_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')

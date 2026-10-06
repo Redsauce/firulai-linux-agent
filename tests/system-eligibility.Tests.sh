@@ -62,6 +62,7 @@ RSM_SYSTEM_FQDN_PROPERTY_ID=1750
 RSM_SYSTEM_UUID_PROPERTY_ID=1780
 RSM_SYSTEM_OS_PROPERTY_ID=1752
 RSM_SYSTEM_COVERAGE_PROPERTY_ID=1972
+RSM_SYSTEM_CLIENT_PROPERTY_ID=1785
 AGENT_TOKEN=token-client-A
 UUID="$uuid"
 AGENT_LOCALE=es_ES
@@ -69,6 +70,7 @@ RSM_BASE_URL='https://example.invalid/AppController/'
 make_private_temp_file() { mktemp; }
 info() { :; }
 error() { printf '%s\n' "$*" >&2; }
+installer_fixture='[]'
 curl() {
     local output="" request_args="$*"
     case "$request_args" in *"Authorization: token-client-A"*) ;; *) return 99 ;; esac
@@ -77,7 +79,7 @@ curl() {
         shift
     done
     [ -n "$output" ] || return 99
-    printf '[]' > "$output"
+    printf '%s' "$installer_fixture" > "$output"
     printf '200'
 }
 if lookup_output=$( (set +o pipefail; check_uuid_exists_in_rsm) 2>&1 ); then
@@ -90,6 +92,21 @@ case "$lookup_output" in
 esac
 passed=$((passed+1))
 # Same-UUID reinstall refreshes executable files but keeps existing state.
+# Existing installations report the detected distribution instead of "Linux".
+local_system_hostname() { printf sonarqube; }
+local_system_fqdn() { printf sonarqube.example.test; }
+installer_fixture="[{\"1780\":\"$uuid\",\"1752\":\"Ubuntu\",\"1749\":\"sonarqube\",\"1750\":\"sonarqube.example.test\",\"1972\":\"covered\",\"1785\":\"6974\"}]"
+(set +o pipefail; check_uuid_exists_in_rsm) || exit 1
+passed=$((passed+1))
+installer_fixture="[{\"1780\":\"$uuid\",\"1752\":\"Debian GNU/Linux\",\"1749\":\"sonarqube\",\"1750\":\"sonarqube.example.test\",\"1972\":\"covered\",\"1785\":\"6974\"}]"
+(set +o pipefail; check_uuid_exists_in_rsm) || exit 1
+passed=$((passed+1))
+installer_fixture="[{\"1780\":\"$uuid\",\"1752\":\"Windows 10 Pro\",\"1749\":\"sonarqube\",\"1972\":\"covered\",\"1785\":\"6974\"}]"
+if (set +o pipefail; check_uuid_exists_in_rsm) >/dev/null 2>&1; then exit 1; fi
+passed=$((passed+1))
+installer_fixture="[{\"1780\":\"$uuid\",\"1752\":\"Ubuntu\",\"1749\":\"sonarqube\",\"1972\":\"uncovered\",\"1785\":\"6956\"}]"
+(set +o pipefail; check_uuid_exists_in_rsm) || exit 1
+passed=$((passed+1))
 upgrade_fixture=$(mktemp -d)
 INSTALL_DIR="$upgrade_fixture"
 API_MODULE_FILE="$upgrade_fixture/module-candidate"
@@ -110,7 +127,7 @@ grep -q '^RSM_RUNTIME_ELIGIBILITY_VERSION=1$' "$INSTALL_DIR/api_endpoint.sh" || 
 passed=$((passed+1))
 # GitHub returns formatted JSON; a future release must still be detected.
 CONFIG_FILE="$upgrade_fixture/no-config"
-curl() { printf '{"tag_name": "0.4.2"}'; }
+curl() { printf '{"tag_name": "0.4.3"}'; }
 download_update() { printf 'update-detected'; }
 update_output=$(check_for_updates)
 case "$update_output" in *update-detected*) ;; *) exit 1 ;; esac
