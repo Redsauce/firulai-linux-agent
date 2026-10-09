@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.2"
+AGENT_VERSION="0.4.3"
 GITHUB_API_URL="https://api.github.com/repos/Redsauce/firulai-linux-agent/releases/latest"
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/rs_agent.sh}"
 
@@ -1081,6 +1081,16 @@ json_escape() {
     s="${s//$'\n'/\\n}"
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
+    # Bash strings cannot contain NUL. Escape every remaining JSON control byte.
+    if [[ "$s" == *[$'\001'-$'\037']* ]]; then
+        local code character escaped index
+        for ((index = 1; index < 32; index++)); do
+            printf -v code '%02x' "$index"
+            printf -v character '%b' "\\x$code"
+            escaped="\\u00$code"
+            s="${s//"$character"/"$escaped"}"
+        done
+    fi
     printf '%s' "$s"
 }
 
