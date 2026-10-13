@@ -27,7 +27,12 @@ Tambien comprueba que una release con una version distinta de la anunciada no
 modifica el agente instalado.
 
 Los cambios locales deben publicarse en el repositorio oficial y en una release
-cuyo tag y `AGENT_VERSION` coincidan para distribuirse. No se ha publicado nada.
-Falta validar una actualizacion completa en un equipo Linux real. Este mecanismo
+cuyo tag y `AGENT_VERSION` coincidan para distribuirse. La release 0.4.3 ya esta
+publicada. Se ha probado en Docker Linux la deteccion desde 0.4.2 y la descarga
+real de 0.4.3 desde GitHub, conservando configuracion y ejecutable anterior.
+Tambien se ha validado la descarga del tag concreto con el actualizador nuevo.
+`scripts/test_published_update.sh` reproduce esta prueba, interceptando el
+reinicio para no enviar un inventario ficticio a RSM.
+Falta validar una ejecucion completa tras actualizar un equipo Linux real. Este mecanismo
 no incorpora la firma RSA del actualizador Windows ni una transaccion completa
 de todos los scripts ante un corte de corriente.
