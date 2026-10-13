@@ -127,7 +127,7 @@ grep -q '^RSM_RUNTIME_ELIGIBILITY_VERSION=1$' "$INSTALL_DIR/api_endpoint.sh" || 
 passed=$((passed+1))
 # GitHub returns formatted JSON; a future release must still be detected.
 CONFIG_FILE="$upgrade_fixture/no-config"
-curl() { printf '{"tag_name": "0.4.3"}'; }
+curl() { printf '{"tag_name": "0.99.0"}'; }
 download_update() { printf 'update-detected'; }
 update_output=$(check_for_updates)
 case "$update_output" in *update-detected*) ;; *) exit 1 ;; esac

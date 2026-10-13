@@ -1591,38 +1591,57 @@ load_api_module() {
     rsm_load_base
 }
 
+is_newer_version() {
+    local candidate="$1" installed="$2" index
+    local -a newer older
+    [[ "$candidate" =~ ^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$ ]] || return 1
+    [[ "$installed" =~ ^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$ ]] || return 1
+    IFS=. read -r -a newer <<< "$candidate"
+    IFS=. read -r -a older <<< "$installed"
+    for index in 0 1 2; do
+        (( 10#${newer[$index]} > 10#${older[$index]} )) && return 0
+        (( 10#${newer[$index]} < 10#${older[$index]} )) && return 1
+    done
+    return 1
+}
+
 check_for_updates() {
     if [ -r "$CONFIG_FILE" ] && grep -q "^AGENT_AUTO_UPDATE='0'$" "$CONFIG_FILE"; then
         return 0
     fi
     command -v curl &>/dev/null || return 0
 
-    local response latest_version
+    local response latest_version latest_tag
     response=$(curl -sf --max-time 5 "$GITHUB_API_URL" 2>/dev/null) || return 0
 
     # Extract "tag_name" from JSON without jq: find the "tag_name":"vX.Y.Z" pattern
-    latest_version=$(printf '%s' "$response" \
+    latest_tag=$(printf '%s' "$response" \
         | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-        | sed -E 's/.*:[[:space:]]*"v?([^"]*)".*/\1/')
+        | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')
+    latest_version="${latest_tag#v}"
 
     [ -z "$latest_version" ] && return 0
-    [ "$latest_version" = "$AGENT_VERSION" ] && return 0
+    is_newer_version "$latest_version" "$AGENT_VERSION" || return 0
 
     echo "$(t new_version): $latest_version ($(t current_version): $AGENT_VERSION)"
-    download_update
+    download_update "$latest_tag"
 }
 
 download_update() {
+    local release_tag="$1" expected_version="${1#v}" release_base
+    [[ "$release_tag" =~ ^v?[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$ ]] || return 1
+    release_base="https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$release_tag"
     local script_path="$INSTALL_DIR/rs_agent.sh"
     local script_tmp module_tmp uninstall_tmp
     script_tmp=$(mktemp "$INSTALL_DIR/rs_agent.XXXXXX") || return 1
     module_tmp=$(mktemp "$INSTALL_DIR/api_endpoint.XXXXXX") || { rm -f "$script_tmp"; return 1; }
     uninstall_tmp=$(mktemp "$INSTALL_DIR/uninstall.XXXXXX") || { rm -f "$script_tmp" "$module_tmp"; return 1; }
     echo "$(t downloading_update)"
-    if curl -fsSL --max-time 10 "$GITHUB_AGENT_URL" -o "$script_tmp" &&
-        curl -fsSL --max-time 10 "${GITHUB_AGENT_URL%/*}/api_endpoint.sh" -o "$module_tmp" &&
-        curl -fsSL --max-time 10 "${GITHUB_AGENT_URL%/*}/uninstall.sh" -o "$uninstall_tmp" &&
+    if curl -fsSL --max-time 10 "$release_base/rs_agent.sh" -o "$script_tmp" &&
+        curl -fsSL --max-time 10 "$release_base/api_endpoint.sh" -o "$module_tmp" &&
+        curl -fsSL --max-time 10 "$release_base/uninstall.sh" -o "$uninstall_tmp" &&
         bash -n "$script_tmp" && bash -n "$module_tmp" && bash -n "$uninstall_tmp" &&
+        grep -Fxq "AGENT_VERSION=\"$expected_version\"" "$script_tmp" &&
         chmod 755 "$script_tmp" "$uninstall_tmp" && chmod 644 "$module_tmp"; then
         cp "$script_path" "${script_path}.backup" &&
             mv -f "$module_tmp" "$INSTALL_DIR/api_endpoint.sh" &&

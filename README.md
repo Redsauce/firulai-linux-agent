@@ -72,10 +72,11 @@ or the lookup cannot be verified.
 
 If an installation with the same UUID is run again after the local agent files
 were created, the installer first validates that the UUID still exists in
-Firulai and then runs the existing agent with trigger
-`installer-retry`. This recovers the initial `newServerData` delivery instead
-of stopping locally before RSM receives any new event. A different local UUID
-is still rejected and must be uninstalled explicitly.
+Firulai, requests `changeSystemStatus` with `action=activate`, and then runs the
+existing agent with trigger `installer-retry`. This reactivates a disconnected
+System and recovers the initial `newServerData` delivery. An empty asynchronous
+validation response does not skip the activation request. A different local
+UUID is still rejected and must be uninstalled explicitly.
 
 The Linux scripts contain no RSM property identifiers and do not call the item get/update endpoints directly. RSM mappings and stored status values belong to the receiver scripts.
 
@@ -142,6 +143,8 @@ bash ~/.local/share/rs-agent/uninstall.sh
 The `~` path is resolved for the user running the command. For example, if the agent was installed by `aps-no-root-test`, run `bash /home/aps-no-root-test/.local/share/rs-agent/uninstall.sh` or switch to that user first. Running the command as `root` would look for `/root/.local/share/rs-agent/uninstall.sh`.
 
 The no-root uninstaller only removes the current user's installation. It does not touch `/opt/rs-agent`, `/var/lib/rs-agent`, global systemd units, or an existing root installation.
+
+After confirmation, the uninstaller attempts to mark the System disconnected in Firulai. Missing credentials, API permission errors, and HTTP failures do not stop local removal. In those cases the remote System may retain its previous status. A root installation can be removed with `sudo bash /opt/rs-agent/uninstall.sh`.
 
 ## Collected Data
 

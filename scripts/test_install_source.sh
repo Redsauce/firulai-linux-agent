@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . <(sed -n '/^write_agent_config() {/,/^}/p' install.sh)
+. <(sed -n '/^is_newer_version() {/,/^}/p' rs_agent.sh)
 . <(sed -n '/^check_for_updates() {/,/^}/p' rs_agent.sh)
 test_dir=$(mktemp -d)
 trap 'rm -f "$test_dir/config.env" "$test_dir/request"; rmdir "$test_dir"' EXIT

@@ -500,13 +500,7 @@ parse_args() {
         esac
     done
 
-    if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID_VAL" ]; then
-        error "$(t missing_token_uuid)"
-        echo "$(t manual_usage)"
-        exit 1
-    fi
-
-    validate_uuid "$UUID_VAL"
+    # Missing credentials only prevent the remote notification, never local removal.
 }
 
 confirm_uninstall() {
@@ -630,31 +624,36 @@ remove_automatic_execution() {
 remove_local_files() {
     info "$(t removing_files)"
 
-    rm -rf "$DATA_DIR"
-    rm -rf "$INSTALL_DIR"
-    rm -f "$LOG_FILE"
+    local failed=0
+    rm -rf "$DATA_DIR" || failed=1
+    rm -rf "$INSTALL_DIR" || failed=1
+    rm -f "$LOG_FILE" || failed=1
+
+    if [ "$failed" -ne 0 ]; then
+        return 1
+    fi
 
     log "$(t files_removed)"
 }
 
 main() {
     load_config
-    . "$(dirname -- "${BASH_SOURCE[0]}")/api_endpoint.sh" || exit 1
-    rsm_load_base || exit 1
     check_root
     parse_args "$@"
-    if ! init_private_tmp_dir; then
-        exit 1
-    fi
     confirm_uninstall
 
-    if ! mark_system_disconnected_in_rsm; then
-        error "$(t stopped_rsm)"
-        exit 1
+    if [ -n "$AGENT_TOKEN" ] && [ -n "$UUID_VAL" ] &&
+       [[ "$UUID_VAL" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] &&
+       init_private_tmp_dir &&
+       . "$(dirname -- "${BASH_SOURCE[0]}")/api_endpoint.sh" &&
+       rsm_load_base; then
+        mark_system_disconnected_in_rsm || warn "$(t mark_failed)"
+    else
+        warn "$(t mark_failed)"
     fi
 
     remove_automatic_execution
-    remove_local_files
+    remove_local_files || exit 1
 
     echo ""
     echo "============================================================"
