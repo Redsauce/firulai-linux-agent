@@ -3447,6 +3447,8 @@ UUID=$(shell_single_quote "$UUID")
 AGENT_LOCALE=$(shell_single_quote "$AGENT_LOCALE")
 RSM_BASE_URL=$(shell_single_quote "$RSM_BASE_URL")
 AGENT_AUTO_UPDATE=$(shell_single_quote "$auto_update")
+AGENT_INSTALLATION_MODE=$(shell_single_quote "$([ "$RUN_AS_ROOT" = "1" ] && printf root || printf user)")
+AGENT_INSTALLATION_USER=$(shell_single_quote "$(id -un)")
 CONFIG_EOF
     chown root:root "$temporary_file" 2>/dev/null || true
     mv -f "$temporary_file" "$CONFIG_FILE"

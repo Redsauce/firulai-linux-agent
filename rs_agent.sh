@@ -1148,6 +1148,26 @@ parse_args() {
 
 # ============ COLLECTORS ============
 
+collect_agent_installation_info() {
+    local mode owner script_owner
+    mode=$(sed -n "s/^AGENT_INSTALLATION_MODE='\(root\|user\)'$/\1/p" "$CONFIG_FILE" 2>/dev/null | head -1) || true
+    owner=$(sed -n "s/^AGENT_INSTALLATION_USER='\([^']*\)'$/\1/p" "$CONFIG_FILE" 2>/dev/null | head -1) || true
+    # Older installations have no persisted metadata. The installed script's
+    # owner identifies user installations even when manually invoked with sudo.
+    if [ -z "$mode" ]; then
+        script_owner=$(stat -c '%U' "${BASH_SOURCE[0]}" 2>/dev/null) || true
+        owner="${script_owner:-$(id -un)}"
+        if [ "$owner" = root ]; then mode=root; else mode=user; fi
+    fi
+    if [ "$mode" = root ]; then owner=root; fi
+    # Never turn agent-controlled user names into shell commands downstream.
+    if [ -z "$owner" ] || [[ "$owner" == *$'\n'* ]] || [[ "$owner" == *$'\r'* ]]; then
+        printf '{}'
+        return
+    fi
+    printf '{"mode":"%s","user":"%s"}' "$mode" "$(json_escape "$owner")"
+}
+
 collect_system_info() {
     local timezone=""
     [ $# -gt 0 ] && timezone="$1"
@@ -1179,7 +1199,7 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s"}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s","agent_installation":%s}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
@@ -1191,7 +1211,8 @@ collect_system_info() {
         "$(json_escape "$arch")" \
         "$(json_escape "$collected_at")" \
         "$(json_escape "$timezone")" \
-        "$(json_escape "$AGENT_VERSION")"
+        "$(json_escape "$AGENT_VERSION")" \
+        "$(collect_agent_installation_info)"
 }
 
 collect_timezone() {
