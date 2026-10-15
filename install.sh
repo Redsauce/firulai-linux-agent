@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # Firulai Inventory Agent - One-liner installer
-# Version 0.2.5 - Validate activation before initial inventory
+# Version 0.2.6 - Reinstall through account-scoped seat admission
 # ============================================================================
 #
 # Usage:
@@ -970,7 +970,7 @@ make_private_temp_file() {
 banner() {
     echo ""
     echo "============================================================================"
-    printf '  Firulai Inventory Agent - %s v0.2.5\n' "$(t installer_title)"
+    printf '  Firulai Inventory Agent - %s v0.2.6\n' "$(t installer_title)"
     printf '  %s\n' "$(t banner_subtitle)"
     echo "============================================================================"
     echo ""
@@ -2815,7 +2815,7 @@ load_api_module() {
 
 check_uuid_exists_in_rsm() {
     local payload response_file http_code exit_code response_body items_url
-    local uuid_match_count stored_hostname stored_fqdn stored_os stored_coverage stored_client
+    local uuid_match_count stored_hostname stored_fqdn stored_os
     local current_hostname current_fqdn
     response_file=$(make_private_temp_file "rsm_install_uuid_lookup_response") || exit 1
     items_url="${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php"
@@ -2862,12 +2862,8 @@ check_uuid_exists_in_rsm() {
         exit 1
     fi
 
-    stored_coverage=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_COVERAGE_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
-    stored_client=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_CLIENT_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1)
-    if [ "$stored_coverage" != "covered" ] && [ "$stored_client" != "6956" ]; then
-        error "$(t coverage_not_allowed)"
-        exit 1
-    fi
+    # Coverage is assigned by account-scoped admission, not this UUID lookup.
+    # An uninstalled system is legitimately uncovered until a seat is granted.
 
     stored_os=$(printf '%s' "$response_body" | sed -n "s/.*\"$RSM_SYSTEM_OS_PROPERTY_ID\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1 | tr '[:upper:]' '[:lower:]')
     case "$stored_os" in
@@ -3063,76 +3059,50 @@ retry_local_agent_installation() {
     exit 1
 }
 
-update_rsm_system_on_install() {
-    local payload response_file http_code exit_code response_body
-
-    # The Events Handler can acknowledge an accepted asynchronous request with
-    # an empty body. An explicit not_found result has already stopped install.
-
-    response_file=$(make_private_temp_file "rsm_install_system_update_response") || {
-        error "$(t activate_failed)"
-        exit 1
-    }
-    payload="{\"uuid\":\"$(json_escape "$UUID")\",\"action\":\"activate\",\"platform\":\"linux\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
-
-    info "$(t marking_active)"
-
+request_installation_admission() {
+    local check_only="${1:-true}" payload response_file http_code exit_code response_body
+    response_file=$(make_private_temp_file "rsm_install_admission") || exit 1
+    payload="{\"uuid\":\"$(json_escape "$UUID")\",\"platform\":\"linux\",\"hostname\":\"$(json_escape "$(local_system_hostname)")\",\"fqdn\":\"$(json_escape "$(local_system_fqdn)")\",\"checkOnly\":$check_only}"
+    # Fixed HTTPS endpoint; never redirect an agent credential to another host.
     set +e
-    http_code=$(rsm_request \
-        --silent \
-        --show-error \
-        --output "$response_file" \
-        --request POST \
+    http_code=$(curl --silent --show-error --proto '=https' \
+        --output "$response_file" --write-out '%{http_code}' \
+        --request POST 'https://firulai.redsauce.net/api/agents/activate' \
         --header "Authorization: $AGENT_TOKEN" \
-        --form-string "RStrigger=changeSystemStatus" \
-        --form-string "RSdata=$payload" \
-        --form-string "RStoken=$AGENT_TOKEN" \
-        --max-time 20)
+        --header 'Content-Type: application/json' --data "$payload" --max-time 20)
     exit_code=$?
     set -e
     response_body=$(cat "$response_file" 2>/dev/null || true)
     rm -f "$response_file"
-
     if [ "$exit_code" -ne 0 ]; then
         error "$(t activate_failed) (curl exit: $exit_code)."
         exit 1
     fi
-
-    if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+    if [ "$http_code" = "409" ]; then
+        error "$(t capacity_exceeded)"
+        exit 1
+    fi
+    if [ "$http_code" != "200" ] ||
+       ! printf '%s' "$response_body" | grep -Eq '"allowed"[[:space:]]*:[[:space:]]*true([[:space:]]*[,}])'; then
         error "$(t activation_denied) (HTTP $http_code)."
-        echo "$(t response): $response_body"
         exit 1
     fi
-
-    if rsm_response_has_api_error "$response_body"; then
-        error "$(t activation_denied)."
-        echo "$(t response): $response_body"
-        exit 1
-    fi
-
-    if [ -n "$(printf '%s' "$response_body" | tr -d '[:space:]')" ] && \
-       ! printf '%s' "$response_body" | grep -Eq '"updated"[[:space:]]*:[[:space:]]*true'; then
-        if printf '%s' "$response_body" | grep -Eq '"error"[[:space:]]*:[[:space:]]*"capacity_exceeded"'; then
-            error "$(t capacity_exceeded)"
-            exit 1
-        fi
+    if [ "$check_only" = "false" ] &&
+       ! printf '%s' "$response_body" | grep -Eq '"activated"[[:space:]]*:[[:space:]]*true([[:space:]]*[,}])'; then
         error "$(t activate_failed)"
-        echo "$(t response): $response_body"
         exit 1
     fi
+}
 
-    # Do not start inventory until the asynchronous activation has taken effect.
-    local activation_attempt activation_check_status
-    for ((activation_attempt=0; activation_attempt<30; activation_attempt++)); do
-        if rsm_check_system_uuid "$UUID" "$AGENT_TOKEN"; then
-            log "$(t activated)"
-            return 0
-        else
-            activation_check_status=$?
-        fi
-        [ "$activation_check_status" = "5" ] || break
-        sleep 1
-    done
+update_rsm_system_on_install() {
+    info "$(t marking_active)"
+    # Admission rechecks capacity under the account lock and persists coverage.
+    # There is no asynchronous legacy fallback that could bypass seat limits.
+    request_installation_admission false
+    if rsm_check_system_uuid "$UUID" "$AGENT_TOKEN"; then
+        log "$(t activated)"
+        return 0
+    fi
     error "$(t activate_failed)"
     exit 1
 }
@@ -3662,6 +3632,7 @@ main() {
     load_api_module
     check_uuid_exists_in_rsm
     check_uuid_available
+    request_installation_admission true
     retry_local_agent_installation
     warn_about_parallel_root_installation
     # Ask about cron/systemd only after every local and remote installation

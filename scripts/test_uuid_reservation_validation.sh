@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-. <(sed -n '/^RSM_SYSTEM_ITEM_TYPE_ID=/,/^RSM_SYSTEM_COVERAGE_PROPERTY_ID=/p' install.sh)
+. <(sed -n '/^RSM_SYSTEM_ITEM_TYPE_ID=/,/^RSM_SYSTEM_CLIENT_PROPERTY_ID=/p' install.sh)
 . <(sed -n '/^check_uuid_exists_in_rsm() {/,/^}/p' install.sh)
 
 test_dir=$(mktemp -d)
@@ -63,8 +63,8 @@ expect_blocked() {
 
 expect_allowed '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Linux","1972":"covered"}]' 'new covered Linux reservation'
 expect_allowed '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"linux-host","1750":"linux-host.example.test","1752":"Linux","1972":"covered"}]' 'same-machine reactivation'
-expect_blocked '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Linux","1972":"uncovered"}]' 'uncovered reservation'
+expect_allowed '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Linux","1972":"uncovered"}]' 'uncovered reservation proceeds to server admission'
 expect_blocked '[{"ID":"1","1780":"00000000-0000-4000-8000-000000000001","1749":"","1750":"","1752":"Windows","1972":"covered"}]' 'Windows reservation' 'uuid_occupied'
 expect_blocked '[]' 'missing reservation'
 
-echo 'PASS: UUID reservations require one covered Linux System and preserve same-machine reactivation.'
+echo 'PASS: UUID lookup preserves identity and platform checks; uncovered Linux proceeds to server admission.'
