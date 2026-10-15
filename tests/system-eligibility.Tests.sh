@@ -18,13 +18,23 @@ expect_status() {
 fixture="[{\"1780\":\"$uuid\",\"1751\":\"Activo\",\"1972\":\"covered\",\"1785\":\"6955\"}]"
 expect_status 0
 fixture="[{\"1780\":\"$uuid\",\"1751\":\"Disconnected\",\"1972\":\"covered\",\"1785\":\"6955\"}]"
-expect_status 5
+expect_status 0
+for lifecycle in 'Agente instalado' 'Agente Desconectado'; do
+    fixture="[{\"1780\":\"$uuid\",\"1751\":\"$lifecycle\",\"1972\":\"covered\",\"1785\":\"6955\"}]"
+    expect_status 0
+    fixture="[{\"1780\":\"$uuid\",\"1751\":\"$lifecycle\",\"1972\":\"uncovered\",\"1785\":\"6955\"}]"
+    expect_status 6
+done
+for lifecycle in 'Pendiente de instalación' 'Agente desinstalado'; do
+    fixture="[{\"1780\":\"$uuid\",\"1751\":\"$lifecycle\",\"1972\":\"covered\",\"1785\":\"6955\"}]"
+    expect_status 5
+done
 fixture="[{\"1780\":\"$uuid\",\"1751\":\"Activo\",\"1972\":\"uncovered\",\"1785\":\"6955\"}]"
 expect_status 6
 fixture="[{\"1780\":\"$uuid\",\"1751\":\"Activo\",\"1972\":\"uncovered\",\"1785\":\"6956\"}]"
-expect_status 0
+expect_status 6
 fixture="[{\"1780\":\"$uuid\",\"1751\":\"Disconnected\",\"1972\":\"covered\",\"1785\":\"6956\"}]"
-expect_status 5
+expect_status 0
 fixture="[{\"1780\":\"$uuid\",\"1751\":\"Activo\",\"1972\":\"covered\"}]"
 expect_status 4
 fixture='[]'

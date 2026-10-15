@@ -1,5 +1,22 @@
 # Actualizacion automatica Linux
 
+## Version 0.4.6: estados del agente
+
+Reconoce `Agente instalado` y permite que `Agente Desconectado` vuelva a enviar
+inventario si sigue `covered`. Pendientes y desinstalados no pueden enviar
+inventario. La cobertura es obligatoria para todas las cuentas. Se conserva la
+lectura de los nombres antiguos durante la transicion de RSM.
+
+La recepcion y escritura de los nombres nuevos tambien requiere actualizar los
+receptores de estado/inventario en RSM. Esta release no incluye los cambios del
+desinstalador pendientes de entrega coordinada.
+
+Las versiones anteriores que comprueban estado antes de buscar actualizaciones
+pueden detenerse si RSM ya devuelve los nombres nuevos. En ese caso se necesita
+actualizar manualmente la instalacion o su modulo `api_endpoint.sh`, conservando
+UUID y configuracion. Publicar esta release no actualiza por si solo un agente
+que no llega a ejecutar la comprobacion de actualizaciones.
+
 La instalacion desde `main` mantiene `AGENT_AUTO_UPDATE='1'` en `config.env`.
 Una instalacion desde una rama de prueba usa `AGENT_AUTO_UPDATE='0'`, para no
 sustituir el agente de prueba por la version estable. Publicar una release no

@@ -103,10 +103,10 @@ rsm_check_system_uuid() {
     [ "$count" = "0" ] && return 2
     [ "$count" = "1" ] || return 3
     lifecycle=$(printf '%s' "$body" | sed -n 's/.*"1751"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tr '[:upper:]' '[:lower:]')
-    case "$lifecycle" in activo|active|connected) ;; *) return 5 ;; esac
+    case "$lifecycle" in 'agente instalado'|'agente desconectado'|desconectado|disconnected|activo|active|connected) ;; *) return 5 ;; esac
     coverage=$(printf '%s' "$body" | sed -n 's/.*"1972"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tr '[:upper:]' '[:lower:]')
     account=$(printf '%s' "$body" | sed -n 's/.*"1785"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
     [ -n "$account" ] || return 4
-    [ "$account" = "6956" ] || [ "$coverage" = "covered" ] || return 6
+    [ "$coverage" = "covered" ] || return 6
     return 0
 }

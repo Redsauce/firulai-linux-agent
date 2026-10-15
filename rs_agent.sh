@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Firulai Inventory Agent
-# Version: 0.4.5 - Report Linux installation mode and owner
+# Version: 0.4.6 - Recognize installed and returning disconnected agents
 # Requires: bash 4+, curl, lscpu, lsblk, uname
 #
 
@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.5"
+AGENT_VERSION="0.4.6"
 GITHUB_API_URL="https://api.github.com/repos/Redsauce/firulai-linux-agent/releases/latest"
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/rs_agent.sh}"
 
