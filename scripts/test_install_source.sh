@@ -12,6 +12,7 @@ AGENT_TOKEN='fake-token'
 UUID='test-uuid'
 AGENT_LOCALE='es_ES'
 AGENT_VERSION='0.4.0'
+RUN_AS_ROOT=0
 GITHUB_API_URL='https://example.invalid/releases/latest'
 rsm_load_base() { RSM_BASE_URL='https://rsm1.example/AppController/'; }
 shell_single_quote() { printf "'%s'" "$1"; }
@@ -30,6 +31,8 @@ check_for_updates
 GITHUB_RAW_URL='https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main'
 write_agent_config
 grep -q "^AGENT_AUTO_UPDATE='1'$" "$CONFIG_FILE"
+grep -q "^AGENT_INSTALLATION_MODE='user'$" "$CONFIG_FILE"
+grep -q "^AGENT_INSTALLATION_USER='$(id -un)'$" "$CONFIG_FILE"
 check_for_updates
 [ -f "$test_dir/request" ]
 echo 'PASS: branch installs disable automatic updates; main installs retain them.'
