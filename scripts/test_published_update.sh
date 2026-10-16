@@ -2,8 +2,8 @@
 # Uses real public GitHub downloads in an isolated Linux directory. The final
 # restart is intercepted so no inventory or fake credentials reach RSM.
 set -euo pipefail
-from_version="${FROM_VERSION:-0.4.3}"
-to_version="${TO_VERSION:-0.4.4}"
+from_version="${FROM_VERSION:-0.4.6}"
+to_version="${TO_VERSION:-0.4.7}"
 export TEST_UPDATE_TARGET="$to_version"
 fixture=$(mktemp -d)
 mkdir -p "$fixture/install" "$fixture/data" "$fixture/bin"

@@ -1,6 +1,7 @@
 #!/bin/bash
 # -*- coding: utf-8 -*-
-# Runs RSAgent only when the daily 03:00 execution is pending.
+# Runs update polling independently of the daily 03:00 inventory.
+FIRULAI_UPDATE_POLLING_VERSION=1
 
 set -uo pipefail
 
@@ -166,6 +167,9 @@ if [ -z "$AGENT_TOKEN" ] || [ -z "$UUID" ]; then
     exit 1
 fi
 
+# Update-only execution never collects or sends inventory, even before 03:00.
+/bin/bash "$AGENT_SCRIPT" --check-updates --token "$AGENT_TOKEN" --uuid "$UUID" --locale "$AGENT_LOCALE" >> "$LOG_FILE" 2>&1 || true
+
 now_epoch=$(date +%s)
 scheduled_epoch=$(date -d "$(date +%F) 03:00:00" +%s 2>/dev/null) || {
     error_line "$(t date_failed)"
@@ -183,6 +187,10 @@ if [ "$now_epoch" -lt "$scheduled_epoch" ] || [ "$last_success_epoch" -ge "$sche
     exit 0
 fi
 
+retry_file="$DATA_DIR/inventory-retry.env"
+retry_epoch=$(sed -n 's/^NEXT_INVENTORY_EPOCH=\([0-9][0-9]*\)$/\1/p' "$retry_file" 2>/dev/null | head -1) || true
+if [ "$now_epoch" -lt "${retry_epoch:-0}" ]; then exit 0; fi
+
 delay_seconds=$((now_epoch - scheduled_epoch))
 log_line "$(t pending_detected) Trigger=$TRIGGER, scheduled=$(date -d "@$scheduled_epoch" '+%Y-%m-%d %H:%M:%S %z'), delaySeconds=$delay_seconds."
 
@@ -195,9 +203,14 @@ agent_status=${PIPESTATUS[0]}
 set -e
 
 if [ "$agent_status" -ne 0 ]; then
+    retry_temp=$(mktemp "$DATA_DIR/inventory-retry.XXXXXX") || exit 1
+    chmod 600 "$retry_temp"
+    printf 'NEXT_INVENTORY_EPOCH=%s\n' "$(($(date +%s) + 1800))" > "$retry_temp"
+    mv -f "$retry_temp" "$retry_file"
     error_line "$(t pending_failed) Trigger=$TRIGGER, code=$agent_status."
     exit "$agent_status"
 fi
 
+rm -f "$retry_file"
 log_line "$(t pending_completed) Trigger=$TRIGGER."
 exit 0

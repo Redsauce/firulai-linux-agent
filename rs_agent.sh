@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Firulai Inventory Agent
-# Version: 0.4.6 - Recognize installed and returning disconnected agents
+# Version: 0.4.7 - Firulai update catalog and independent hourly polling
 # Requires: bash 4+, curl, lscpu, lsblk, uname
 #
 
@@ -10,9 +10,10 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.6"
-GITHUB_API_URL="https://api.github.com/repos/Redsauce/firulai-linux-agent/releases/latest"
-GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/rs_agent.sh}"
+AGENT_VERSION="0.4.7"
+AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
+UPDATE_ONLY=0
+GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/rs_agent.sh}"
 
 RUN_AS_ROOT=0
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -1004,6 +1005,10 @@ acquire_execution_lock() {
         exit 1
     fi
     mkdir -p "$(dirname "$LOCK_FILE")"
+    # An exec after an update inherits the same locked open file description.
+    if [ "$(readlink /proc/self/fd/9 2>/dev/null || true)" = "$LOCK_FILE" ] && flock -n 9; then
+        return 0
+    fi
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
         echo "$(t already_running) Trigger=$EXECUTION_TRIGGER"
@@ -1118,6 +1123,7 @@ parse_args() {
 
     while [ $# -gt 0 ]; do
         case "$1" in
+            --check-updates) UPDATE_ONLY=1; shift ;;
             --token)
                 [ $# -ge 2 ] || { echo "$(t token_requires_value)"; exit 1; }
                 AGENT_TOKEN="$2"
@@ -1626,54 +1632,132 @@ is_newer_version() {
     return 1
 }
 
+record_update_check() {
+    local now="$1" failed="$2" boot="$3" delay jitter temporary
+    case "$failed" in 0) delay=3600 ;; 1) delay=300 ;; 2) delay=600 ;; 3) delay=1200 ;; *) delay=3600 ;; esac
+    jitter=$(printf '%s' "$(hostname)" | cksum | awk '{print $1 % 61}')
+    temporary=$(mktemp "$OUTPUT_DIR/update-state.XXXXXX") || return 1
+    chmod 600 "$temporary" || return 1
+    printf 'NEXT_UPDATE_EPOCH=%s\nUPDATE_FAILURES=%s\nUPDATE_BOOT_ID=%s\n' "$((now + delay + jitter))" "$failed" "$boot" > "$temporary"
+    mv -f "$temporary" "$OUTPUT_DIR/update-state.env" || return 1
+    printf 'Automatic update check: failures=%s, next=%s\n' "$failed" "$(date -d "@$((now + delay + jitter))" -Iseconds)"
+}
+
 check_for_updates() {
-    if [ -r "$CONFIG_FILE" ] && grep -q "^AGENT_AUTO_UPDATE='0'$" "$CONFIG_FILE"; then
+    if [ -r "$CONFIG_FILE" ] && grep -q "^AGENT_AUTO_UPDATE='0'$" "$CONFIG_FILE"; then return 0; fi
+    local response latest_version latest_tag now boot next=0 failures=0
+    now=$(date +%s)
+    boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || printf unknown)
+    if [ -r "$OUTPUT_DIR/update-state.env" ]; then
+        next=$(sed -n 's/^NEXT_UPDATE_EPOCH=\([0-9][0-9]*\)$/\1/p' "$OUTPUT_DIR/update-state.env" | head -1)
+        failures=$(sed -n 's/^UPDATE_FAILURES=\([0-4]\)$/\1/p' "$OUTPUT_DIR/update-state.env" | head -1)
+        if ! grep -Fxq "UPDATE_BOOT_ID=$boot" "$OUTPUT_DIR/update-state.env"; then next=0; failures=0; fi
+    fi
+    [ "$now" -ge "${next:-0}" ] || return 0
+    failures="${failures:-0}"
+    if ! response=$(curl -fsS --proto '=https' --max-time 20 --max-filesize 32768 "$AGENT_CATALOG_URL" 2>/dev/null); then
+        record_update_check "$(date +%s)" "$((failures < 4 ? failures + 1 : 4))" "$boot"
+        return 1
+    fi
+    local compact version_pattern catalog_pattern
+    compact=$(printf '%s' "$response" | tr -d '[:space:]')
+    version_pattern='v?[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}'
+    catalog_pattern='^\{("linux":"'"$version_pattern"'","windows":"'"$version_pattern"'"|"windows":"'"$version_pattern"'","linux":"'"$version_pattern"'")\}$'
+    if [ "${#response}" -gt 32768 ] || [[ ! "$compact" =~ $catalog_pattern ]]; then
+        record_update_check "$(date +%s)" "$((failures < 4 ? failures + 1 : 4))" "$boot"
+        return 1
+    fi
+    latest_tag=$(printf '%s' "$response" | grep -oE '"linux"[[:space:]]*:[[:space:]]*"v?[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}"' | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')
+    if [[ ! "$latest_tag" =~ ^v?[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$ ]]; then
+        record_update_check "$(date +%s)" "$((failures < 4 ? failures + 1 : 4))" "$boot"
+        return 1
+    fi
+    latest_version="${latest_tag#v}"
+    if ! is_newer_version "$latest_version" "$AGENT_VERSION"; then
+        record_update_check "$(date +%s)" 0 "$boot"
         return 0
     fi
-    command -v curl &>/dev/null || return 0
-
-    local response latest_version latest_tag
-    response=$(curl -sf --max-time 5 "$GITHUB_API_URL" 2>/dev/null) || return 0
-
-    # Extract "tag_name" from JSON without jq: find the "tag_name":"vX.Y.Z" pattern
-    latest_tag=$(printf '%s' "$response" \
-        | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-        | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')
-    latest_version="${latest_tag#v}"
-
-    [ -z "$latest_version" ] && return 0
-    is_newer_version "$latest_version" "$AGENT_VERSION" || return 0
-
     echo "$(t new_version): $latest_version ($(t current_version): $AGENT_VERSION)"
-    download_update "$latest_tag"
+    record_update_check "$(date +%s)" 0 "$boot" || return 1
+    if ! download_update "$latest_tag"; then
+        record_update_check "$(date +%s)" "$((failures < 4 ? failures + 1 : 4))" "$boot"
+        return 1
+    fi
 }
 
 download_update() {
-    local release_tag="$1" expected_version="${1#v}" release_base
+    local release_tag="$1" expected_version="${1#v}" release_base staging file
+    local -a restart_args=()
+    [ "${UPDATE_ONLY:-0}" != 1 ] || restart_args=(--check-updates)
     [[ "$release_tag" =~ ^v?[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$ ]] || return 1
     release_base="https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$release_tag"
-    local script_path="$INSTALL_DIR/rs_agent.sh"
-    local script_tmp module_tmp uninstall_tmp
-    script_tmp=$(mktemp "$INSTALL_DIR/rs_agent.XXXXXX") || return 1
-    module_tmp=$(mktemp "$INSTALL_DIR/api_endpoint.XXXXXX") || { rm -f "$script_tmp"; return 1; }
-    uninstall_tmp=$(mktemp "$INSTALL_DIR/uninstall.XXXXXX") || { rm -f "$script_tmp" "$module_tmp"; return 1; }
-    echo "$(t downloading_update)"
-    if curl -fsSL --max-time 10 "$release_base/rs_agent.sh" -o "$script_tmp" &&
-        curl -fsSL --max-time 10 "$release_base/api_endpoint.sh" -o "$module_tmp" &&
-        curl -fsSL --max-time 10 "$release_base/uninstall.sh" -o "$uninstall_tmp" &&
-        bash -n "$script_tmp" && bash -n "$module_tmp" && bash -n "$uninstall_tmp" &&
-        grep -Fxq "AGENT_VERSION=\"$expected_version\"" "$script_tmp" &&
-        chmod 755 "$script_tmp" "$uninstall_tmp" && chmod 644 "$module_tmp"; then
-        cp "$script_path" "${script_path}.backup" &&
-            mv -f "$module_tmp" "$INSTALL_DIR/api_endpoint.sh" &&
-            mv -f "$uninstall_tmp" "$INSTALL_DIR/uninstall.sh" &&
-            mv -f "$script_tmp" "$script_path" || { rm -f "$script_tmp" "$module_tmp" "$uninstall_tmp"; return 1; }
-        echo "$(t update_completed)"
-        exec bash "$script_path" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --locale "$AGENT_LOCALE"
-    else
-        rm -f "$script_tmp" "$module_tmp" "$uninstall_tmp"
-        echo "$(t update_failed)"
+    staging=$(mktemp -d "$INSTALL_DIR/update.XXXXXX") || return 1
+    for file in rs_agent.sh api_endpoint.sh uninstall.sh rs_agent_runner.sh; do
+        if ! curl -fsSL --proto '=https' --proto-redir '=https' --max-time 20 "$release_base/$file" -o "$staging/$file" ||
+            ! bash -n "$staging/$file"; then
+            rm -rf -- "$staging"; return 1
+        fi
+    done
+    if ! grep -Fxq "AGENT_VERSION=\"$expected_version\"" "$staging/rs_agent.sh" ||
+        ! grep -Fxq 'FIRULAI_UPDATE_POLLING_VERSION=1' "$staging/rs_agent_runner.sh"; then
+        rm -rf -- "$staging"; return 1
     fi
+    for file in rs_agent.sh api_endpoint.sh uninstall.sh rs_agent_runner.sh; do
+        if [ -f "$INSTALL_DIR/$file" ]; then
+            cp -p "$INSTALL_DIR/$file" "$staging/$file.old" || { rm -rf -- "$staging"; return 1; }
+        fi
+        chmod 755 "$staging/$file" || { rm -rf -- "$staging"; return 1; }
+    done
+    chmod 644 "$staging/api_endpoint.sh"
+    cp "$INSTALL_DIR/rs_agent.sh" "$INSTALL_DIR/rs_agent.sh.backup" || { rm -rf -- "$staging"; return 1; }
+    for file in rs_agent.sh api_endpoint.sh uninstall.sh rs_agent_runner.sh; do
+        if ! mv -f "$staging/$file" "$INSTALL_DIR/$file"; then
+            for file in rs_agent.sh api_endpoint.sh uninstall.sh rs_agent_runner.sh; do
+                [ ! -f "$staging/$file.old" ] || cp -p "$staging/$file.old" "$INSTALL_DIR/$file"
+            done
+            rm -rf -- "$staging"; return 1
+        fi
+    done
+    rm -rf -- "$staging"
+    # Pass the existing flock descriptor through exec; do not reacquire it.
+    exec bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID_VAL" --locale "$AGENT_LOCALE" "${restart_args[@]}"
+}
+
+ensure_update_polling() {
+    local runner="$INSTALL_DIR/rs_agent_runner.sh" temporary timer scope="" unit_dir
+    if ! grep -Fxq 'FIRULAI_UPDATE_POLLING_VERSION=1' "$runner" 2>/dev/null; then
+        temporary=$(mktemp "$INSTALL_DIR/runner.XXXXXX") || return 1
+        if ! curl -fsSL --proto '=https' --proto-redir '=https' --max-time 20 \
+            "https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/rs_agent_runner.sh" -o "$temporary" ||
+            ! bash -n "$temporary" || ! grep -Fxq 'FIRULAI_UPDATE_POLLING_VERSION=1' "$temporary"; then
+            rm -f "$temporary"; return 1
+        fi
+        chmod 755 "$temporary" && mv -f "$temporary" "$runner" || return 1
+    fi
+    [ ! -f "$OUTPUT_DIR/update-scheduler-v1" ] || return 0
+    if [ "$RUN_AS_ROOT" = 1 ] && [ -f /etc/systemd/system/rs-agent.timer ]; then
+        unit_dir=/etc/systemd/system
+    elif [ "$RUN_AS_ROOT" != 1 ] && [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/rs-agent.timer" ]; then
+        scope=--user
+        unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    else
+        # Preserve unrelated cron jobs and the existing boot entry.
+        command -v crontab >/dev/null || return 1
+        temporary=$(mktemp "$OUTPUT_DIR/cron.XXXXXX") || return 1
+        crontab -l > "$temporary" 2>/dev/null || { rm -f "$temporary"; return 1; }
+        if ! grep -Fq "$runner" "$temporary"; then rm -f "$temporary"; return 1; fi
+        awk -v runner="$runner" 'index($0, runner) {sub(/^\*\/30 \* \* \* \* /, "* * * * * "); sub(/^@reboot sleep 60; /, "@reboot ")} {print}' "$temporary" | crontab - || { rm -f "$temporary"; return 1; }
+        rm -f "$temporary"
+        printf '1\n' > "$OUTPUT_DIR/update-scheduler-v1"
+        return
+    fi
+    # These are units belonging to this installation, not arbitrary services.
+    grep -Fq "$runner" "$unit_dir/rs-agent.service" || return 1
+    sed -i 's/OnCalendar=\*-\*-\* 03:00:00/OnCalendar=*-*-* *:*:00/' "$unit_dir/rs-agent.timer" || return 1
+    grep -q '^OnBootSec=' "$unit_dir/rs-agent.timer" || sed -i '/^\[Timer\]$/a OnBootSec=1s' "$unit_dir/rs-agent.timer" || return 1
+    sed -i '/^Restart=on-failure$/d; /^RestartSec=30min$/d' "$unit_dir/rs-agent.service" || return 1
+    systemctl $scope daemon-reload && systemctl $scope restart rs-agent.timer || return 1
+    printf '1\n' > "$OUTPUT_DIR/update-scheduler-v1"
 }
 
 # ============ SEND TO RSM ============
@@ -1828,28 +1912,33 @@ validate_runtime_system() {
 main() {
     parse_args "$@"
 
-    echo ""
-    echo "============================================================"
-    printf  'Firulai Inventory Agent v%s - %s\n' "$AGENT_VERSION" "$(t collecting_title)"
-    echo "============================================================"
-    echo ""
+    if [ "$UPDATE_ONLY" != 1 ]; then
+        echo ""
+        echo "============================================================"
+        printf  'Firulai Inventory Agent v%s - %s\n' "$AGENT_VERSION" "$(t collecting_title)"
+        echo "============================================================"
+        echo ""
 
-    check_root
+        check_root
+    fi
     acquire_execution_lock
     if ! init_private_tmp_dir; then
         exit 1
     fi
-    echo "$(t trigger): $EXECUTION_TRIGGER"
+    if [ "$UPDATE_ONLY" != 1 ]; then echo "$(t trigger): $EXECUTION_TRIGGER"; fi
     load_api_module || exit 1
     if ! declare -F rsm_check_system_uuid >/dev/null; then
         echo "$(t uuid_validate_failed): missing API module support" >&2
         exit 1
     fi
-    validate_runtime_system || exit 1
-    check_for_updates
     if ! ensure_private_directory "$OUTPUT_DIR"; then
         exit 1
     fi
+
+    ensure_update_polling || echo "Update scheduler migration pending; will retry." >&2
+    check_for_updates || echo "Automatic update failed; inventory can continue." >&2
+    if [ "$UPDATE_ONLY" = 1 ]; then return 0; fi
+    validate_runtime_system || exit 1
 
     # --- Timezone ---
     echo "$(t collecting_timezone)"

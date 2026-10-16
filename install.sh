@@ -535,7 +535,8 @@ fi
 
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
-GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main}"
+INSTALLER_AGENT_VERSION="0.4.7"
+GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$INSTALLER_AGENT_VERSION}"
 RSM_SYSTEM_ITEM_TYPE_ID="191"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
 RSM_SYSTEM_FQDN_PROPERTY_ID="1750"
@@ -3402,7 +3403,7 @@ write_agent_config() {
     local temporary_file auto_update=1
 
     # A test branch must not be replaced by the stable updater on its first run.
-    if [ "${GITHUB_RAW_URL%/}" != "https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main" ]; then
+    if [[ ! "${GITHUB_RAW_URL%/}" =~ ^https://raw\.githubusercontent\.com/Redsauce/firulai-linux-agent/(main|v?[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9})$ ]]; then
         auto_update=0
     fi
 
@@ -3441,8 +3442,6 @@ ConditionPathExists=$RUNNER_FILE
 [Service]
 Type=oneshot
 ExecStart=/bin/bash $RUNNER_FILE --if-due --trigger systemd-timer
-Restart=on-failure
-RestartSec=30min
 TimeoutStartSec=30min
 SyslogIdentifier=rs-agent
 SERVICE_EOF
@@ -3452,7 +3451,8 @@ SERVICE_EOF
 Description=Firulai Inventory Agent daily schedule
 
 [Timer]
-OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-* *:*:00
+OnBootSec=1s
 Persistent=true
 AccuracySec=1min
 Unit=rs-agent.service
@@ -3489,8 +3489,6 @@ ConditionPathExists=$RUNNER_FILE
 [Service]
 Type=oneshot
 ExecStart=/bin/bash $RUNNER_FILE --if-due --trigger systemd-user-timer
-Restart=on-failure
-RestartSec=30min
 TimeoutStartSec=30min
 SERVICE_EOF
 
@@ -3499,7 +3497,8 @@ SERVICE_EOF
 Description=Firulai Inventory Agent daily schedule
 
 [Timer]
-OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-* *:*:00
+OnBootSec=1s
 Persistent=true
 AccuracySec=1min
 Unit=rs-agent.service
@@ -3531,8 +3530,8 @@ TIMER_EOF
     fi
 
     local cron_watchdog cron_reboot
-    cron_watchdog="*/30 * * * * /bin/bash $RUNNER_FILE --if-due --trigger cron-check >/dev/null 2>&1"
-    cron_reboot="@reboot sleep 60; /bin/bash $RUNNER_FILE --if-due --trigger cron-boot >/dev/null 2>&1"
+    cron_watchdog="* * * * * /bin/bash $RUNNER_FILE --if-due --trigger cron-check >/dev/null 2>&1"
+    cron_reboot="@reboot /bin/bash $RUNNER_FILE --if-due --trigger cron-boot >/dev/null 2>&1"
 
     # Checking every 30 minutes allows the 03:00 run and retries one missed
     # execution without duplicating it thanks to state.env and flock.

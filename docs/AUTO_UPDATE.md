@@ -1,5 +1,13 @@
 # Actualizacion automatica Linux
 
+## Catalogo Firulai y consulta horaria (0.4.7, pendiente de publicar)
+
+La nueva seleccion y programacion esta documentada en
+[releases/0.4.7.md](releases/0.4.7.md). El agente consulta el catalogo publico de
+Firulai, no los datos globales de RSM ni GitHub latest. Se conserva la version
+elegida por RSM y se separa la actualizacion del inventario. Las secciones
+siguientes describen el mecanismo de las versiones anteriores.
+
 ## Version 0.4.6: estados del agente
 
 Reconoce `Agente instalado` y permite que `Agente Desconectado` vuelva a enviar

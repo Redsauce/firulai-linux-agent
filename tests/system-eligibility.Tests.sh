@@ -137,11 +137,12 @@ grep -q '^RSM_RUNTIME_ELIGIBILITY_VERSION=1$' "$INSTALL_DIR/api_endpoint.sh" || 
 passed=$((passed+1))
 # GitHub returns formatted JSON; a future release must still be detected.
 CONFIG_FILE="$upgrade_fixture/no-config"
-curl() { printf '{"tag_name": "0.99.0"}'; }
+OUTPUT_DIR="$upgrade_fixture"
+curl() { printf '{"linux": "0.99.0", "windows": "0.20.8"}'; }
 download_update() { printf 'update-detected'; }
 update_output=$(check_for_updates)
 case "$update_output" in *update-detected*) ;; *) exit 1 ;; esac
 passed=$((passed+1))
-rm -f "$upgrade_fixture/rs_agent.sh" "$upgrade_fixture/api_endpoint.sh" "$upgrade_fixture/module-candidate" "$upgrade_fixture/state.env"
+rm -f "$upgrade_fixture/rs_agent.sh" "$upgrade_fixture/api_endpoint.sh" "$upgrade_fixture/module-candidate" "$upgrade_fixture/state.env" "$upgrade_fixture/update-state.env"
 rmdir "$upgrade_fixture"
 printf '%s Linux eligibility checks passed.\n' "$passed"
