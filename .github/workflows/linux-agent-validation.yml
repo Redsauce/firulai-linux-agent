@@ -1,0 +1,31 @@
+name: Linux agent validation
+on:
+  push:
+    branches: [feature/firulai-update-catalog, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact source revision
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/Redsauce/firulai-linux-agent.git
+          git fetch --depth 1 origin "$SOURCE_COMMIT"
+          git checkout --detach FETCH_HEAD
+      - name: Validate scripts and update behavior
+        run: |
+          bash -n rs_agent.sh install.sh rs_agent_runner.sh api_endpoint.sh uninstall.sh
+          bash scripts/test_auto_update.sh
+          bash scripts/test_install_source.sh
+          bash scripts/test_update_runner.sh
+          bash tests/system-eligibility.Tests.sh
+      - name: Read production catalog without credentials
+        run: bash scripts/test_public_catalog.sh
+      - name: Exercise real systemd migration in the isolated runner VM
+        run: sudo bash scripts/test_systemd_update_polling.sh
