@@ -1,6 +1,6 @@
 # Actualizacion automatica Linux
 
-## Catalogo Firulai y consulta horaria (0.4.7, pendiente de publicar)
+## Catalogo Firulai y consulta horaria (0.4.7)
 
 La nueva seleccion y programacion esta documentada en
 [releases/0.4.7.md](releases/0.4.7.md). El agente consulta el catalogo publico de
