@@ -578,7 +578,7 @@ mark_system_disconnected_in_rsm() {
         fi
         sleep 1
     done
-    error "$(t mark_failed)"
+    error "$(t mark_failed) (confirmation_not_verified)"
     return 1
 
 }
@@ -646,7 +646,7 @@ main() {
        init_private_tmp_dir &&
        . "$(dirname -- "${BASH_SOURCE[0]}")/api_endpoint.sh" &&
        rsm_load_base; then
-        mark_system_disconnected_in_rsm || { error "$(t mark_failed)"; exit 1; }
+        mark_system_disconnected_in_rsm || exit 1
     else
         error "$(t mark_failed)"
         exit 1

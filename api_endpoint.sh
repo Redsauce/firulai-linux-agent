@@ -111,7 +111,23 @@ rsm_check_system_uuid() {
     return 0
 }
 
-# Confirmation of queued uninstall event; missing/ambiguous/error replies fail closed.
+# Verify an empty System lookup independently. No redirects may carry the token.
+rsm_confirm_system_missing() {
+    local uuid="$1" token="$2" response status body
+    [[ "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || return 1
+    response=$(rsm_curl --silent --show-error --max-time 10 --request POST \
+        'https://firulai.redsauce.net/api/agents/uninstall/missing-system' \
+        --header "Authorization: $token" --header 'Content-Type: application/json' \
+        --data "{\"uuid\":\"$uuid\"}" --write-out $'\n%{http_code}') || return 1
+    status="${response##*$'\n'}"; body="${response%$'\n'*}"
+    [ "$status" = 200 ] || return 1
+    # Exact server contract: neither a generic 200 nor an empty/error object
+    # authorizes local deletion. Both reads and account authentication must pass.
+    local contract='^[[:space:]]*\{[[:space:]]*"missing"[[:space:]]*:[[:space:]]*true[[:space:]]*,[[:space:]]*"verified"[[:space:]]*:[[:space:]]*true[[:space:]]*\}[[:space:]]*$'
+    [[ "$body" =~ $contract ]]
+}
+
+# Confirmation of queued uninstall event; ambiguous/error replies fail closed.
 rsm_check_uninstallation() {
     local uuid="$1" token="$2" response status body count
     rsm_load_base || return 1
@@ -120,7 +136,12 @@ rsm_check_uninstallation() {
     status="${response##*$'\n'}"; body="${response%$'\n'*}"
     [ "$status" = 200 ] && ! rsm_response_has_api_error "$body" || return 1
     count=$(printf '%s' "$body" | { grep -Eio "\"1780\"[[:space:]]*:[[:space:]]*\"$uuid\"" || true; } | wc -l | tr -d '[:space:]')
-    [ "$count" = 0 ] && [ "$(printf '%s' "$body" | tr -d '[:space:]')" = "[]" ] && return 0
+    if [ "$count" = 0 ]; then
+        case "$(printf '%s' "$body" | tr -d '[:space:]')" in
+            '[]'|'{}') rsm_confirm_system_missing "$uuid" "$token"; return $? ;;
+            *) return 1 ;;
+        esac
+    fi
     [ "$count" = 1 ] || return 1
     # Status and coverage must belong to the single returned System, not a
     # second row or duplicate property elsewhere in the response.
