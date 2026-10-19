@@ -76,11 +76,11 @@ t() {
         es_ES:query_failed) printf '%s' "No se pudo consultar el sistema en RSM" ;;
         es_ES:query_denied) printf '%s' "RSM no permitio consultar el sistema" ;;
         es_ES:response) printf '%s' "Respuesta" ;;
-        es_ES:marking_inactive) printf '%s' "Marcando sistema como inactivo en Firulai..." ;;
+        es_ES:marking_inactive) printf '%s' "Desinstalar agente" ;;
         es_ES:no_system) printf '%s' "No hay ningun System enlazado a este UUID en Firulai. La desinstalacion local continuara." ;;
-        es_ES:mark_failed) printf '%s' "No se pudo marcar el sistema como inactivo en RSM" ;;
+        es_ES:mark_failed) printf '%s' "Necesitas conexión con Firulai. Si no se confirma la operación, la desinstalación se cancela y el agente permanece instalado." ;;
         es_ES:mark_denied) printf '%s' "RSM no permitio marcar el sistema como inactivo" ;;
-        es_ES:marked) printf '%s' "Sistema marcado como inactivo en Firulai" ;;
+        es_ES:marked) printf '%s' "Agente desinstalado" ;;
         es_ES:removing_schedule) printf '%s' "Eliminando ejecucion automatica..." ;;
         es_ES:cron_removed) printf '%s' "Entradas de cron eliminadas" ;;
         es_ES:cron_update_failed) printf '%s' "No se pudo actualizar crontab o no habia entradas configuradas" ;;
@@ -111,11 +111,11 @@ t() {
         ca_ES:query_failed) printf '%s' "No s'ha pogut consultar el sistema a RSM" ;;
         ca_ES:query_denied) printf '%s' "RSM no ha permes consultar el sistema" ;;
         ca_ES:response) printf '%s' "Resposta" ;;
-        ca_ES:marking_inactive) printf '%s' "Marcant sistema com a inactiu a Firulai..." ;;
+        ca_ES:marking_inactive) printf '%s' "Desinstal·lar agent" ;;
         ca_ES:no_system) printf '%s' "No hi ha cap System enllacat a aquest UUID a Firulai. La desinstal.lacio local continuara." ;;
-        ca_ES:mark_failed) printf '%s' "No s'ha pogut marcar el sistema com a inactiu a RSM" ;;
+        ca_ES:mark_failed) printf '%s' "Cal connexió amb Firulai. Sense confirmació es cancel·la la desinstal·lació i l’agent continua instal·lat." ;;
         ca_ES:mark_denied) printf '%s' "RSM no ha permes marcar el sistema com a inactiu" ;;
-        ca_ES:marked) printf '%s' "Sistema marcat com a inactiu a Firulai" ;;
+        ca_ES:marked) printf '%s' "Agent desinstal·lat" ;;
         ca_ES:removing_schedule) printf '%s' "Eliminant execucio automatica..." ;;
         ca_ES:cron_removed) printf '%s' "Entrades de cron eliminades" ;;
         ca_ES:cron_update_failed) printf '%s' "No s'ha pogut actualitzar crontab o no hi havia entrades configurades" ;;
@@ -136,9 +136,9 @@ t() {
         eu_ES:local_only) printf '%s' "Ekintza honek agente lokalaren instalazioa bakarrik kenduko du." ;;
         eu_ES:manual_usage) printf '%s' "Eskuzko erabilera: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         eu_ES:mark_denied) printf '%s' "RSM-k ez zuen sistema inaktibo gisa markatzea baimendu" ;;
-        eu_ES:mark_failed) printf '%s' "Ezin izan da sistema inaktibo gisa markatu RSMn" ;;
-        eu_ES:marked) printf '%s' "Sistema inaktibo gisa markatu da Firulai-n" ;;
-        eu_ES:marking_inactive) printf '%s' "Firulai-n inaktibo gisa markatzeko sistema..." ;;
+        eu_ES:mark_failed) printf '%s' "Firulairekin konexioa behar da. Berrespenik gabe desinstalazioa bertan behera uzten da eta agentea instalatuta geratzen da." ;;
+        eu_ES:marked) printf '%s' "Agentea desinstalatuta" ;;
+        eu_ES:marking_inactive) printf '%s' "Agentea desinstalatu" ;;
         eu_ES:missing_token_uuid) printf '%s' "Ezin izan da token edo UUID aurkitu RSM jakinarazteko" ;;
         eu_ES:mktemp_missing) printf '%s' "mktemp ez dago erabilgarri" ;;
         eu_ES:no_root_uninstall) printf '%s' "Errorik gabeko modua: oraingo erabiltzailearen instalazioa bakarrik kenduko da." ;;
@@ -170,9 +170,9 @@ t() {
         gl_ES:local_only) printf '%s' "Esta acción só eliminará a instalación do axente local." ;;
         gl_ES:manual_usage) printf '%s' "Uso manual: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         gl_ES:mark_denied) printf '%s' "RSM non permitiu marcar o sistema como inactivo" ;;
-        gl_ES:mark_failed) printf '%s' "Non se puido marcar o sistema como inactivo en RSM" ;;
-        gl_ES:marked) printf '%s' "Sistema marcado como inactivo en Firulai" ;;
-        gl_ES:marking_inactive) printf '%s' "Sistema de marcado como inactivo en Firulai..." ;;
+        gl_ES:mark_failed) printf '%s' "Precisas conexión con Firulai. Sen confirmación cancélase a desinstalación e o axente segue instalado." ;;
+        gl_ES:marked) printf '%s' "Axente desinstalado" ;;
+        gl_ES:marking_inactive) printf '%s' "Desinstalar axente" ;;
         gl_ES:missing_token_uuid) printf '%s' "Non se puido atopar o token ou o UUID para notificar a RSM" ;;
         gl_ES:mktemp_missing) printf '%s' "mktemp non está dispoñible" ;;
         gl_ES:no_root_uninstall) printf '%s' "Modo sen root: só se eliminará a instalación do usuario actual." ;;
@@ -204,9 +204,9 @@ t() {
         fr_FR:local_only) printf '%s' "Cette action supprimera uniquement l'installation de l'agent local." ;;
         fr_FR:manual_usage) printf '%s' "Utilisation manuelle : bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         fr_FR:mark_denied) printf '%s' "RSM n'a pas permis de marquer le système comme inactif" ;;
-        fr_FR:mark_failed) printf '%s' "Impossible de marquer le système comme inactif dans RSM" ;;
-        fr_FR:marked) printf '%s' "Système marqué comme inactif à Firulai" ;;
-        fr_FR:marking_inactive) printf '%s' "Système de marquage comme inactif à Firulai..." ;;
+        fr_FR:mark_failed) printf '%s' "Une connexion à Firulai est nécessaire. Sans confirmation, la désinstallation est annulée et l’agent reste installé." ;;
+        fr_FR:marked) printf '%s' "Agent désinstallé" ;;
+        fr_FR:marking_inactive) printf '%s' "Désinstaller l’agent" ;;
         fr_FR:missing_token_uuid) printf '%s' "Impossible de trouver le jeton ou l'UUID pour informer RSM" ;;
         fr_FR:mktemp_missing) printf '%s' "mktemp n'est pas disponible" ;;
         fr_FR:no_root_uninstall) printf '%s' "Mode sans root : seule l'installation de l'utilisateur actuel sera supprimée." ;;
@@ -238,9 +238,9 @@ t() {
         de_DE:local_only) printf '%s' "Durch diese Aktion wird nur die lokale Agenteninstallation entfernt." ;;
         de_DE:manual_usage) printf '%s' "Manuelle Verwendung: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         de_DE:mark_denied) printf '%s' "RSM erlaubte nicht, das System als inaktiv zu markieren" ;;
-        de_DE:mark_failed) printf '%s' "Das System konnte in RSM nicht als inaktiv markiert werden" ;;
-        de_DE:marked) printf '%s' "System in Firulai als inaktiv markiert" ;;
-        de_DE:marking_inactive) printf '%s' "System in Firulai als inaktiv markieren..." ;;
+        de_DE:mark_failed) printf '%s' "Eine Verbindung zu Firulai ist erforderlich. Ohne Bestätigung wird die Deinstallation abgebrochen und der Agent bleibt installiert." ;;
+        de_DE:marked) printf '%s' "Agent deinstalliert" ;;
+        de_DE:marking_inactive) printf '%s' "Agent deinstallieren" ;;
         de_DE:missing_token_uuid) printf '%s' "Token oder UUID zur Benachrichtigung von RSM konnten nicht gefunden werden" ;;
         de_DE:mktemp_missing) printf '%s' "mktemp ist nicht verfügbar" ;;
         de_DE:no_root_uninstall) printf '%s' "No-Root-Modus: Nur die Installation des aktuellen Benutzers wird entfernt." ;;
@@ -272,9 +272,9 @@ t() {
         it_IT:local_only) printf '%s' "Questa azione rimuoverà solo l'installazione dell'agente locale." ;;
         it_IT:manual_usage) printf '%s' "Utilizzo manuale: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         it_IT:mark_denied) printf '%s' "RSM non ha consentito di contrassegnare il sistema come inattivo" ;;
-        it_IT:mark_failed) printf '%s' "Impossibile contrassegnare il sistema come inattivo in RSM" ;;
-        it_IT:marked) printf '%s' "Sistema contrassegnato come inattivo a Firulai" ;;
-        it_IT:marking_inactive) printf '%s' "Sistema di contrassegno come inattivo in Firulai..." ;;
+        it_IT:mark_failed) printf '%s' "Serve una connessione a Firulai. Senza conferma la disinstallazione viene annullata e l’agente rimane installato." ;;
+        it_IT:marked) printf '%s' "Agente disinstallato" ;;
+        it_IT:marking_inactive) printf '%s' "Disinstalla agente" ;;
         it_IT:missing_token_uuid) printf '%s' "Impossibile trovare il token o l'UUID per notificare RSM" ;;
         it_IT:mktemp_missing) printf '%s' "mktemp non è disponibile" ;;
         it_IT:no_root_uninstall) printf '%s' "Modalità no-root: verrà rimossa solo l'installazione dell'utente corrente." ;;
@@ -306,9 +306,9 @@ t() {
         ja_JP:local_only) printf '%s' "この操作では、ローカル エージェントのインストールのみが削除されます。" ;;
         ja_JP:manual_usage) printf '%s' "手動使用: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         ja_JP:mark_denied) printf '%s' "RSM はシステムを非アクティブとしてマークすることを許可していませんでした" ;;
-        ja_JP:mark_failed) printf '%s' "RSM でシステムを非アクティブとしてマークできませんでした" ;;
-        ja_JP:marked) printf '%s' "Firulai でシステムが非アクティブとしてマークされている" ;;
-        ja_JP:marking_inactive) printf '%s' "Firulai でシステムを非アクティブとしてマークしています..." ;;
+        ja_JP:mark_failed) printf '%s' "Firulaiへの接続が必要です。確認できない場合はアンインストールを中止し、エージェントを残します。" ;;
+        ja_JP:marked) printf '%s' "エージェント未インストール" ;;
+        ja_JP:marking_inactive) printf '%s' "エージェントをアンインストール" ;;
         ja_JP:missing_token_uuid) printf '%s' "RSM に通知するトークンまたは UUID が見つかりませんでした" ;;
         ja_JP:mktemp_missing) printf '%s' "mktemp は使用できません" ;;
         ja_JP:no_root_uninstall) printf '%s' "ルートなしモード: 現在のユーザーのインストールのみが削除されます。" ;;
@@ -340,9 +340,9 @@ t() {
         zh_CN:local_only) printf '%s' "此操作只会删除本地代理安装。" ;;
         zh_CN:manual_usage) printf '%s' "手动使用：bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
         zh_CN:mark_denied) printf '%s' "RSM 不允许将系统标记为非活动状态" ;;
-        zh_CN:mark_failed) printf '%s' "无法在 RSM 中将系统标记为非活动状态" ;;
-        zh_CN:marked) printf '%s' "系统在 Firulai 标记为非活动状态" ;;
-        zh_CN:marking_inactive) printf '%s' "在 Firulai 中将系统标记为非活动状态..." ;;
+        zh_CN:mark_failed) printf '%s' "需要连接 Firulai。无法确认时将取消卸载，代理仍保留安装。" ;;
+        zh_CN:marked) printf '%s' "代理已卸载" ;;
+        zh_CN:marking_inactive) printf '%s' "卸载代理" ;;
         zh_CN:missing_token_uuid) printf '%s' "找不到用于通知 RSM 的令牌或 UUID" ;;
         zh_CN:mktemp_missing) printf '%s' "mktemp 不可用" ;;
         zh_CN:no_root_uninstall) printf '%s' "无root模式：仅删除当前用户的安装。" ;;
@@ -384,11 +384,11 @@ t() {
         *:query_failed) printf '%s' "Could not query the system in RSM" ;;
         *:query_denied) printf '%s' "RSM did not allow querying the system" ;;
         *:response) printf '%s' "Response" ;;
-        *:marking_inactive) printf '%s' "Marking system as inactive in Firulai..." ;;
+        *:marking_inactive) printf '%s' "Uninstall agent" ;;
         *:no_system) printf '%s' "No System is linked to this UUID in Firulai. Local uninstall will continue." ;;
-        *:mark_failed) printf '%s' "Could not mark the system as inactive in RSM" ;;
+        *:mark_failed) printf '%s' "A connection to Firulai is required. Without confirmation, uninstallation is cancelled and the agent remains installed." ;;
         *:mark_denied) printf '%s' "RSM did not allow marking the system as inactive" ;;
-        *:marked) printf '%s' "System marked as inactive in Firulai" ;;
+        *:marked) printf '%s' "Agent uninstalled" ;;
         *:removing_schedule) printf '%s' "Removing automatic execution..." ;;
         *:cron_removed) printf '%s' "Cron entries removed" ;;
         *:cron_update_failed) printf '%s' "Could not update crontab or no entries were configured" ;;
@@ -536,7 +536,7 @@ mark_system_disconnected_in_rsm() {
     response_file=$(make_private_temp_file "rsm_uninstall_status_update") || return 1
     local_hostname=$(hostname 2>/dev/null || true)
     local_fqdn=$(hostname -f 2>/dev/null || printf '%s' "$local_hostname")
-    payload="{\"uuid\":\"$(json_escape "$UUID_VAL")\",\"action\":\"disconnect\",\"hostname\":\"$(json_escape "$local_hostname")\",\"fqdn\":\"$(json_escape "$local_fqdn")\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
+    payload="{\"uuid\":\"$(json_escape "$UUID_VAL")\",\"action\":\"uninstall\",\"hostname\":\"$(json_escape "$local_hostname")\",\"fqdn\":\"$(json_escape "$local_fqdn")\",\"RStoken\":\"$(json_escape "$AGENT_TOKEN")\"}"
 
     http_code=$(rsm_request \
         --silent \
@@ -569,26 +569,18 @@ mark_system_disconnected_in_rsm() {
         return 1
     fi
 
-    if [ -z "$(printf '%s' "$response_body" | tr -d '[:space:]')" ]; then
-        log "$(t marked)"
-        return 0
-    fi
+    # Events may be queued: verify persisted status and coverage before deleting.
+    local attempt
+    for ((attempt=0; attempt<20; attempt++)); do
+        if rsm_check_uninstallation "$UUID_VAL" "$AGENT_TOKEN"; then
+            log "$(t marked)"
+            return 0
+        fi
+        sleep 1
+    done
+    error "$(t mark_failed)"
+    return 1
 
-    if printf '%s' "$response_body" | grep -Eq '"systemFound"[[:space:]]*:[[:space:]]*false' && \
-       printf '%s' "$response_body" | grep -Eq '"disconnected"[[:space:]]*:[[:space:]]*false'; then
-        info "$(t no_system)"
-        return 0
-    fi
-
-    if ! printf '%s' "$response_body" | grep -Eq '"systemFound"[[:space:]]*:[[:space:]]*true' || \
-       ! printf '%s' "$response_body" | grep -Eq '"disconnected"[[:space:]]*:[[:space:]]*true'; then
-        error "$(t mark_failed)"
-        echo "$(t response): $response_body"
-        return 1
-    fi
-
-    log "$(t marked)"
-    return 0
 }
 
 remove_automatic_execution() {
@@ -642,14 +634,22 @@ main() {
     parse_args "$@"
     confirm_uninstall
 
+    # Exclude a scheduled/manual inventory while confirming and removing files.
+    local lock_file="${RS_AGENT_LOCK_FILE:-$DATA_DIR/rs-agent.lock}"
+    [ "$RUN_AS_ROOT" = "1" ] && lock_file="${RS_AGENT_LOCK_FILE:-/run/lock/rs-agent.lock}"
+    command -v flock >/dev/null 2>&1 || { error "$(t mark_failed)"; exit 1; }
+    exec 9>"$lock_file" || exit 1
+    flock -w 30 9 || { error "$(t mark_failed)"; exit 1; }
+
     if [ -n "$AGENT_TOKEN" ] && [ -n "$UUID_VAL" ] &&
        [[ "$UUID_VAL" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] &&
        init_private_tmp_dir &&
        . "$(dirname -- "${BASH_SOURCE[0]}")/api_endpoint.sh" &&
        rsm_load_base; then
-        mark_system_disconnected_in_rsm || warn "$(t mark_failed)"
+        mark_system_disconnected_in_rsm || { error "$(t mark_failed)"; exit 1; }
     else
-        warn "$(t mark_failed)"
+        error "$(t mark_failed)"
+        exit 1
     fi
 
     remove_automatic_execution
@@ -662,4 +662,6 @@ main() {
     echo ""
 }
 
-main "$@"
+if [ "${RS_AGENT_UNINSTALL_LIBRARY_ONLY:-0}" != "1" ]; then
+    main "$@"
+fi

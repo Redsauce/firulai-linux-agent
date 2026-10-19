@@ -110,3 +110,24 @@ rsm_check_system_uuid() {
     [ "$coverage" = "covered" ] || return 6
     return 0
 }
+
+# Confirmation of queued uninstall event; missing/ambiguous/error replies fail closed.
+rsm_check_uninstallation() {
+    local uuid="$1" token="$2" response status body count
+    rsm_load_base || return 1
+    local payload="{\"itemTypeID\":\"191\",\"propertyIDs\":[\"1780\",\"1751\",\"1972\"],\"translateIDs\":false,\"filterRules\":[{\"propertyID\":\"1780\",\"value\":\"$uuid\",\"operation\":\"=\"}]}"
+    response=$(rsm_curl --silent --show-error --max-time 5 --request POST "${RSM_BASE_URL%/}/commands_RSM/api/v2/items/get.php" --header "Authorization: $token" --header 'Content-Type: application/json' --data "$payload" --write-out $'\n%{http_code}') || return 1
+    status="${response##*$'\n'}"; body="${response%$'\n'*}"
+    [ "$status" = 200 ] && ! rsm_response_has_api_error "$body" || return 1
+    count=$(printf '%s' "$body" | { grep -Eio "\"1780\"[[:space:]]*:[[:space:]]*\"$uuid\"" || true; } | wc -l | tr -d '[:space:]')
+    [ "$count" = 0 ] && [ "$(printf '%s' "$body" | tr -d '[:space:]')" = "[]" ] && return 0
+    [ "$count" = 1 ] || return 1
+    # Status and coverage must belong to the single returned System, not a
+    # second row or duplicate property elsewhere in the response.
+    local property
+    for property in 1780 1751 1972; do
+        [ "$(printf '%s' "$body" | grep -Eo "\"$property\"[[:space:]]*:" | wc -l | tr -d '[:space:]')" = 1 ] || return 1
+    done
+    printf '%s' "$body" | grep -Eq '"1751"[[:space:]]*:[[:space:]]*"Agente desinstalado"' || return 1
+    printf '%s' "$body" | grep -Eq '"1972"[[:space:]]*:[[:space:]]*"uncovered"'
+}
