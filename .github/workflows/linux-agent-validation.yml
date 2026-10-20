@@ -27,5 +27,7 @@ jobs:
           bash tests/system-eligibility.Tests.sh
       - name: Read production catalog without credentials
         run: bash scripts/test_public_catalog.sh
+      - name: Validate collection status and inventory metadata
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: Exercise real systemd migration in the isolated runner VM
         run: sudo bash scripts/test_systemd_update_polling.sh

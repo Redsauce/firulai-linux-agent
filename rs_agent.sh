@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Firulai Inventory Agent
-# Version: 0.4.7 - Firulai update catalog and independent hourly polling
+# Version: 0.4.11 - Live collection status for manual and scheduled runs
 # Requires: bash 4+, curl, lscpu, lsblk, uname
 #
 
@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.10"
+AGENT_VERSION="0.4.11"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/rs_agent.sh}"
@@ -1909,6 +1909,51 @@ validate_runtime_system() {
 
 # ============ MAIN ============
 
+report_collection_status() {
+    local state="$1" endpoint="${RS_AGENT_COLLECTION_URL:-https://firulai.redsauce.net/api/agents/collection-status}"
+    case "$endpoint" in https://*) ;; *) return 0 ;; esac
+    curl --silent --connect-timeout 2 --max-time 4 --proto '=https' \
+        --request POST "$endpoint" --header "Authorization: $AGENT_TOKEN" \
+        --header 'Content-Type: application/json' \
+        --data "{\"uuid\":\"$(json_escape "$UUID_VAL")\",\"hostname\":\"$(json_escape "$COLLECTION_HOSTNAME")\",\"fqdn\":\"$(json_escape "$COLLECTION_FQDN")\",\"platform\":\"linux\",\"runId\":\"$COLLECTION_RUN_ID\",\"state\":\"$state\"}" \
+        >/dev/null 2>&1 || true
+}
+
+finish_collection_status() {
+    local result=$?
+    trap - EXIT
+    if [ -n "${COLLECTION_WORKER_PID:-}" ]; then
+        kill "$COLLECTION_WORKER_PID" 2>/dev/null || true
+        wait "$COLLECTION_WORKER_PID" 2>/dev/null || true
+    fi
+    report_collection_status finish
+    return "$result"
+}
+
+start_collection_status() {
+    COLLECTION_RUN_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null) || return 0
+    COLLECTION_HOSTNAME=$(hostname -s 2>/dev/null || hostname)
+    COLLECTION_FQDN=$(hostname -f 2>/dev/null || hostname)
+    local owner_pid=$$
+    report_collection_status start
+    (
+        trap - EXIT
+        trap 'exit 0' INT TERM
+        # Do not retain the inventory execution lock in the heartbeat worker.
+        exec 9>&-
+        while kill -0 "$owner_pid" 2>/dev/null; do
+            sleep 45 &
+            wait $! || exit 0
+            kill -0 "$owner_pid" 2>/dev/null || exit 0
+            report_collection_status heartbeat
+        done
+    ) >/dev/null 2>&1 &
+    COLLECTION_WORKER_PID=$!
+    trap finish_collection_status EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+}
+
 main() {
     parse_args "$@"
 
@@ -1939,6 +1984,7 @@ main() {
     check_for_updates || echo "Automatic update failed; inventory can continue." >&2
     if [ "$UPDATE_ONLY" = 1 ]; then return 0; fi
     validate_runtime_system || exit 1
+    start_collection_status
 
     # --- Timezone ---
     echo "$(t collecting_timezone)"

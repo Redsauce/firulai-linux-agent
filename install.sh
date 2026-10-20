@@ -535,7 +535,7 @@ fi
 
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
-INSTALLER_AGENT_VERSION="0.4.10"
+INSTALLER_AGENT_VERSION="0.4.11"
 GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$INSTALLER_AGENT_VERSION}"
 RSM_SYSTEM_ITEM_TYPE_ID="191"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"

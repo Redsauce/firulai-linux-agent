@@ -2,6 +2,18 @@
 
 Linux system analysis agent for vulnerability detection. It collects system information, installed packages, and relevant software data, then sends the inventory to Firulai/RSM.
 
+## Collection indicator (0.4.11)
+
+Manual and scheduled inventory runs report start, a heartbeat every 45 seconds,
+and finish to `/api/agents/collection-status`. Firulai shows “Collecting data”
+during collection/upload and removes it on finish. A three-minute lease clears
+interrupted runs. Status-report failures never block inventory. Existing agents
+need the updated agent and backend before the indicator can appear.
+
+The default destination is `https://firulai.redsauce.net/api/agents/collection-status`.
+For isolated tests, `RS_AGENT_COLLECTION_URL` may select a different HTTPS endpoint;
+redirects are not followed with agent credentials. No RSM script changes are needed.
+
 ## No-Root Installation
 
 The external command remains the same shape as the UI-provided installer command:
