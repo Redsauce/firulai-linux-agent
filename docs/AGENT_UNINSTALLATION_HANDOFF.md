@@ -1,5 +1,25 @@
 # Continuar la desinstalaci?n Linux
 
+## Publicacion 2026-10-20: Linux 0.4.10
+
+Linux 0.4.10 esta publicado en GitHub desde el commit 3106b7d. El catalogo de
+produccion confirma 0.4.10 tras la seleccion de la usuaria. Los cinco scripts
+publicos coinciden por SHA256 con las fuentes; no se han sustituido paquetes
+anteriores. Esta version conserva una copia privada de configuracion y helpers
+para reintentar si falla parcialmente el borrado local despues de confirmar la
+baja. No reactiva el sistema ni recupera una plaza automaticamente.
+
+Pasan las pruebas de confirmacion/cancelacion, demora y reintento, recuperacion
+de borrado parcial en modos root/usuario, actualizacion y runner. El caso de
+ficha eliminada previamente pasa tambien ejecutando el entrypoint real como
+root en un chroot desechable: ausencia verificada permite retirar; falta de
+conexion o confirmacion 403 conserva la instalacion y su programacion. HTTP y
+planificadores estan simulados y no se tocaron sistemas monitorizados.
+Consultar tests/uninstallation-root-missing-system-results.md para ese limite.
+
+El minimo visual de Firulai permanece en 0.4.8; el catalogo recomienda 0.4.10.
+Los apartados siguientes conservan el registro anterior.
+
 ## Preparación para pruebas, 19 de octubre
 
 Linux **0.4.8** está publicado: https://github.com/Redsauce/firulai-linux-agent/releases/tag/0.4.8 . La etiqueta apunta a `d49018a`; incluye los cambios de desinstalación y fija la misma versión en `install.sh` y `rs_agent.sh`.
