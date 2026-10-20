@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.9"
+AGENT_VERSION="0.4.10"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/rs_agent.sh}"

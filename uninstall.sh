@@ -616,15 +616,40 @@ remove_automatic_execution() {
 remove_local_files() {
     info "$(t removing_files)"
 
-    local failed=0
+    # A partial rm can remove credentials or the uninstaller before reporting
+    # failure. Preserve only the retry essentials in a private external directory.
+    local failed=0 recovery
+    recovery=$(mktemp -d /tmp/rs-agent-uninstall.XXXXXX) || return 1
+    chmod 700 "$recovery" || return 1
+    if ! cp -p "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/api_endpoint.sh" "$recovery/"; then
+        rm -rf -- "$recovery"
+        return 1
+    fi
+    if [ -f "$CONFIG_FILE" ]; then
+        cp -p "$CONFIG_FILE" "$recovery/config.env" || { rm -rf -- "$recovery"; return 1; }
+    else
+        (umask 077; printf 'AGENT_TOKEN=%q\nUUID=%q\nAGENT_LOCALE=%q\n' \
+            "$AGENT_TOKEN" "$UUID_VAL" "$AGENT_LOCALE" > "$recovery/config.env") || return 1
+    fi
     rm -rf "$DATA_DIR" || failed=1
     rm -rf "$INSTALL_DIR" || failed=1
     rm -f "$LOG_FILE" || failed=1
 
     if [ "$failed" -ne 0 ]; then
+        if ensure_private_directory "$DATA_DIR" && ensure_private_directory "$INSTALL_DIR" &&
+           cp -p "$recovery/config.env" "$CONFIG_FILE" &&
+           chmod 600 "$CONFIG_FILE" &&
+           cp -p "$recovery/uninstall.sh" "$recovery/api_endpoint.sh" "$INSTALL_DIR/"; then
+            rm -rf -- "$recovery"
+            error "$(t removing_files) (cleanup_failed; retry: bash $INSTALL_DIR/uninstall.sh)"
+        else
+            # Do not destroy the only recovery copy if permissions prevent restore.
+            error "$(t removing_files) (cleanup_failed; recovery: $recovery)"
+        fi
         return 1
     fi
 
+    rm -rf -- "$recovery"
     log "$(t files_removed)"
 }
 
