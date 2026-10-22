@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Firulai Inventory Agent
-# Version: 0.4.11 - Live collection status for manual and scheduled runs
+# Version: 0.4.12 - Active subscription messages
 # Requires: bash 4+, curl, lscpu, lsblk, uname
 #
 
@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.11"
+AGENT_VERSION="0.4.12"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/rs_agent.sh}"
@@ -63,16 +63,26 @@ normalize_locale() {
 t() {
     local key="$1"
     case "$(normalize_locale "$AGENT_LOCALE"):$key" in
-        es_ES:runtime_not_allowed) printf '%s' "ERROR: El sistema debe estar activo y tener cobertura para enviar el inventario." ;;
-        ca_ES:runtime_not_allowed) printf '%s' "ERROR: El sistema ha d'estar actiu i tenir cobertura per enviar l'inventari." ;;
-        eu_ES:runtime_not_allowed) printf '%s' "ERROREA: Sistemak aktibo eta estaldurarekin egon behar du inbentarioa bidaltzeko." ;;
-        gl_ES:runtime_not_allowed) printf '%s' "ERRO: O sistema debe estar activo e ter cobertura para enviar o inventario." ;;
-        fr_FR:runtime_not_allowed) printf '%s' "ERREUR : Le système doit être actif et couvert pour envoyer l'inventaire." ;;
-        de_DE:runtime_not_allowed) printf '%s' "FEHLER: Das System muss aktiv sein und eine Abdeckung haben, um das Inventar zu senden." ;;
-        it_IT:runtime_not_allowed) printf '%s' "ERRORE: Il sistema deve essere attivo e coperto per inviare l'inventario." ;;
-        ja_JP:runtime_not_allowed) printf '%s' "エラー: インベントリを送信するには、システムが有効でカバレッジを持つ必要があります。" ;;
-        zh_CN:runtime_not_allowed) printf '%s' "错误：系统必须处于活动状态并具有覆盖才能发送清单。" ;;
-        *:runtime_not_allowed) printf '%s' "ERROR: The system must be active and covered to send inventory." ;;
+        es_ES:runtime_not_allowed) printf '%s' "ERROR: El agente no está activo en este sistema. No se recopilan ni se envían datos." ;;
+        es_ES:runtime_no_subscription) printf '%s' "ERROR: Este sistema no tiene una suscripción activa. No se recopilan ni se envían datos." ;;
+        ca_ES:runtime_not_allowed) printf '%s' "ERROR: L’agent no està actiu en aquest sistema. No es recullen ni s’envien dades." ;;
+        ca_ES:runtime_no_subscription) printf '%s' "ERROR: Aquest sistema no té una subscripció activa. No es recullen ni s’envien dades." ;;
+        eu_ES:runtime_not_allowed) printf '%s' "ERROREA: Agentea ez dago aktibo sistema honetan. Ez da daturik biltzen edo bidaltzen." ;;
+        eu_ES:runtime_no_subscription) printf '%s' "ERROREA: Sistema honek ez du harpidetza aktiborik. Ez da daturik biltzen edo bidaltzen." ;;
+        gl_ES:runtime_not_allowed) printf '%s' "ERRO: O axente non está activo neste sistema. Non se recollen nin se envían datos." ;;
+        gl_ES:runtime_no_subscription) printf '%s' "ERRO: Este sistema non ten unha subscrición activa. Non se recollen nin se envían datos." ;;
+        fr_FR:runtime_not_allowed) printf '%s' "ERREUR : L’agent n’est pas actif sur ce système. Aucune donnée n’est collectée ni envoyée." ;;
+        fr_FR:runtime_no_subscription) printf '%s' "ERREUR : Ce système ne dispose pas d’un abonnement actif. Aucune donnée n’est collectée ni envoyée." ;;
+        de_DE:runtime_not_allowed) printf '%s' "FEHLER: Der Agent ist auf diesem System nicht aktiv. Es werden keine Daten erfasst oder gesendet." ;;
+        de_DE:runtime_no_subscription) printf '%s' "FEHLER: Dieses System hat kein aktives Abonnement. Es werden keine Daten erfasst oder gesendet." ;;
+        it_IT:runtime_not_allowed) printf '%s' "ERRORE: L’agente non è attivo su questo sistema. Nessun dato viene raccolto o inviato." ;;
+        it_IT:runtime_no_subscription) printf '%s' "ERRORE: Questo sistema non ha un abbonamento attivo. Nessun dato viene raccolto o inviato." ;;
+        ja_JP:runtime_not_allowed) printf '%s' "エラー: このシステムではエージェントが有効ではありません。データの収集や送信は行われません。" ;;
+        ja_JP:runtime_no_subscription) printf '%s' "エラー: このシステムには有効なサブスクリプションがありません。データの収集や送信は行われません。" ;;
+        zh_CN:runtime_not_allowed) printf '%s' "错误：此系统的代理未启用。不会收集或发送数据。" ;;
+        zh_CN:runtime_no_subscription) printf '%s' "错误：此系统没有有效订阅。不会收集或发送数据。" ;;
+        *:runtime_not_allowed) printf '%s' "ERROR: The agent is not active on this system. No data is collected or sent." ;;
+        *:runtime_no_subscription) printf '%s' "ERROR: This system has no active subscription. No data is collected or sent." ;;
         es_ES:flock_missing) printf '%s' "ERROR: flock no esta disponible; instala el paquete util-linux." ;;
         es_ES:already_running) printf '%s' "INFO: Ya hay otra ejecucion del agente en curso; se omite esta solicitud." ;;
         es_ES:unsafe_symlink) printf '%s' "ERROR: Ruta no segura: es un enlace simbolico" ;;
@@ -1901,7 +1911,8 @@ validate_runtime_system() {
     fi
     case "$check_status" in
         2) echo "$(t invalid_uuid_rsm)" >&2 ;;
-        5|6) echo "$(t runtime_not_allowed)" >&2 ;;
+        5) echo "$(t runtime_not_allowed)" >&2 ;;
+        6) echo "$(t runtime_no_subscription)" >&2 ;;
         *) echo "$(t uuid_validate_failed)" >&2 ;;
     esac
     return 1
