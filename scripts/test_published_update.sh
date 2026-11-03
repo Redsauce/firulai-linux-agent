@@ -8,16 +8,16 @@ export TEST_UPDATE_TARGET="$to_version"
 fixture=$(mktemp -d)
 mkdir -p "$fixture/install" "$fixture/data" "$fixture/bin"
 base='https://raw.githubusercontent.com/Redsauce/firulai-linux-agent'
-for file in rs_agent.sh api_endpoint.sh uninstall.sh; do
+for file in firulaiAgent.sh api_endpoint.sh uninstall.sh; do
     curl -fsSL "$base/$from_version/$file" -o "$fixture/install/$file"
 done
-cp "$fixture/install/rs_agent.sh" "$fixture/original.sh"
+cp "$fixture/install/firulaiAgent.sh" "$fixture/original.sh"
 printf "AGENT_AUTO_UPDATE='1'\nUUID='00000000-0000-4000-8000-000000000001'\nAGENT_TOKEN='fixture-only'\n" > "$fixture/data/config.env"
 cp "$fixture/data/config.env" "$fixture/original-config.env"
 cat > "$fixture/bin/bash" <<'RESTART'
 #!/bin/sh
 if [ "$1" = '-n' ]; then exec /bin/bash "$@"; fi
-[ "$1" = "$RS_AGENT_INSTALL_DIR/rs_agent.sh" ] || exit 1
+[ "$1" = "$RS_AGENT_INSTALL_DIR/firulaiAgent.sh" ] || exit 1
 grep -Fxq "AGENT_VERSION=\"$TEST_UPDATE_TARGET\"" "$1" || exit 1
 printf 'restart verified\n' > "$RS_AGENT_DATA_DIR/restart.txt"
 RESTART
@@ -26,7 +26,7 @@ export PATH="$fixture/bin:$PATH"
 export RS_AGENT_INSTALL_DIR="$fixture/install" RS_AGENT_DATA_DIR="$fixture/data"
 run_check() {
     (
-        source <(sed '$d' "$fixture/install/rs_agent.sh")
+        source <(sed '$d' "$fixture/install/firulaiAgent.sh")
         AGENT_TOKEN='fixture-only'
         UUID_VAL='00000000-0000-4000-8000-000000000001'
         AGENT_LOCALE='en_US'
@@ -35,13 +35,13 @@ run_check() {
 }
 run_check
 cmp "$fixture/original-config.env" "$fixture/data/config.env"
-cmp "$fixture/original.sh" "$fixture/install/rs_agent.sh.backup"
-grep -Fxq "AGENT_VERSION=\"$to_version\"" "$fixture/install/rs_agent.sh"
+cmp "$fixture/original.sh" "$fixture/install/firulaiAgent.sh.backup"
+grep -Fxq "AGENT_VERSION=\"$to_version\"" "$fixture/install/firulaiAgent.sh"
 test -s "$fixture/data/restart.txt"
 echo "PASS: released Linux $from_version detects and downloads $to_version, preserves config and delegates restart."
 # Exercise the new pinned downloader directly using the published tag.
 (
-    source <(sed '$d' "$fixture/install/rs_agent.sh")
+    source <(sed '$d' "$fixture/install/firulaiAgent.sh")
     AGENT_TOKEN='fixture-only'
     UUID_VAL='00000000-0000-4000-8000-000000000001'
     AGENT_LOCALE='en_US'

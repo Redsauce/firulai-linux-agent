@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-. <(sed -n '/^is_newer_version() {/,/^# ============ SEND TO RSM/p' rs_agent.sh | sed '$d')
+. <(sed -n '/^is_newer_version() {/,/^# ============ SEND TO RSM/p' firulaiAgent.sh | sed '$d')
 fixture=$(mktemp -d)
 trap 'rm -rf -- "$fixture"' EXIT
 CONFIG_FILE="$fixture/config.env"
@@ -45,30 +45,30 @@ printf "AGENT_AUTO_UPDATE='0'\n" > "$CONFIG_FILE"
 check_for_updates
 [ "$(wc -l < "$fixture/catalog-requests")" = 3 ]
 printf "AGENT_AUTO_UPDATE='1'\n" > "$CONFIG_FILE"
-. <(sed -n '/^download_update() {/,/^ensure_update_polling() {/p' rs_agent.sh | sed '$d')
-printf '#!/bin/bash\necho original\n' > "$INSTALL_DIR/rs_agent.sh"
+. <(sed -n '/^download_update() {/,/^ensure_update_polling() {/p' firulaiAgent.sh | sed '$d')
+printf '#!/bin/bash\necho original\n' > "$INSTALL_DIR/firulaiAgent.sh"
 curl() {
     local url="${@: -3:1}" output="${@: -1}"
     printf '%s\n' "$url" >> "$fixture/requests"
     case "$url" in
-        */v0.4.4/rs_agent.sh) printf '#!/bin/bash\nAGENT_VERSION="0.4.4"\nprintf "upgraded\\n"\nprintf "args:%%s\\n" "$*"\n' > "$output" ;;
-        */v0.4.4/rs_agent_runner.sh) printf '#!/bin/bash\nFIRULAI_UPDATE_POLLING_VERSION=1\n' > "$output" ;;
+        */v0.4.4/firulaiAgent.sh) printf '#!/bin/bash\nAGENT_VERSION="0.4.4"\nprintf "upgraded\\n"\nprintf "args:%%s\\n" "$*"\n' > "$output" ;;
+        */v0.4.4/firulaiAgent_runner.sh) printf '#!/bin/bash\nFIRULAI_UPDATE_POLLING_VERSION=1\n' > "$output" ;;
         */v0.4.4/api_endpoint.sh|*/v0.4.4/uninstall.sh) printf '#!/bin/bash\n:\n' > "$output" ;;
         *) return 1 ;;
     esac
 }
 case "$(download_update v0.4.4)" in *upgraded*--check-updates*) ;; *) exit 1 ;; esac
-grep -q original "$INSTALL_DIR/rs_agent.sh.backup"
+grep -q original "$INSTALL_DIR/firulaiAgent.sh.backup"
 ! grep -q '/main/' "$fixture/requests"
 curl() { printf '#!/bin/bash\nAGENT_VERSION="0.4.5"\n' > "${@: -1}"; }
-before=$(cat "$INSTALL_DIR/rs_agent.sh")
+before=$(cat "$INSTALL_DIR/firulaiAgent.sh")
 ! download_update v0.4.4
-[ "$(cat "$INSTALL_DIR/rs_agent.sh")" = "$before" ]
+[ "$(cat "$INSTALL_DIR/firulaiAgent.sh")" = "$before" ]
 # Migrate only this installation's cron watchdog; retain unrelated jobs.
 RUN_AS_ROOT=0
 HOME="$fixture"
 XDG_CONFIG_HOME="$fixture/config"
-printf '15 2 * * * echo unrelated\n*/30 * * * * /bin/bash %s/rs_agent_runner.sh --if-due\n@reboot /bin/bash %s/rs_agent_runner.sh --if-due\n' "$INSTALL_DIR" "$INSTALL_DIR" > "$fixture/cron-jobs"
+printf '15 2 * * * echo unrelated\n*/30 * * * * /bin/bash %s/firulaiAgent_runner.sh --if-due\n@reboot /bin/bash %s/firulaiAgent_runner.sh --if-due\n' "$INSTALL_DIR" "$INSTALL_DIR" > "$fixture/cron-jobs"
 crontab() { if [ "${1:-}" = -l ]; then cat "$fixture/cron-jobs"; else cat > "$fixture/cron-jobs"; fi; }
 ensure_update_polling
 ! grep -q '^\*/30 ' "$fixture/cron-jobs"
@@ -76,7 +76,7 @@ grep -q '^\* \* \* \* \* /bin/bash ' "$fixture/cron-jobs"
 grep -Fxq '15 2 * * * echo unrelated' "$fixture/cron-jobs"
 grep -q '^@reboot ' "$fixture/cron-jobs"
 # An updater exec must reuse the inherited lock, not deadlock itself.
-. <(sed -n '/^acquire_execution_lock() {/,/^}/p' rs_agent.sh)
+. <(sed -n '/^acquire_execution_lock() {/,/^}/p' firulaiAgent.sh)
 LOCK_FILE="$fixture/update.lock"
 EXECUTION_TRIGGER=fixture
 export LOCK_FILE EXECUTION_TRIGGER

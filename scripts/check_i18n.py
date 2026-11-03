@@ -4,7 +4,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FILES = ["install.sh", "rs_agent.sh", "rs_agent_runner.sh", "uninstall.sh"]
+FILES = ["install.sh", "firulaiAgent.sh", "firulaiAgent_runner.sh", "uninstall.sh"]
 LOCALES = ["es_ES", "ca_ES", "eu_ES", "gl_ES", "fr_FR", "de_DE", "it_IT", "ja_JP", "zh_CN"]
 EARLY_PREFIXES = ["es", "ca", "eu", "gl", "fr", "de", "it", "ja", "zh"]
 

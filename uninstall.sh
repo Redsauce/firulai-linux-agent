@@ -1,7 +1,7 @@
 #!/bin/bash
 # -*- coding: utf-8 -*-
 #
-# Firulai Inventory Agent - Uninstaller
+# Firulai Security Agent - Uninstaller
 # Marks the system as inactive in RSM and removes the local installation.
 #
 
@@ -13,20 +13,20 @@ if [ "${EUID:-$(id -u)}" -eq 0 ]; then
 fi
 
 if [ "$RUN_AS_ROOT" = "1" ]; then
-    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/rs-agent}"
-    DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/rs-agent}"
-    LOG_FILE="${RS_AGENT_LOG_FILE:-/var/log/rs-agent.log}"
-    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/rs-agent/tmp}"
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/firulaiAgent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/firulaiAgent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-/var/log/firulaiAgent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/firulaiAgent/tmp}"
     SYSTEMD_USER_SERVICE_FILE=""
     SYSTEMD_USER_TIMER_FILE=""
 else
-    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/rs-agent}"
-    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
-    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/rs-agent.log}"
-    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/rs-agent/tmp}"
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/firulaiAgent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/firulaiAgent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/firulaiAgent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/firulaiAgent/tmp}"
     SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-    SYSTEMD_USER_SERVICE_FILE="$SYSTEMD_USER_DIR/rs-agent.service"
-    SYSTEMD_USER_TIMER_FILE="$SYSTEMD_USER_DIR/rs-agent.timer"
+    SYSTEMD_USER_SERVICE_FILE="$SYSTEMD_USER_DIR/firulaiAgent.service"
+    SYSTEMD_USER_TIMER_FILE="$SYSTEMD_USER_DIR/firulaiAgent.timer"
 fi
 
 CONFIG_FILE="$DATA_DIR/config.env"
@@ -64,7 +64,7 @@ t() {
         es_ES:unknown_argument) printf '%s' "Argumento desconocido" ;;
         es_ES:missing_token_uuid) printf '%s' "No se pudo encontrar token o UUID para notificar a RSM" ;;
         es_ES:manual_usage) printf '%s' "Uso manual: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
-        es_ES:title) printf '%s' "Firulai Inventory Agent - Desinstalacion" ;;
+        es_ES:title) printf '%s' "Firulai Security Agent - Desinstalacion" ;;
         es_ES:local_only) printf '%s' "Esta accion solo eliminara la instalacion local del agente." ;;
         es_ES:rsm_not_deleted) printf '%s' "Los datos de RSM no se eliminaran." ;;
         es_ES:inactive_1) printf '%s' "El sistema se marcara como inactivo en Firulai. Desde Firulai podras" ;;
@@ -99,7 +99,7 @@ t() {
         ca_ES:unknown_argument) printf '%s' "Argument desconegut" ;;
         ca_ES:missing_token_uuid) printf '%s' "No s'ha pogut trobar token o UUID per notificar RSM" ;;
         ca_ES:manual_usage) printf '%s' "Us manual: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
-        ca_ES:title) printf '%s' "Firulai Inventory Agent - Desinstal.lacio" ;;
+        ca_ES:title) printf '%s' "Firulai Security Agent - Desinstal.lacio" ;;
         ca_ES:local_only) printf '%s' "Aquesta accio nomes eliminara la instal.lacio local de l'agent." ;;
         ca_ES:rsm_not_deleted) printf '%s' "Les dades de RSM no s'eliminaran." ;;
         ca_ES:inactive_1) printf '%s' "El sistema es marcara com a inactiu a Firulai. Des de Firulai podras" ;;
@@ -154,7 +154,7 @@ t() {
         eu_ES:stopped_rsm) printf '%s' "Desinstalazioa gelditu da: ezin izan da egoera eguneratu RSMn" ;;
         eu_ES:success) printf '%s' "Agentea behar bezala desinstalatu da" ;;
         eu_ES:system_uuid) printf '%s' "Sistemaren UUID" ;;
-        eu_ES:title) printf '%s' "Firulai Inventory Agent - Desinstalatu" ;;
+        eu_ES:title) printf '%s' "Firulai Security Agent - Desinstalatu" ;;
         eu_ES:unknown_argument) printf '%s' "Argumentu ezezaguna" ;;
         eu_ES:unsafe_owner) printf '%s' "Direktorio ez segurua: ez da uneko erabiltzailearen jabetzakoa" ;;
         eu_ES:unsafe_symlink) printf '%s' "Bide ez-segurua: lotura sinbolikoa da" ;;
@@ -188,7 +188,7 @@ t() {
         gl_ES:stopped_rsm) printf '%s' "Desinstalación detida: non se puido actualizar o estado en RSM" ;;
         gl_ES:success) printf '%s' "O axente desinstalouse correctamente" ;;
         gl_ES:system_uuid) printf '%s' "UUID do sistema" ;;
-        gl_ES:title) printf '%s' "Firulai Inventory Agent - Desinstalar" ;;
+        gl_ES:title) printf '%s' "Firulai Security Agent - Desinstalar" ;;
         gl_ES:unknown_argument) printf '%s' "Argumento descoñecido" ;;
         gl_ES:unsafe_owner) printf '%s' "Directorio non seguro: non é propiedade do usuario actual" ;;
         gl_ES:unsafe_symlink) printf '%s' "Camiño inseguro: é un enlace simbólico" ;;
@@ -256,7 +256,7 @@ t() {
         de_DE:stopped_rsm) printf '%s' "Deinstallation gestoppt: Der Status in RSM konnte nicht aktualisiert werden" ;;
         de_DE:success) printf '%s' "Der Agent wurde erfolgreich deinstalliert" ;;
         de_DE:system_uuid) printf '%s' "System-UUID" ;;
-        de_DE:title) printf '%s' "Firulai Inventory Agent – Deinstallation" ;;
+        de_DE:title) printf '%s' "Firulai Security Agent – Deinstallation" ;;
         de_DE:unknown_argument) printf '%s' "Unbekanntes Argument" ;;
         de_DE:unsafe_owner) printf '%s' "Unsicheres Verzeichnis: gehört nicht dem aktuellen Benutzer" ;;
         de_DE:unsafe_symlink) printf '%s' "Unsicherer Pfad: ist ein symbolischer Link" ;;
@@ -372,7 +372,7 @@ t() {
         *:unknown_argument) printf '%s' "Unknown argument" ;;
         *:missing_token_uuid) printf '%s' "Could not find token or UUID to notify RSM" ;;
         *:manual_usage) printf '%s' "Manual usage: bash uninstall.sh --token <TOKEN> --uuid <UUID>" ;;
-        *:title) printf '%s' "Firulai Inventory Agent - Uninstall" ;;
+        *:title) printf '%s' "Firulai Security Agent - Uninstall" ;;
         *:local_only) printf '%s' "This action will only remove the local agent installation." ;;
         *:rsm_not_deleted) printf '%s' "RSM data will not be deleted." ;;
         *:inactive_1) printf '%s' "The system will be marked as inactive in Firulai. From Firulai you can" ;;
@@ -587,17 +587,17 @@ remove_automatic_execution() {
     info "$(t removing_schedule)"
 
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &>/dev/null; then
-        systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
-        systemctl stop rs-agent.service >/dev/null 2>&1 || true
+        systemctl disable --now firulaiAgent.timer >/dev/null 2>&1 || true
+        systemctl stop firulaiAgent.service >/dev/null 2>&1 || true
     fi
     if [ "$RUN_AS_ROOT" = "1" ]; then
-        rm -f /etc/systemd/system/rs-agent.timer /etc/systemd/system/rs-agent.service
+        rm -f /etc/systemd/system/firulaiAgent.timer /etc/systemd/system/firulaiAgent.service
     fi
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &>/dev/null; then
         systemctl daemon-reload >/dev/null 2>&1 || true
     fi
     if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &>/dev/null; then
-        systemctl --user disable --now rs-agent.timer >/dev/null 2>&1 || true
+        systemctl --user disable --now firulaiAgent.timer >/dev/null 2>&1 || true
         rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
         systemctl --user daemon-reload >/dev/null 2>&1 || true
     fi
@@ -619,7 +619,7 @@ remove_local_files() {
     # A partial rm can remove credentials or the uninstaller before reporting
     # failure. Preserve only the retry essentials in a private external directory.
     local failed=0 recovery
-    recovery=$(mktemp -d /tmp/rs-agent-uninstall.XXXXXX) || return 1
+    recovery=$(mktemp -d /tmp/firulaiAgent-uninstall.XXXXXX) || return 1
     chmod 700 "$recovery" || return 1
     if ! cp -p "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/api_endpoint.sh" "$recovery/"; then
         rm -rf -- "$recovery"
@@ -660,8 +660,8 @@ main() {
     confirm_uninstall
 
     # Exclude a scheduled/manual inventory while confirming and removing files.
-    local lock_file="${RS_AGENT_LOCK_FILE:-$DATA_DIR/rs-agent.lock}"
-    [ "$RUN_AS_ROOT" = "1" ] && lock_file="${RS_AGENT_LOCK_FILE:-/run/lock/rs-agent.lock}"
+    local lock_file="${RS_AGENT_LOCK_FILE:-$DATA_DIR/firulaiAgent.lock}"
+    [ "$RUN_AS_ROOT" = "1" ] && lock_file="${RS_AGENT_LOCK_FILE:-/run/lock/firulaiAgent.lock}"
     command -v flock >/dev/null 2>&1 || { error "$(t mark_failed)"; exit 1; }
     exec 9>"$lock_file" || exit 1
     flock -w 30 9 || { error "$(t mark_failed)"; exit 1; }

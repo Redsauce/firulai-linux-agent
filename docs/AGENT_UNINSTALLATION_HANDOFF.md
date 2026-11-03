@@ -22,7 +22,7 @@ Los apartados siguientes conservan el registro anterior.
 
 ## Preparación para pruebas, 19 de octubre
 
-Linux **0.4.8** está publicado: https://github.com/Redsauce/firulai-linux-agent/releases/tag/0.4.8 . La etiqueta apunta a `d49018a`; incluye los cambios de desinstalación y fija la misma versión en `install.sh` y `rs_agent.sh`.
+Linux **0.4.8** está publicado: https://github.com/Redsauce/firulai-linux-agent/releases/tag/0.4.8 . La etiqueta apunta a `d49018a`; incluye los cambios de desinstalación y fija la misma versión en `install.sh` y `firulaiAgent.sh`.
 
 Firulai está desplegado como `firulai-v2026.10.19-01` con el endpoint de confirmación disponible. La usuaria confirma que ha actualizado los objetos RSM. Su ejecución y asociaciones se validarán con el piloto.
 

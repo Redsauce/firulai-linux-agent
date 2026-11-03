@@ -32,7 +32,7 @@ reactiva automaticamente una configuracion que tenga el valor `0`.
 
 El agente consulta la ultima release al ejecutar el inventario. Solo actualiza
 si su version numerica es superior a la instalada. Rechaza versiones de prueba,
-malformadas o inferiores. Descarga `rs_agent.sh`, `api_endpoint.sh` y
+malformadas o inferiores. Descarga `firulaiAgent.sh`, `api_endpoint.sh` y
 `uninstall.sh` desde el tag concreto de esa release, en lugar de usar `main`.
 Verifica la sintaxis y que la version del script coincida con la anunciada antes
 de reemplazar archivos. Conserva configuracion, identidad y estado.
@@ -43,7 +43,7 @@ La descarga y seleccion de versiones se prueban sin red ni instalacion real:
 bash scripts/test_auto_update.sh
 bash scripts/test_install_source.sh
 bash tests/system-eligibility.Tests.sh
-bash -n rs_agent.sh install.sh rs_agent_runner.sh uninstall.sh
+bash -n firulaiAgent.sh install.sh firulaiAgent_runner.sh uninstall.sh
 ```
 
 La prueba usa un paquete simulado y ejecuta el reinicio del script descargado,

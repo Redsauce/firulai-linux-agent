@@ -20,7 +20,8 @@ jobs:
           git checkout --detach FETCH_HEAD
       - name: Validate scripts and update behavior
         run: |
-          bash -n rs_agent.sh install.sh rs_agent_runner.sh api_endpoint.sh uninstall.sh
+          bash -n firulaiAgent.sh install.sh firulaiAgent_runner.sh rs_agent.sh rs_agent_runner.sh api_endpoint.sh uninstall.sh
+          bash scripts/test_name_migration.sh
           bash scripts/test_auto_update.sh
           bash scripts/test_install_source.sh
           bash scripts/test_update_runner.sh

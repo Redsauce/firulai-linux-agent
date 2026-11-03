@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 . <(sed -n '/^check_local_agent_installation() {/,/^}/p' install.sh)
 
 test_dir=$(mktemp -d)
-trap 'rm -f "$test_dir"/config.env "$test_dir"/rs_agent.sh; rmdir "$test_dir"' EXIT
+trap 'rm -f "$test_dir"/config.env "$test_dir"/firulaiAgent.sh; rmdir "$test_dir"' EXIT
 
 INSTALL_DIR="$test_dir"
 DATA_DIR="$test_dir"

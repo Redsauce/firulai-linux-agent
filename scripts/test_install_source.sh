@@ -2,9 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . <(sed -n '/^write_agent_config() {/,/^}/p' install.sh)
-. <(sed -n '/^is_newer_version() {/,/^}/p' rs_agent.sh)
-. <(sed -n '/^record_update_check() {/,/^}/p' rs_agent.sh)
-. <(sed -n '/^check_for_updates() {/,/^}/p' rs_agent.sh)
+. <(sed -n '/^is_newer_version() {/,/^}/p' firulaiAgent.sh)
+. <(sed -n '/^record_update_check() {/,/^}/p' firulaiAgent.sh)
+. <(sed -n '/^check_for_updates() {/,/^}/p' firulaiAgent.sh)
 test_dir=$(mktemp -d)
 trap 'rm -f "$test_dir/config.env" "$test_dir/request" "$test_dir/update-state.env"; rmdir "$test_dir"' EXIT
 DATA_DIR="$test_dir"

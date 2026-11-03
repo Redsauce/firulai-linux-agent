@@ -3,7 +3,7 @@
 # inventory collection, scheduler changes or real installation.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-source <(sed -n '/^is_newer_version() {/,/^download_update() {/p' rs_agent.sh | sed '$d')
+source <(sed -n '/^is_newer_version() {/,/^download_update() {/p' firulaiAgent.sh | sed '$d')
 fixture=$(mktemp -d)
 trap 'rm -rf -- "$fixture"' EXIT
 OUTPUT_DIR="$fixture"

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class JsonEscapeTests(unittest.TestCase):
     def test_all_control_bytes_and_unicode_roundtrip(self):
-        source = (ROOT / "rs_agent.sh").read_text(encoding="utf-8")
+        source = (ROOT / "firulaiAgent.sh").read_text(encoding="utf-8")
         start = source.index("json_escape() {")
         function = source[start:source.index("\n}", start)+2]
         bash = Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "Git/bin/bash.exe"

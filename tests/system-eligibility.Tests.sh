@@ -44,7 +44,7 @@ expect_status 4
 fixture="[{\"1780\":\"$uuid\"},{\"1780\":\"$uuid\"}]"
 expect_status 3
 # Load production functions without executing main or touching agent directories.
-source <(sed '$d' "$test_dir/../rs_agent.sh")
+source <(sed '$d' "$test_dir/../firulaiAgent.sh")
 UUID_VAL="$uuid"
 AGENT_TOKEN='test-token'
 AGENT_LOCALE='en_US'
@@ -121,12 +121,12 @@ upgrade_fixture=$(mktemp -d)
 INSTALL_DIR="$upgrade_fixture"
 API_MODULE_FILE="$upgrade_fixture/module-candidate"
 printf 'RSM_RUNTIME_ELIGIBILITY_VERSION=1\n' > "$API_MODULE_FILE"
-printf '#!/bin/bash\necho old-version\n' > "$INSTALL_DIR/rs_agent.sh"
+printf '#!/bin/bash\necho old-version\n' > "$INSTALL_DIR/firulaiAgent.sh"
 printf 'preserved-state\n' > "$INSTALL_DIR/state.env"
 LOCAL_AGENT_RETRY=1
 source <(awk '/^retry_local_agent_installation\(\) \{$/{capture=1} capture{print} capture && /^}$/{capture=0}' "$test_dir/../install.sh")
 update_rsm_system_on_install() { :; }
-download_agent() { printf '#!/bin/bash\necho candidate-version\n' > "$INSTALL_DIR/rs_agent.sh"; }
+download_agent() { printf '#!/bin/bash\necho candidate-version\n' > "$INSTALL_DIR/firulaiAgent.sh"; }
 download_runner() { :; }
 download_uninstaller() { :; }
 log() { :; }
@@ -143,6 +143,6 @@ download_update() { printf 'update-detected'; }
 update_output=$(check_for_updates)
 case "$update_output" in *update-detected*) ;; *) exit 1 ;; esac
 passed=$((passed+1))
-rm -f "$upgrade_fixture/rs_agent.sh" "$upgrade_fixture/api_endpoint.sh" "$upgrade_fixture/module-candidate" "$upgrade_fixture/state.env" "$upgrade_fixture/update-state.env"
+rm -f "$upgrade_fixture/firulaiAgent.sh" "$upgrade_fixture/api_endpoint.sh" "$upgrade_fixture/module-candidate" "$upgrade_fixture/state.env" "$upgrade_fixture/update-state.env"
 rmdir "$upgrade_fixture"
 printf '%s Linux eligibility checks passed.\n' "$passed"
