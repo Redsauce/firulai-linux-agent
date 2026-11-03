@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class InstallationMetadataTests(unittest.TestCase):
     def test_metadata_for_old_and_new_installations(self):
-        source = (ROOT / 'rs_agent.sh').read_text(encoding='utf-8')
+        source = (ROOT / 'firulaiAgent.sh').read_text(encoding='utf-8')
         functions = []
         for name in ('json_escape', 'collect_agent_installation_info'):
             start = source.index(name + '() {')

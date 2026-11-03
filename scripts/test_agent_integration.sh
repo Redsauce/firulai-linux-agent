@@ -2,26 +2,26 @@
 # Runs the real agent entry point in isolation. Only collectors and the HTTP
 # test-server adapter are replaced, in a COPY of the installed module.
 set -euo pipefail
-source_dir=/opt/rs-agent
+source_dir=/opt/firulaiAgent
 mode=--offline
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --source) [ "$#" -ge 2 ] || exit 2; source_dir="$2"; shift 2 ;;
         --live|--offline) mode="$1"; shift ;;
-        *) echo 'Usage: bash test_agent_integration.sh [--source /opt/rs-agent] [--live]' >&2; exit 2 ;;
+        *) echo 'Usage: bash test_agent_integration.sh [--source /opt/firulaiAgent] [--live]' >&2; exit 2 ;;
     esac
 done
-for file in rs_agent.sh api_endpoint.sh; do
+for file in firulaiAgent.sh api_endpoint.sh; do
     [ -r "$source_dir/$file" ] || { echo "Missing $source_dir/$file" >&2; exit 1; }
 done
 command -v flock >/dev/null || { echo 'This test requires Linux flock (util-linux).' >&2; exit 1; }
-test_root=$(mktemp -d "${TMPDIR:-/tmp}/rs-agent-integration.XXXXXX")
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/firulaiAgent-integration.XXXXXX")
 mkdir "$test_root/install"
-cp "$source_dir/rs_agent.sh" "$test_root/install/rs_agent.sh"
+cp "$source_dir/firulaiAgent.sh" "$test_root/install/firulaiAgent.sh"
 cp "$source_dir/api_endpoint.sh" "$test_root/install/api_endpoint.sh"
-cmp "$source_dir/rs_agent.sh" "$test_root/install/rs_agent.sh"
+cmp "$source_dir/firulaiAgent.sh" "$test_root/install/firulaiAgent.sh"
 cmp "$source_dir/api_endpoint.sh" "$test_root/install/api_endpoint.sh"
-printf 'Copia del agente: %s/rs_agent.sh\nResultados conservados en: %s\n' "$source_dir" "$test_root"
+printf 'Copia del agente: %s/firulaiAgent.sh\nResultados conservados en: %s\n' "$source_dir" "$test_root"
 
 # This fixture code is appended only to the temporary copy. No inventory from
 # the machine is collected, and the exact outbound payload is checked below.
@@ -96,7 +96,7 @@ for status in 301 302; do
     fi
     for run in 1 2; do
         export INTEGRATION_CALLS="$case_dir/calls-$run.txt"
-        if ! bash "$test_root/install/rs_agent.sh" --token fake-token --uuid 00000000-0000-4000-8000-000000000001 --locale en_US > "$case_dir/run-$run.log" 2>&1; then
+        if ! bash "$test_root/install/firulaiAgent.sh" --token fake-token --uuid 00000000-0000-4000-8000-000000000001 --locale en_US > "$case_dir/run-$run.log" 2>&1; then
             cat "$case_dir/run-$run.log"
             echo "FAIL: HTTP $status execution $run. Evidence: $test_root" >&2
             exit 1

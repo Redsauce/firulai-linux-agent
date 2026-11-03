@@ -19,8 +19,8 @@ destino no cambian la configuracion. Token, UUID e idioma se conservan.
 ```bash
 bash scripts/test_install_source.sh
 bash scripts/test_api_redirects.sh
-bash scripts/test_api_redirects.sh --live --module /opt/rs-agent/api_endpoint.sh
-bash scripts/test_agent_integration.sh --source /opt/rs-agent --live
+bash scripts/test_api_redirects.sh --live --module /opt/firulaiAgent/api_endpoint.sh
+bash scripts/test_agent_integration.sh --source /opt/firulaiAgent --live
 ```
 
 HTTPBingo simula origen y destino. Se usan datos ficticios y archivos temporales;

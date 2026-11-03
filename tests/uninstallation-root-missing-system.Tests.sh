@@ -11,7 +11,7 @@ cleanup() {
 trap cleanup EXIT
 for scenario in missing denied offline; do
     jail="$workspace/$scenario"
-    mkdir -p "$jail"/{bin,usr/bin,usr/lib,lib,dev,etc/systemd/system,opt/rs-agent,var/lib/rs-agent,var/log,run/lock,tmp,harness}
+    mkdir -p "$jail"/{bin,usr/bin,usr/lib,lib,dev,etc/systemd/system,opt/firulaiAgent,var/lib/firulaiAgent,var/log,run/lock,tmp,harness}
     for binary in /bin/bash /bin/busybox /usr/bin/flock /lib/ld-musl-x86_64.so.1 /usr/lib/libreadline.so.7 /usr/lib/libncursesw.so.6; do
         cp -L "$binary" "$jail$binary"
     done
@@ -22,20 +22,20 @@ for scenario in missing denied offline; do
     : > "$jail/dev/null"
     printf 'root:x:0:0:root:/:/bin/bash\n' > "$jail/etc/passwd"
     printf 'root:x:0:\n' > "$jail/etc/group"
-    cp "$repo/uninstall.sh" "$repo/api_endpoint.sh" "$jail/opt/rs-agent/"
-    printf 'fixture collector\n' > "$jail/opt/rs-agent/rs_agent.sh"
-    cat > "$jail/var/lib/rs-agent/config.env" <<'CONFIG'
+    cp "$repo/uninstall.sh" "$repo/api_endpoint.sh" "$jail/opt/firulaiAgent/"
+    printf 'fixture collector\n' > "$jail/opt/firulaiAgent/firulaiAgent.sh"
+    cat > "$jail/var/lib/firulaiAgent/config.env" <<'CONFIG'
 AGENT_TOKEN='fixture-token'
 UUID='11111111-2222-4333-8444-555555555555'
 RSM_BASE_URL='https://fixture.invalid/'
 AGENT_LOCALE='en_US'
 CONFIG
-    chmod 600 "$jail/var/lib/rs-agent/config.env"
-    printf 'fixture unit\n' > "$jail/etc/systemd/system/rs-agent.service"
-    printf 'fixture unit\n' > "$jail/etc/systemd/system/rs-agent.timer"
-    printf 'fixture log\n' > "$jail/var/log/rs-agent.log"
+    chmod 600 "$jail/var/lib/firulaiAgent/config.env"
+    printf 'fixture unit\n' > "$jail/etc/systemd/system/firulaiAgent.service"
+    printf 'fixture unit\n' > "$jail/etc/systemd/system/firulaiAgent.timer"
+    printf 'fixture log\n' > "$jail/var/log/firulaiAgent.log"
     printf 'unrelated inventory history\n' > "$jail/harness/other-system"
-    printf '* * * * * /opt/rs-agent/rs_agent_runner.sh\n0 0 * * * unrelated-backup\n' > "$jail/harness/crontab"
+    printf '* * * * * /opt/firulaiAgent/firulaiAgent_runner.sh\n0 0 * * * unrelated-backup\n' > "$jail/harness/crontab"
     printf '%s' "$scenario" > "$jail/harness/scenario"
     cat > "$jail/bin/systemctl" <<'SCRIPT'
 #!/bin/bash
@@ -88,27 +88,27 @@ SCRIPT
     chmod +x "$jail/bin/"{curl,crontab,systemctl,sleep}
     [ "$(chroot "$jail" /bin/id -u)" = 0 ]
     result=0
-    printf 'y\n' | chroot "$jail" /bin/bash /opt/rs-agent/uninstall.sh > "$workspace/$scenario.log" 2>&1 || result=$?
+    printf 'y\n' | chroot "$jail" /bin/bash /opt/firulaiAgent/uninstall.sh > "$workspace/$scenario.log" 2>&1 || result=$?
     # Every unexpected tool failure is a test failure, even on rejection paths.
     if grep -Eq 'command not found|No such file or directory|unrecognized option' "$workspace/$scenario.log"; then
         cat "$workspace/$scenario.log"; exit 1
     fi
     if [ "$scenario" = missing ]; then
         [ "$result" = 0 ] || { cat "$workspace/$scenario.log"; exit 1; }
-        for path in opt/rs-agent var/lib/rs-agent var/log/rs-agent.log etc/systemd/system/rs-agent.service etc/systemd/system/rs-agent.timer; do
+        for path in opt/firulaiAgent var/lib/firulaiAgent var/log/firulaiAgent.log etc/systemd/system/firulaiAgent.service etc/systemd/system/firulaiAgent.timer; do
             [ ! -e "$jail/$path" ] || { echo "Unexpected retained path: $path"; exit 1; }
         done
-        grep -q '^disable --now rs-agent.timer$' "$jail/harness/systemctl.calls"
-        ! grep -q /opt/rs-agent "$jail/harness/crontab"
+        grep -q '^disable --now firulaiAgent.timer$' "$jail/harness/systemctl.calls"
+        ! grep -q /opt/firulaiAgent "$jail/harness/crontab"
         grep -q '/uninstall/missing-system$' "$jail/harness/http.calls"
     else
         [ "$result" != 0 ]
-        cmp "$repo/uninstall.sh" "$jail/opt/rs-agent/uninstall.sh"
-        [ -f "$jail/var/lib/rs-agent/config.env" ]
-        [ -f "$jail/etc/systemd/system/rs-agent.timer" ]
-        [ -f "$jail/var/log/rs-agent.log" ]
+        cmp "$repo/uninstall.sh" "$jail/opt/firulaiAgent/uninstall.sh"
+        [ -f "$jail/var/lib/firulaiAgent/config.env" ]
+        [ -f "$jail/etc/systemd/system/firulaiAgent.timer" ]
+        [ -f "$jail/var/log/firulaiAgent.log" ]
         [ ! -e "$jail/harness/systemctl.calls" ]
-        grep -q /opt/rs-agent "$jail/harness/crontab"
+        grep -q /opt/firulaiAgent "$jail/harness/crontab"
     fi
     [ "$(cat "$jail/harness/other-system")" = 'unrelated inventory history' ]
     grep -q '^0 0 \* \* \* unrelated-backup$' "$jail/harness/crontab"

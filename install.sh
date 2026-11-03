@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# Firulai Inventory Agent - One-liner installer
+# Firulai Security Agent - One-liner installer
 # Version 0.2.6 - Reinstall through account-scoped seat admission
 # ============================================================================
 #
@@ -535,7 +535,7 @@ fi
 
 # GitHub URL where the agent is hosted. In this experimental branch it points to
 # the same branch to test no-root installation without mixing it with main.
-INSTALLER_AGENT_VERSION="0.4.12"
+INSTALLER_AGENT_VERSION="0.4.13"
 GITHUB_RAW_URL="${RS_AGENT_GITHUB_RAW_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$INSTALLER_AGENT_VERSION}"
 RSM_SYSTEM_ITEM_TYPE_ID="191"
 RSM_SYSTEM_HOSTNAME_PROPERTY_ID="1749"
@@ -877,28 +877,28 @@ choose_install_mode_if_root
 
 # Installation directories
 if [ "$RUN_AS_ROOT" = "1" ]; then
-    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/rs-agent}"
-    DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/rs-agent}"
-    LOG_FILE="${RS_AGENT_LOG_FILE:-/var/log/rs-agent.log}"
-    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/rs-agent/tmp}"
-    SYSTEMD_SERVICE_FILE="/etc/systemd/system/rs-agent.service"
-    SYSTEMD_TIMER_FILE="/etc/systemd/system/rs-agent.timer"
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-/opt/firulaiAgent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-/var/lib/firulaiAgent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-/var/log/firulaiAgent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-/run/firulaiAgent/tmp}"
+    SYSTEMD_SERVICE_FILE="/etc/systemd/system/firulaiAgent.service"
+    SYSTEMD_TIMER_FILE="/etc/systemd/system/firulaiAgent.timer"
     SYSTEMD_USER_DIR=""
     SYSTEMD_USER_SERVICE_FILE=""
     SYSTEMD_USER_TIMER_FILE=""
 else
-    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/rs-agent}"
-    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent}"
-    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/rs-agent.log}"
-    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/rs-agent/tmp}"
+    INSTALL_DIR="${RS_AGENT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/firulaiAgent}"
+    DATA_DIR="${RS_AGENT_DATA_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/firulaiAgent}"
+    LOG_FILE="${RS_AGENT_LOG_FILE:-$DATA_DIR/firulaiAgent.log}"
+    PRIVATE_TMP_DIR="${RS_AGENT_TMP_DIR:-${XDG_RUNTIME_DIR:-$DATA_DIR}/firulaiAgent/tmp}"
     SYSTEMD_SERVICE_FILE=""
     SYSTEMD_TIMER_FILE=""
     SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-    SYSTEMD_USER_SERVICE_FILE="$SYSTEMD_USER_DIR/rs-agent.service"
-    SYSTEMD_USER_TIMER_FILE="$SYSTEMD_USER_DIR/rs-agent.timer"
+    SYSTEMD_USER_SERVICE_FILE="$SYSTEMD_USER_DIR/firulaiAgent.service"
+    SYSTEMD_USER_TIMER_FILE="$SYSTEMD_USER_DIR/firulaiAgent.timer"
 fi
 CONFIG_FILE="$DATA_DIR/config.env"
-RUNNER_FILE="$INSTALL_DIR/rs_agent_runner.sh"
+RUNNER_FILE="$INSTALL_DIR/firulaiAgent_runner.sh"
 SCHEDULER_TYPE=""
 
 # Semantic lifecycle endpoint shared with the Windows agent.
@@ -971,7 +971,7 @@ make_private_temp_file() {
 banner() {
     echo ""
     echo "============================================================================"
-    printf '  Firulai Inventory Agent - %s v0.2.6\n' "$(t installer_title)"
+    printf '  Firulai Security Agent - %s v0.2.6\n' "$(t installer_title)"
     printf '  %s\n' "$(t banner_subtitle)"
     echo "============================================================================"
     echo ""
@@ -1287,7 +1287,7 @@ t() {
         es_ES:invalid_uuid_local) printf '%s' "no es un UUID valido" ;;
         es_ES:rsm_item_missing) printf '%s' "No se ha podido validar el sistema. Comprueba el UUID y el token e inténtalo de nuevo." ;;
         es_ES:rsm_status_safety) printf '%s' "Por seguridad, la instalacion no continuara sin poder actualizar el estado." ;;
-        es_ES:root_existing) printf '%s' "Se ha encontrado una instalacion root existente en /opt/rs-agent o /var/lib/rs-agent." ;;
+        es_ES:root_existing) printf '%s' "Se ha encontrado una instalacion root existente en /opt/firulaiAgent o /var/lib/firulaiAgent." ;;
         es_ES:root_coexist) printf '%s' "La instalacion sin root coexistira con ella usando rutas del usuario actual." ;;
         es_ES:test_uuid_alias) printf '%s' "Para comparar, usa un UUID de prueba separado." ;;
         es_ES:current_installed_uuid) printf '%s' "UUID instalado actualmente" ;;
@@ -1349,7 +1349,7 @@ t() {
         es_ES:uninstall_download_failed) printf '%s' "No se pudo descargar el desinstalador desde GitHub" ;;
         es_ES:configuring_auto) printf '%s' "Configurando ejecucion automatica..." ;;
         es_ES:systemd_reload_failed) printf '%s' "systemd no pudo recargar las unidades" ;;
-        es_ES:systemd_enable_failed) printf '%s' "systemd no pudo habilitar rs-agent.timer" ;;
+        es_ES:systemd_enable_failed) printf '%s' "systemd no pudo habilitar firulaiAgent.timer" ;;
         es_ES:systemd_timer_configured) printf '%s' "Timer systemd configurado a las 03:00 con recuperacion al arrancar" ;;
         es_ES:systemd_linger_available_warn) printf '%s' "systemd --user esta disponible, pero linger no esta habilitado para el usuario actual." ;;
         es_ES:user_cron_fallback_session) printf '%s' "Se usara cron de usuario para no depender de una sesion activa." ;;
@@ -1497,7 +1497,7 @@ t() {
         ca_ES:root_coexist) printf '%s' "La instal·lació sense root coexistirà amb ella utilitzant les rutes de l'usuari actual." ;;
         ca_ES:root_cron_configured) printf '%s' "Cron de root configurat amb execució diària i recuperació automàtica" ;;
         ca_ES:root_crontab_failed) printf '%s' "No s'ha pogut actualitzar el crontab root" ;;
-        ca_ES:root_existing) printf '%s' "S'ha trobat una instal·lació arrel existent a /opt/rs-agent o /var/lib/rs-agent." ;;
+        ca_ES:root_existing) printf '%s' "S'ha trobat una instal·lació arrel existent a /opt/firulaiAgent o /var/lib/firulaiAgent." ;;
         ca_ES:rsm_item_missing) printf '%s' "No s'ha pogut validar el sistema. Comprova l'UUID i el token i torna-ho a provar." ;;
         ca_ES:rsm_manages_changes) printf '%s' "RSM detecta i gestiona els canvis" ;;
         ca_ES:rsm_status_safety) printf '%s' "Per seguretat, la instal·lació no continuarà sense poder actualitzar l'estat." ;;
@@ -1508,7 +1508,7 @@ t() {
         ca_ES:systemd_bus_su) printf '%s' "Això pot passar després de canviar d'usuari amb su perquè el bus systemd de l'usuari no s'inicia." ;;
         ca_ES:systemd_choose_alternative) printf '%s' "Pots executar l'instal·lador des de root i triar el mode sense root, triar cron d'usuari o contactar amb Firulai." ;;
         ca_ES:systemd_choose_cron) printf '%s' "Pots triar cron d'usuari o contactar amb Firulai." ;;
-        ca_ES:systemd_enable_failed) printf '%s' "systemd no ha pogut habilitar rs-agent.timer" ;;
+        ca_ES:systemd_enable_failed) printf '%s' "systemd no ha pogut habilitar firulaiAgent.timer" ;;
         ca_ES:systemd_linger_available_warn) printf '%s' "systemd --user està disponible, però linger no està habilitat per a l'usuari actual." ;;
         ca_ES:systemd_linger_unreliable) printf '%s' "systemd --user no serà fiable sense una sessió activa fins que linger estigui habilitat." ;;
         ca_ES:systemd_no_bus) printf '%s' "No es pot continuar amb systemd --user sense un bus systemd d'usuari." ;;
@@ -1625,7 +1625,7 @@ t() {
         eu_ES:root_coexist) printf '%s' "Errorik gabeko instalazioa berarekin batera biziko da uneko erabiltzailearen bideak erabiliz." ;;
         eu_ES:root_cron_configured) printf '%s' "Erro cron eguneroko exekuzioarekin eta berreskuratze automatikoarekin konfiguratuta" ;;
         eu_ES:root_crontab_failed) printf '%s' "Ezin izan da root crontab eguneratu" ;;
-        eu_ES:root_existing) printf '%s' "Lehendik dagoen root instalazio bat aurkitu da /opt/rs-agent edo /var/lib/rs-agent-en." ;;
+        eu_ES:root_existing) printf '%s' "Lehendik dagoen root instalazio bat aurkitu da /opt/firulaiAgent edo /var/lib/firulaiAgent-en." ;;
         eu_ES:root_mode) printf '%s' "Erro/sistemaren instalazio modua hautatuta; sistemaren bideak erabiliko dira." ;;
         eu_ES:rsm_item_missing) printf '%s' "Ezin izan da sistema balioztatu. Egiaztatu UUIDa eta tokena eta saiatu berriro." ;;
         eu_ES:rsm_manages_changes) printf '%s' "RSM-k aldaketak hautematen eta kudeatzen ditu" ;;
@@ -1646,7 +1646,7 @@ t() {
         eu_ES:systemd_bus_su) printf '%s' "Hau erabiltzailea su-rekin aldatu ondoren gerta daiteke, erabiltzailearen systemd busa abiarazten ez delako." ;;
         eu_ES:systemd_choose_alternative) printf '%s' "Instalatzailea errotik exekutatu eta errorik gabeko modua aukeratu, erabiltzailea cron aukeratu edo Firulairekin harremanetan jarri." ;;
         eu_ES:systemd_choose_cron) printf '%s' "Erabiltzailearen cron aukeratu dezakezu edo Firulairekin harremanetan jarri." ;;
-        eu_ES:systemd_enable_failed) printf '%s' "systemd-ek ezin izan du gaitu rs-agent.timer" ;;
+        eu_ES:systemd_enable_failed) printf '%s' "systemd-ek ezin izan du gaitu firulaiAgent.timer" ;;
         eu_ES:systemd_linger_available_warn) printf '%s' "systemd --user eskuragarri dago, baina linger ez dago gaituta uneko erabiltzailearentzat." ;;
         eu_ES:systemd_linger_unreliable) printf '%s' "systemd --user ez da fidagarria izango saio aktiborik gabe linger gaitu arte." ;;
         eu_ES:systemd_no_bus) printf '%s' "Ezin da systemd --user erabiltzailearekin systemd bus gabe jarraitu." ;;
@@ -1779,7 +1779,7 @@ t() {
         gl_ES:root_coexist) printf '%s' "A instalación sen root coexistirá con ela utilizando as rutas do usuario actual." ;;
         gl_ES:root_cron_configured) printf '%s' "Root cron configurado con execución diaria e recuperación automática" ;;
         gl_ES:root_crontab_failed) printf '%s' "Non se puido actualizar o root crontab" ;;
-        gl_ES:root_existing) printf '%s' "Atopouse unha instalación raíz existente en /opt/rs-agent ou /var/lib/rs-agent." ;;
+        gl_ES:root_existing) printf '%s' "Atopouse unha instalación raíz existente en /opt/firulaiAgent ou /var/lib/firulaiAgent." ;;
         gl_ES:root_mode) printf '%s' "Modo de instalación raíz/sistema seleccionado; utilizaranse as rutas do sistema." ;;
         gl_ES:rsm_item_missing) printf '%s' "Non se puido validar o sistema. Comproba o UUID e o token e téntao de novo." ;;
         gl_ES:rsm_manages_changes) printf '%s' "RSM detecta e xestiona os cambios" ;;
@@ -1800,7 +1800,7 @@ t() {
         gl_ES:systemd_bus_su) printf '%s' "Isto pode ocorrer despois de cambiar de usuario con su porque o bus systemd do usuario non se inicia." ;;
         gl_ES:systemd_choose_alternative) printf '%s' "Pode executar o instalador desde root e escoller o modo sen root, escoller o usuario cron ou contactar con Firulai." ;;
         gl_ES:systemd_choose_cron) printf '%s' "Podes escoller o usuario cron ou contactar con Firulai." ;;
-        gl_ES:systemd_enable_failed) printf '%s' "systemd non puido activar rs-agent.timer" ;;
+        gl_ES:systemd_enable_failed) printf '%s' "systemd non puido activar firulaiAgent.timer" ;;
         gl_ES:systemd_linger_available_warn) printf '%s' "systemd --user está dispoñible, pero Linger non está habilitado para o usuario actual." ;;
         gl_ES:systemd_linger_unreliable) printf '%s' "systemd --user non será fiable sen unha sesión activa ata que linger estea habilitado." ;;
         gl_ES:systemd_no_bus) printf '%s' "Non se pode continuar con systemd --user sen un bus systemd do usuario." ;;
@@ -1933,7 +1933,7 @@ t() {
         fr_FR:root_coexist) printf '%s' "L'installation sans racine coexistera avec elle en utilisant les chemins de l'utilisateur actuel." ;;
         fr_FR:root_cron_configured) printf '%s' "Cron racine configuré avec exécution quotidienne et récupération automatique" ;;
         fr_FR:root_crontab_failed) printf '%s' "Impossible de mettre à jour la crontab racine" ;;
-        fr_FR:root_existing) printf '%s' "Une installation racine existante a été trouvée dans /opt/rs-agent ou /var/lib/rs-agent." ;;
+        fr_FR:root_existing) printf '%s' "Une installation racine existante a été trouvée dans /opt/firulaiAgent ou /var/lib/firulaiAgent." ;;
         fr_FR:root_mode) printf '%s' "Mode d'installation racine/système sélectionné ; les chemins du système seront utilisés." ;;
         fr_FR:rsm_item_missing) printf '%s' "Impossible de valider le système. Vérifiez l'UUID et le jeton, puis réessayez." ;;
         fr_FR:rsm_manages_changes) printf '%s' "RSM détecte et gère les changements" ;;
@@ -1954,7 +1954,7 @@ t() {
         fr_FR:systemd_bus_su) printf '%s' "Cela peut se produire après avoir changé d'utilisateur avec su car le bus systemd de l'utilisateur n'est pas démarré." ;;
         fr_FR:systemd_choose_alternative) printf '%s' "Vous pouvez exécuter le programme d'installation à partir de root et choisir le mode sans root, choisir l'utilisateur cron ou contacter Firulai." ;;
         fr_FR:systemd_choose_cron) printf '%s' "Vous pouvez choisir l'utilisateur cron ou contacter Firulai." ;;
-        fr_FR:systemd_enable_failed) printf '%s' "systemd n'a pas pu activer rs-agent.timer" ;;
+        fr_FR:systemd_enable_failed) printf '%s' "systemd n'a pas pu activer firulaiAgent.timer" ;;
         fr_FR:systemd_linger_available_warn) printf '%s' "systemd --user est disponible, mais Linger n'est pas activé pour l'utilisateur actuel." ;;
         fr_FR:systemd_linger_unreliable) printf '%s' "systemd --user ne sera pas fiable sans session active jusqu'à ce que Linger soit activé." ;;
         fr_FR:systemd_no_bus) printf '%s' "Impossible de continuer avec systemd --user sans bus systemd utilisateur." ;;
@@ -2087,7 +2087,7 @@ t() {
         de_DE:root_coexist) printf '%s' "Die No-Root-Installation wird mit ihr koexistieren und dabei die Pfade des aktuellen Benutzers verwenden." ;;
         de_DE:root_cron_configured) printf '%s' "Root-Cron mit täglicher Ausführung und automatischer Wiederherstellung konfiguriert" ;;
         de_DE:root_crontab_failed) printf '%s' "Root-Crontab konnte nicht aktualisiert werden" ;;
-        de_DE:root_existing) printf '%s' "Eine vorhandene Root-Installation wurde in /opt/rs-agent oder /var/lib/rs-agent gefunden." ;;
+        de_DE:root_existing) printf '%s' "Eine vorhandene Root-Installation wurde in /opt/firulaiAgent oder /var/lib/firulaiAgent gefunden." ;;
         de_DE:root_mode) printf '%s' "Root-/Systeminstallationsmodus ausgewählt; Es werden Systempfade verwendet." ;;
         de_DE:rsm_item_missing) printf '%s' "Das System konnte nicht validiert werden. Prüfen Sie UUID und Token und versuchen Sie es erneut." ;;
         de_DE:rsm_manages_changes) printf '%s' "RSM erkennt und verwaltet Änderungen" ;;
@@ -2108,7 +2108,7 @@ t() {
         de_DE:systemd_bus_su) printf '%s' "Dies kann nach dem Benutzerwechsel mit su passieren, da der Systemd-Bus des Benutzers nicht gestartet ist." ;;
         de_DE:systemd_choose_alternative) printf '%s' "Sie können das Installationsprogramm von Root aus ausführen und den No-Root-Modus wählen, den Benutzer cron auswählen oder sich an Firulai wenden." ;;
         de_DE:systemd_choose_cron) printf '%s' "Sie können den Benutzer cron auswählen oder sich an Firulai wenden." ;;
-        de_DE:systemd_enable_failed) printf '%s' "systemd konnte rs-agent.timer nicht aktivieren" ;;
+        de_DE:systemd_enable_failed) printf '%s' "systemd konnte firulaiAgent.timer nicht aktivieren" ;;
         de_DE:systemd_linger_available_warn) printf '%s' "systemd --user ist verfügbar, aber Linger ist für den aktuellen Benutzer nicht aktiviert." ;;
         de_DE:systemd_linger_unreliable) printf '%s' "systemd --user ist ohne eine aktive Sitzung nicht zuverlässig, bis Linger aktiviert ist." ;;
         de_DE:systemd_no_bus) printf '%s' "Ohne einen Benutzer-Systemd-Bus kann mit systemd --user nicht fortgefahren werden." ;;
@@ -2241,7 +2241,7 @@ t() {
         it_IT:root_coexist) printf '%s' "L'installazione senza root coesisterà con essa utilizzando i percorsi dell'utente corrente." ;;
         it_IT:root_cron_configured) printf '%s' "Cron root configurato con esecuzione giornaliera e ripristino automatico" ;;
         it_IT:root_crontab_failed) printf '%s' "Impossibile aggiornare crontab root" ;;
-        it_IT:root_existing) printf '%s' "È stata trovata un'installazione root esistente in /opt/rs-agent o /var/lib/rs-agent." ;;
+        it_IT:root_existing) printf '%s' "È stata trovata un'installazione root esistente in /opt/firulaiAgent o /var/lib/firulaiAgent." ;;
         it_IT:root_mode) printf '%s' "Modalità di installazione root/sistema selezionata; verranno utilizzati i percorsi di sistema." ;;
         it_IT:rsm_item_missing) printf '%s' "Impossibile convalidare il sistema. Controlla UUID e token e riprova." ;;
         it_IT:rsm_manages_changes) printf '%s' "RSM rileva e gestisce le modifiche" ;;
@@ -2262,7 +2262,7 @@ t() {
         it_IT:systemd_bus_su) printf '%s' "Ciò può accadere dopo aver cambiato utente con su perché il bus systemd dell'utente non è avviato." ;;
         it_IT:systemd_choose_alternative) printf '%s' "Puoi eseguire il programma di installazione da root e scegliere la modalità no-root, scegliere l'utente cron o contattare Firulai." ;;
         it_IT:systemd_choose_cron) printf '%s' "Puoi scegliere l'utente cron o contattare Firulai." ;;
-        it_IT:systemd_enable_failed) printf '%s' "systemd non è riuscito ad abilitare rs-agent.timer" ;;
+        it_IT:systemd_enable_failed) printf '%s' "systemd non è riuscito ad abilitare firulaiAgent.timer" ;;
         it_IT:systemd_linger_available_warn) printf '%s' "systemd --user è disponibile, ma il ritardo non è abilitato per l'utente corrente." ;;
         it_IT:systemd_linger_unreliable) printf '%s' "systemd --user non sarà affidabile senza una sessione attiva finché il ritardo non sarà abilitato." ;;
         it_IT:systemd_no_bus) printf '%s' "Impossibile continuare con systemd --user senza un bus systemd utente." ;;
@@ -2395,7 +2395,7 @@ t() {
         ja_JP:root_coexist) printf '%s' "root を使用しないインストールは、現在のユーザーのパスを使用して共存します。" ;;
         ja_JP:root_cron_configured) printf '%s' "毎日の実行と自動リカバリが設定された root cron" ;;
         ja_JP:root_crontab_failed) printf '%s' "ルートの crontab を更新できませんでした" ;;
-        ja_JP:root_existing) printf '%s' "既存のルート インストールが /opt/rs-agent または /var/lib/rs-agent に見つかりました。" ;;
+        ja_JP:root_existing) printf '%s' "既存のルート インストールが /opt/firulaiAgent または /var/lib/firulaiAgent に見つかりました。" ;;
         ja_JP:root_mode) printf '%s' "ルート/システム インストール モードが選択されています。システムパスが使用されます。" ;;
         ja_JP:rsm_item_missing) printf '%s' "システムを検証できませんでした。UUID とトークンを確認して再試行してください。" ;;
         ja_JP:rsm_manages_changes) printf '%s' "RSM は変更を検出して管理します" ;;
@@ -2416,7 +2416,7 @@ t() {
         ja_JP:systemd_bus_su) printf '%s' "これは、ユーザーの systemd バスが開始されていないため、su でユーザーを切り替えた後に発生する可能性があります。" ;;
         ja_JP:systemd_choose_alternative) printf '%s' "root からインストーラーを実行して非 root モードを選択するか、ユーザー cron を選択するか、Firulai に問い合わせることができます。" ;;
         ja_JP:systemd_choose_cron) printf '%s' "ユーザー cron を選択するか、Firulai に連絡することができます。" ;;
-        ja_JP:systemd_enable_failed) printf '%s' "systemd は rs-agent.timer を有効にできませんでした" ;;
+        ja_JP:systemd_enable_failed) printf '%s' "systemd は firulaiAgent.timer を有効にできませんでした" ;;
         ja_JP:systemd_linger_available_warn) printf '%s' "systemd --user は使用できますが、現在のユーザーに対して linger が有効になっていません。" ;;
         ja_JP:systemd_linger_unreliable) printf '%s' "systemd --user は、linger が有効になるまで、アクティブなセッションがないと信頼できません。" ;;
         ja_JP:systemd_no_bus) printf '%s' "ユーザー systemd バスがないと systemd --user を続行できません。" ;;
@@ -2549,7 +2549,7 @@ t() {
         zh_CN:root_coexist) printf '%s' "无根安装将使用当前用户路径与其共存。" ;;
         zh_CN:root_cron_configured) printf '%s' "Root cron 配置每日执行和自动恢复" ;;
         zh_CN:root_crontab_failed) printf '%s' "无法更新 root crontab" ;;
-        zh_CN:root_existing) printf '%s' "在 /opt/rs-agent 或 /var/lib/rs-agent 中找到了现有的 root 安装。" ;;
+        zh_CN:root_existing) printf '%s' "在 /opt/firulaiAgent 或 /var/lib/firulaiAgent 中找到了现有的 root 安装。" ;;
         zh_CN:root_mode) printf '%s' "选择root/系统安装模式；将使用系统路径。" ;;
         zh_CN:rsm_item_missing) printf '%s' "无法验证系统。请检查 UUID 和令牌，然后重试。" ;;
         zh_CN:rsm_manages_changes) printf '%s' "RSM 检测并管理变更" ;;
@@ -2570,7 +2570,7 @@ t() {
         zh_CN:systemd_bus_su) printf '%s' "使用 su 切换用户后可能会发生这种情况，因为用户 systemd 总线未启动。" ;;
         zh_CN:systemd_choose_alternative) printf '%s' "您可以从 root 运行安装程序并选择无 root 模式、选择用户 cron 或联系 Firulai。" ;;
         zh_CN:systemd_choose_cron) printf '%s' "您可以选择用户 cron 或联系 Firulai。" ;;
-        zh_CN:systemd_enable_failed) printf '%s' "systemd 无法启用 rs-agent.timer" ;;
+        zh_CN:systemd_enable_failed) printf '%s' "systemd 无法启用 firulaiAgent.timer" ;;
         zh_CN:systemd_linger_available_warn) printf '%s' "systemd --user 可用，但当前用户未启用 linger。" ;;
         zh_CN:systemd_linger_unreliable) printf '%s' "在启用 linger 之前，如果没有活动会话，systemd --user 将不可靠。" ;;
         zh_CN:systemd_no_bus) printf '%s' "如果没有用户 systemd 总线，则无法继续使用 systemd --user。" ;;
@@ -2749,7 +2749,7 @@ t() {
         *:root_coexist) printf '%s' "The no-root installation will coexist with it using current-user paths." ;;
         *:root_cron_configured) printf '%s' "Root cron configured with daily execution and automatic recovery" ;;
         *:root_crontab_failed) printf '%s' "Could not update root crontab" ;;
-        *:root_existing) printf '%s' "An existing root installation was found in /opt/rs-agent or /var/lib/rs-agent." ;;
+        *:root_existing) printf '%s' "An existing root installation was found in /opt/firulaiAgent or /var/lib/firulaiAgent." ;;
         *:rsm_item_missing) printf '%s' "Could not validate the system. Check the UUID and token and try again." ;;
         *:rsm_manages_changes) printf '%s' "RSM detects and manages changes" ;;
         *:rsm_status_safety) printf '%s' "For safety, installation will not continue without being able to update the status." ;;
@@ -2760,7 +2760,7 @@ t() {
         *:systemd_bus_su) printf '%s' "This can happen after switching user with su because the user systemd bus is not started." ;;
         *:systemd_choose_alternative) printf '%s' "You can run the installer from root and choose no-root mode, choose user cron, or contact Firulai." ;;
         *:systemd_choose_cron) printf '%s' "You can choose user cron or contact Firulai." ;;
-        *:systemd_enable_failed) printf '%s' "systemd could not enable rs-agent.timer" ;;
+        *:systemd_enable_failed) printf '%s' "systemd could not enable firulaiAgent.timer" ;;
         *:systemd_linger_available_warn) printf '%s' "systemd --user is available, but linger is not enabled for the current user." ;;
         *:systemd_linger_unreliable) printf '%s' "systemd --user will not be reliable without an active session until linger is enabled." ;;
         *:systemd_no_bus) printf '%s' "Cannot continue with systemd --user without a user systemd bus." ;;
@@ -2967,7 +2967,7 @@ check_uuid_available() {
 }
 
 check_existing_installation() {
-    if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
+    if [ -f "$INSTALL_DIR/firulaiAgent.sh" ] || [ -f "$CONFIG_FILE" ]; then
         local manual_prefix=""
         [ "$RUN_AS_ROOT" = "1" ] && manual_prefix="sudo "
         warn "$(t existing_agent)"
@@ -2977,12 +2977,32 @@ check_existing_installation() {
     fi
 }
 
+check_legacy_installation() {
+    local legacy_install legacy_data
+    if [ "$RUN_AS_ROOT" = "1" ]; then
+        legacy_install=/opt/rs-agent
+        legacy_data=/var/lib/rs-agent
+    else
+        legacy_install="${XDG_DATA_HOME:-$HOME/.local/share}/rs-agent"
+        legacy_data="${XDG_STATE_HOME:-$HOME/.local/state}/rs-agent"
+    fi
+    if [ -f "$legacy_install/rs_agent.sh" ] || [ -f "$legacy_data/config.env" ]; then
+        error "An earlier rs-agent installation was found. Uninstall it with bash $legacy_install/uninstall.sh before installing Firulai Security Agent."
+        exit 1
+    fi
+    if [ "$RUN_AS_ROOT" != "1" ] &&
+        { [ -f /opt/rs-agent/rs_agent.sh ] || [ -f /var/lib/rs-agent/config.env ]; }; then
+        error "An earlier root rs-agent installation was found. Uninstall it with sudo bash /opt/rs-agent/uninstall.sh before installing Firulai Security Agent."
+        exit 1
+    fi
+}
+
 warn_about_parallel_root_installation() {
     if [ "$RUN_AS_ROOT" = "1" ]; then
         return 0
     fi
 
-    if [ -f "/opt/rs-agent/rs_agent.sh" ] || [ -f "/var/lib/rs-agent/config.env" ]; then
+    if [ -f "/opt/firulaiAgent/firulaiAgent.sh" ] || [ -f "/var/lib/firulaiAgent/config.env" ]; then
         warn "$(t root_existing)"
         warn "$(t root_coexist)"
         warn "$(t test_uuid_alias)"
@@ -2990,7 +3010,7 @@ warn_about_parallel_root_installation() {
 }
 
 check_local_agent_installation() {
-    if [ -f "$INSTALL_DIR/rs_agent.sh" ] || [ -f "$CONFIG_FILE" ]; then
+    if [ -f "$INSTALL_DIR/firulaiAgent.sh" ] || [ -f "$CONFIG_FILE" ]; then
         local installed_uuid=""
         if [ -f "$CONFIG_FILE" ]; then
             installed_uuid=$(sed -n "s/^UUID='\([^']*\)'.*/\1/p" "$CONFIG_FILE" | head -1)
@@ -3025,7 +3045,7 @@ retry_local_agent_installation() {
     # Never execute an existing local agent until RSM has confirmed that its
     # UUID still exists, remains covered, targets Linux and belongs to this
     # machine. This preserves safe recovery without accepting deleted UUIDs.
-    if [ -f "$INSTALL_DIR/rs_agent.sh" ]; then
+    if [ -f "$INSTALL_DIR/firulaiAgent.sh" ]; then
         update_rsm_system_on_install
         # Reinstalling the same UUID must run the downloaded version, while
         # retaining the existing state, credentials and scheduler configuration.
@@ -3035,7 +3055,7 @@ retry_local_agent_installation() {
         download_uninstaller
         info "$(t running_initial)"
         set +e
-        RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/rs_agent.sh" \
+        RS_AGENT_TRIGGER="installer-retry" /bin/bash "$INSTALL_DIR/firulaiAgent.sh" \
             --token "$AGENT_TOKEN" \
             --uuid "$UUID" \
             --locale "$AGENT_LOCALE"
@@ -3306,8 +3326,8 @@ check_automatic_execution_prerequisites() {
 cleanup_partial_installation() {
     warn "$(t cleanup_partial)"
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null; then
-        systemctl disable --now rs-agent.timer >/dev/null 2>&1 || true
-        systemctl stop rs-agent.service >/dev/null 2>&1 || true
+        systemctl disable --now firulaiAgent.timer >/dev/null 2>&1 || true
+        systemctl stop firulaiAgent.service >/dev/null 2>&1 || true
     fi
     [ -n "$SYSTEMD_SERVICE_FILE" ] && rm -f "$SYSTEMD_SERVICE_FILE"
     [ -n "$SYSTEMD_TIMER_FILE" ] && rm -f "$SYSTEMD_TIMER_FILE"
@@ -3315,7 +3335,7 @@ cleanup_partial_installation() {
         systemctl daemon-reload >/dev/null 2>&1 || true
     fi
     if [ "$RUN_AS_ROOT" != "1" ] && command -v systemctl &> /dev/null; then
-        systemctl --user disable --now rs-agent.timer >/dev/null 2>&1 || true
+        systemctl --user disable --now firulaiAgent.timer >/dev/null 2>&1 || true
         rm -f "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
         systemctl --user daemon-reload >/dev/null 2>&1 || true
     fi
@@ -3349,11 +3369,11 @@ create_directories() {
 download_agent() {
     info "$(t downloading_agent)"
 
-    AGENT_URL="${GITHUB_RAW_URL}/rs_agent.sh?ts=$(date +%s)"
+    AGENT_URL="${GITHUB_RAW_URL}/firulaiAgent.sh?ts=$(date +%s)"
 
-    if curl -fsSL "$AGENT_URL" -o "$INSTALL_DIR/rs_agent.sh"; then
-        chmod +x "$INSTALL_DIR/rs_agent.sh"
-        log "$(t agent_downloaded): $INSTALL_DIR/rs_agent.sh"
+    if curl -fsSL "$AGENT_URL" -o "$INSTALL_DIR/firulaiAgent.sh"; then
+        chmod +x "$INSTALL_DIR/firulaiAgent.sh"
+        log "$(t agent_downloaded): $INSTALL_DIR/firulaiAgent.sh"
     else
         error "$(t download_agent_failed)"
         error ""
@@ -3369,7 +3389,7 @@ download_agent() {
 download_runner() {
     info "$(t downloading_runner)"
 
-    RUNNER_URL="${GITHUB_RAW_URL}/rs_agent_runner.sh?ts=$(date +%s)"
+    RUNNER_URL="${GITHUB_RAW_URL}/firulaiAgent_runner.sh?ts=$(date +%s)"
     if curl -fsSL "$RUNNER_URL" -o "$RUNNER_FILE"; then
         chmod +x "$RUNNER_FILE"
         log "$(t runner_downloaded): $RUNNER_FILE"
@@ -3434,7 +3454,7 @@ setup_automatic_execution() {
     if [ "$RUN_AS_ROOT" = "1" ] && command -v systemctl &> /dev/null && [ -d /run/systemd/system ]; then
         cat > "$SYSTEMD_SERVICE_FILE" << SERVICE_EOF
 [Unit]
-Description=Firulai Inventory Agent execution
+Description=Firulai Security Agent execution
 Wants=network-online.target
 After=network-online.target
 ConditionPathExists=$RUNNER_FILE
@@ -3443,19 +3463,19 @@ ConditionPathExists=$RUNNER_FILE
 Type=oneshot
 ExecStart=/bin/bash $RUNNER_FILE --if-due --trigger systemd-timer
 TimeoutStartSec=30min
-SyslogIdentifier=rs-agent
+SyslogIdentifier=firulaiAgent
 SERVICE_EOF
 
         cat > "$SYSTEMD_TIMER_FILE" << TIMER_EOF
 [Unit]
-Description=Firulai Inventory Agent daily schedule
+Description=Firulai Security Agent daily schedule
 
 [Timer]
 OnCalendar=*-*-* *:*:00
 OnBootSec=1s
 Persistent=true
 AccuracySec=1min
-Unit=rs-agent.service
+Unit=firulaiAgent.service
 
 [Install]
 WantedBy=timers.target
@@ -3466,7 +3486,7 @@ TIMER_EOF
             error "$(t systemd_reload_failed)"
             return 1
         fi
-        if ! systemctl enable --now rs-agent.timer; then
+        if ! systemctl enable --now firulaiAgent.timer; then
             error "$(t systemd_enable_failed)"
             return 1
         fi
@@ -3483,7 +3503,7 @@ TIMER_EOF
             mkdir -p "$SYSTEMD_USER_DIR"
             cat > "$SYSTEMD_USER_SERVICE_FILE" << SERVICE_EOF
 [Unit]
-Description=Firulai Inventory Agent execution
+Description=Firulai Security Agent execution
 ConditionPathExists=$RUNNER_FILE
 
 [Service]
@@ -3494,21 +3514,21 @@ SERVICE_EOF
 
             cat > "$SYSTEMD_USER_TIMER_FILE" << TIMER_EOF
 [Unit]
-Description=Firulai Inventory Agent daily schedule
+Description=Firulai Security Agent daily schedule
 
 [Timer]
 OnCalendar=*-*-* *:*:00
 OnBootSec=1s
 Persistent=true
 AccuracySec=1min
-Unit=rs-agent.service
+Unit=firulaiAgent.service
 
 [Install]
 WantedBy=timers.target
 TIMER_EOF
 
             chmod 644 "$SYSTEMD_USER_SERVICE_FILE" "$SYSTEMD_USER_TIMER_FILE"
-            if systemctl --user daemon-reload && systemctl --user enable --now rs-agent.timer; then
+            if systemctl --user daemon-reload && systemctl --user enable --now firulaiAgent.timer; then
                 SCHEDULER_TYPE="systemd --user timer"
                 log "$(t systemd_user_timer_configured)"
                 return 0
@@ -3557,7 +3577,7 @@ test_agent() {
     info "$(t running_initial)"
 
     set +e
-    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/rs_agent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --locale "$AGENT_LOCALE" 2>&1 | tee -a "$LOG_FILE"
+    RS_AGENT_TRIGGER="initial-installation" /bin/bash "$INSTALL_DIR/firulaiAgent.sh" --token "$AGENT_TOKEN" --uuid "$UUID" --locale "$AGENT_LOCALE" 2>&1 | tee -a "$LOG_FILE"
     local agent_status=${PIPESTATUS[0]}
     set -e
 
@@ -3584,7 +3604,7 @@ print_summary() {
     echo "============================================================================"
     echo ""
     echo "$(t locations)"
-    echo "   - Agent:       $INSTALL_DIR/rs_agent.sh"
+    echo "   - Agent:       $INSTALL_DIR/firulaiAgent.sh"
     echo "   - Inventory:   $DATA_DIR/inventory.json"
     echo "   - State:       $DATA_DIR/state.env"
     echo "   - Logs:        $LOG_FILE"
@@ -3592,7 +3612,7 @@ print_summary() {
     echo "$(t execution)"
     echo "   - $(t automatic):   $(t daily_at) ($SCHEDULER_TYPE)"
     echo "   - $(t recovery):    $(t recovery_detail)"
-    echo "   - $(t manual):      ${manual_prefix}bash $INSTALL_DIR/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID> --locale $AGENT_LOCALE"
+    echo "   - $(t manual):      ${manual_prefix}bash $INSTALL_DIR/firulaiAgent.sh --token <AGENT_TOKEN> --uuid <UUID> --locale $AGENT_LOCALE"
     echo ""
     echo "$(t view_inventory)"
     echo "   cat $DATA_DIR/inventory.json"
@@ -3621,6 +3641,7 @@ main() {
     
     # Verificaciones
     check_root
+    check_legacy_installation
     # Inspect the machine before performing distribution, dependency or RSM
     # work. A different local installation must stop the process immediately.
     check_local_agent_installation

@@ -1,4 +1,7 @@
-# Firulai Inventory Agent
+# Firulai Security Agent
+
+La instalación nueva usa `firulaiAgent` para los directorios, las unidades systemd y los scripts `firulaiAgent.sh` y `firulaiAgent_runner.sh`. Para una instalación sin root, la ejecución manual es `bash ~/.local/share/firulaiAgent/firulaiAgent_runner.sh --if-due`. El actualizador migra automáticamente una instalación antigua `rs-agent`; si se ejecuta el instalador nuevo manualmente sobre ella, el instalador detiene la operación para evitar dos agentes activos.
+Los tags publicados también incluyen `rs_agent.sh` y `rs_agent_runner.sh` como entradas de compatibilidad para el actualizador antiguo. Esos archivos migran la instalación automáticamente; después de una migración correcta no quedan en el equipo.
 
 Linux system analysis agent for vulnerability detection. It collects system information, installed packages, and relevant software data, then sends the inventory to Firulai/RSM.
 
@@ -35,8 +38,8 @@ curl -fsSL https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/main/i
 If `--locale` is not provided, the installer uses English. It does not query AppUser or Account properties. The selected locale is stored in `config.env` as `AGENT_LOCALE` and is reused by:
 
 - `install.sh`
-- `rs_agent.sh`
-- `rs_agent_runner.sh`
+- `firulaiAgent.sh`
+- `firulaiAgent_runner.sh`
 - `uninstall.sh`
 
 Supported Firulai preference locales are `en_US`, `es_ES`, `ca_ES`, `eu_ES`, `gl_ES`, `fr_FR`, `de_DE`, `it_IT`, `ja_JP`, and `zh_CN`. Locale aliases such as `ca`, `ca-ES`, or `ca_ES` are normalized to the supported value.
@@ -45,7 +48,7 @@ All user-facing messages in the Linux installer, agent run, automatic runner, an
 
 ```bash
 python3 scripts/check_i18n.py
-bash -n install.sh rs_agent.sh rs_agent_runner.sh uninstall.sh
+bash -n install.sh firulaiAgent.sh firulaiAgent_runner.sh uninstall.sh
 ```
 
 ## Semantic Lifecycle
@@ -98,13 +101,13 @@ By default, user-mode installation uses:
 
 | Path | Description |
 |------|-------------|
-| `${XDG_DATA_HOME:-~/.local/share}/rs-agent/rs_agent.sh` | Main agent |
-| `${XDG_DATA_HOME:-~/.local/share}/rs-agent/rs_agent_runner.sh` | Automatic runner |
-| `${XDG_DATA_HOME:-~/.local/share}/rs-agent/uninstall.sh` | Uninstaller |
-| `${XDG_STATE_HOME:-~/.local/state}/rs-agent/config.env` | Token and UUID |
-| `${XDG_STATE_HOME:-~/.local/state}/rs-agent/inventory.json` | Last inventory |
-| `${XDG_STATE_HOME:-~/.local/state}/rs-agent/state.env` | Last successful run |
-| `${XDG_STATE_HOME:-~/.local/state}/rs-agent/rs-agent.log` | Log file |
+| `${XDG_DATA_HOME:-~/.local/share}/firulaiAgent/firulaiAgent.sh` | Main agent |
+| `${XDG_DATA_HOME:-~/.local/share}/firulaiAgent/firulaiAgent_runner.sh` | Automatic runner |
+| `${XDG_DATA_HOME:-~/.local/share}/firulaiAgent/uninstall.sh` | Uninstaller |
+| `${XDG_STATE_HOME:-~/.local/state}/firulaiAgent/config.env` | Token and UUID |
+| `${XDG_STATE_HOME:-~/.local/state}/firulaiAgent/inventory.json` | Last inventory |
+| `${XDG_STATE_HOME:-~/.local/state}/firulaiAgent/state.env` | Last successful run |
+| `${XDG_STATE_HOME:-~/.local/state}/firulaiAgent/firulaiAgent.log` | Log file |
 
 Paths can be overridden with `RS_AGENT_INSTALL_DIR`, `RS_AGENT_DATA_DIR`, `RS_AGENT_LOG_FILE`, and `RS_AGENT_TMP_DIR`.
 
@@ -132,8 +135,8 @@ crontab -l | grep rs_agent_runner
 - Requires linger to run without an active session. If it is not active, it will be enabled, requiring the root/admin password.
 
 ```bash
-systemctl --user status rs-agent.timer
-systemctl --user list-timers rs-agent.timer
+systemctl --user status firulaiAgent.timer
+systemctl --user list-timers firulaiAgent.timer
 ```
 
 If there is no interactive terminal, the installer uses user cron by default and validates its requirements before completing the installation.
@@ -141,7 +144,7 @@ If there is no interactive terminal, the installer uses user cron by default and
 ## Manual Run
 
 ```bash
-bash ~/.local/share/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
+bash ~/.local/share/firulaiAgent/firulaiAgent.sh --token <AGENT_TOKEN> --uuid <UUID>
 ```
 
 ## Uninstall No-Root Instance
@@ -149,14 +152,14 @@ bash ~/.local/share/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
 Run the uninstaller as the same user that installed the no-root agent:
 
 ```bash
-bash ~/.local/share/rs-agent/uninstall.sh
+bash ~/.local/share/firulaiAgent/uninstall.sh
 ```
 
-The `~` path is resolved for the user running the command. For example, if the agent was installed by `aps-no-root-test`, run `bash /home/aps-no-root-test/.local/share/rs-agent/uninstall.sh` or switch to that user first. Running the command as `root` would look for `/root/.local/share/rs-agent/uninstall.sh`.
+The `~` path is resolved for the user running the command. For example, if the agent was installed by `aps-no-root-test`, run `bash /home/aps-no-root-test/.local/share/firulaiAgent/uninstall.sh` or switch to that user first. Running the command as `root` would look for `/root/.local/share/firulaiAgent/uninstall.sh`.
 
-The no-root uninstaller only removes the current user's installation. It does not touch `/opt/rs-agent`, `/var/lib/rs-agent`, global systemd units, or an existing root installation.
+The no-root uninstaller only removes the current user's installation. It does not touch `/opt/firulaiAgent`, `/var/lib/firulaiAgent`, global systemd units, or an existing root installation.
 
-After confirmation, the uninstaller attempts to mark the System disconnected in Firulai. Missing credentials, API permission errors, and HTTP failures do not stop local removal. In those cases the remote System may retain its previous status. A root installation can be removed with `sudo bash /opt/rs-agent/uninstall.sh`.
+After confirmation, the uninstaller attempts to mark the System disconnected in Firulai. Missing credentials, API permission errors, and HTTP failures do not stop local removal. In those cases the remote System may retain its previous status. A root installation can be removed with `sudo bash /opt/firulaiAgent/uninstall.sh`.
 
 ## Collected Data
 
@@ -179,7 +182,7 @@ The Linux installer and runtime are distribution-neutral. The agent selects a pa
 Selection defaults to `RS_AGENT_PACKAGE_COLLECTOR=auto`. If a host intentionally uses a non-native package database, force a collector before running the agent:
 
 ```bash
-RS_AGENT_PACKAGE_COLLECTOR=rpm bash ~/.local/share/rs-agent/rs_agent.sh --token <AGENT_TOKEN> --uuid <UUID>
+RS_AGENT_PACKAGE_COLLECTOR=rpm bash ~/.local/share/firulaiAgent/firulaiAgent.sh --token <AGENT_TOKEN> --uuid <UUID>
 ```
 
 Language and application-level collectors are additive. When available, the agent also inspects global/user-visible Python, Node.js, Snap, Flatpak, and Ruby packages without changing the selected system package collector.
@@ -202,10 +205,10 @@ Useful commands:
 ```bash
 id
 dpkg-query -W | wc -l
-cat ~/.local/state/rs-agent/inventory.json
-grep -o '"manager":"dpkg"' ~/.local/state/rs-agent/inventory.json | wc -l
-grep -o '"manager":"pip"' ~/.local/state/rs-agent/inventory.json | wc -l
-grep -o '"manager":"npm"' ~/.local/state/rs-agent/inventory.json | wc -l
+cat ~/.local/state/firulaiAgent/inventory.json
+grep -o '"manager":"dpkg"' ~/.local/state/firulaiAgent/inventory.json | wc -l
+grep -o '"manager":"pip"' ~/.local/state/firulaiAgent/inventory.json | wc -l
+grep -o '"manager":"npm"' ~/.local/state/firulaiAgent/inventory.json | wc -l
 ```
 
 ## Requirements

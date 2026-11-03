@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CollectionStatusTests(unittest.TestCase):
     def run_fixture(self, curl_exit=0, endpoint='https://fixture.invalid/status'):
-        source = (ROOT / 'rs_agent.sh').read_text(encoding='utf-8')
+        source = (ROOT / 'firulaiAgent.sh').read_text(encoding='utf-8')
         functions = source.split('report_collection_status() {', 1)[1].split('\nmain() {', 1)[0]
         functions = 'report_collection_status() {' + functions
         bash = Path(os.environ.get('PROGRAMFILES', 'C:/Program Files')) / 'Git/bin/bash.exe'
