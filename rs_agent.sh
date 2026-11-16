@@ -1,7 +1,7 @@
 #!/bin/bash
 # Compatibility entry point for agents installed before the firulaiAgent rename.
 # The published legacy updater requires this exact filename and version line.
-AGENT_VERSION="0.4.13"
+AGENT_VERSION="0.4.14"
 set -euo pipefail
 
 legacy_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)

@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.13"
+AGENT_VERSION="0.4.14"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/firulaiAgent.sh}"
@@ -1305,11 +1305,6 @@ select_source_package_version() {
     local source_version="$2"
     local upstream_version="$3"
 
-    if [ -n "$source_version" ] && [ "$source_version" = "$component_version" ] && [ -n "$upstream_version" ] && [ "$upstream_version" != "unknown" ]; then
-        printf '%s' "$upstream_version"
-        return
-    fi
-
     if [ -n "$source_version" ] && [ "$source_version" != "unknown" ]; then
         printf '%s' "$source_version"
         return
@@ -1325,11 +1320,7 @@ select_component_version() {
     local source_version="$2"
     local upstream_version="$3"
 
-    if [ -n "$source_version" ] && [ "$source_version" = "$component_version" ] && [ -n "$upstream_version" ] && [ "$upstream_version" != "unknown" ]; then
-        printf '%s' "$upstream_version"
-        return
-    fi
-
+    # Preserve the package manager revision needed to verify vendor backports.
     printf '%s' "$component_version"
 }
 
@@ -1341,7 +1332,7 @@ collect_packages_dpkg() {
     while IFS='|' read -r name version source_package source_version upstream_version status; do
         [ -z "$name" ] && continue
         # Only packages with "installed" status
-        case "$status" in *"installed"*) ;; *) continue ;; esac
+        case "$status" in *" installed") ;; *) continue ;; esac
 
         if [ -n "$source_package" ]; then
             if [ -z "${seen_source_packages[$source_package]+x}" ]; then
@@ -1355,9 +1346,8 @@ collect_packages_dpkg() {
                 source_package_count=$((source_package_count + 1))
             fi
 
-            if [ "$name" = "$source_package" ]; then
-                continue
-            fi
+            # A real binary may have the same name as its source package.
+            # Keep its dpkg identity and full version as installation evidence.
         fi
 
         local component_json selected_component_version
@@ -1597,6 +1587,11 @@ collect_gem_packages() {
 
     while IFS='|' read -r name version; do
         [ -z "$name" ] && continue
+
+        # RubyGems marks bundled gems with "default:"; it is not version data.
+        if [[ "$version" =~ ^default:[[:space:]]+([^[:space:]]+)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+        fi
 
         [ "$first" = "1" ] && first=0 || packages_json+=","
         packages_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"gem\"}"
