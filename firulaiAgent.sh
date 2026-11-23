@@ -1187,11 +1187,12 @@ collect_agent_installation_info() {
 collect_system_info() {
     local timezone=""
     [ $# -gt 0 ] && timezone="$1"
-    local hostname fqdn kernel arch
+    local hostname fqdn kernel_name kernel arch
     local os_name="Unknown" os_version="Unknown" distro_id="unknown" distro_version="Unknown"
 
     hostname=$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown")
     fqdn=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "unknown")
+    kernel_name=$(uname -s 2>/dev/null) || kernel_name=""
     kernel=$(uname -r 2>/dev/null || echo "unknown")
     arch=$(uname -m 2>/dev/null || echo "unknown")
 
@@ -1215,7 +1216,7 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s","agent_installation":%s}' \
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel_name":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s","agent_installation":%s}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
@@ -1223,6 +1224,7 @@ collect_system_info() {
         "$(json_escape "$os_version")" \
         "$(json_escape "$distro_id")" \
         "$(json_escape "$distro_version")" \
+        "$(json_escape "$kernel_name")" \
         "$(json_escape "$kernel")" \
         "$(json_escape "$arch")" \
         "$(json_escape "$collected_at")" \
@@ -1551,16 +1553,21 @@ collect_npm_packages() {
 
 collect_snap_packages() {
     local packages_json="" first=1
+    local name version revision tracking publisher notes
 
     command -v snap &>/dev/null || return
 
-    while read -r name version _rest; do
+    while read -r name version revision tracking publisher notes; do
         [ -z "$name" ] && continue
         [ "$name" = "Name" ] && continue
 
         [ "$first" = "1" ] && first=0 || packages_json+=","
-        packages_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"snap\"}"
-    done < <(snap list 2>/dev/null)
+        packages_json+="{\"name\":\"$(json_escape "$name")\",\"version\":\"$(json_escape "$version")\",\"manager\":\"snap\""
+        if [ -n "$revision" ] && [ -n "$tracking" ] && [ -n "$publisher" ] && [ -n "$notes" ]; then
+            packages_json+=",\"inventory_evidence\":{\"schema\":1,\"source\":\"snap_list\",\"revision\":\"$(json_escape "$revision")\",\"tracking\":\"$(json_escape "$tracking")\",\"publisher\":\"$(json_escape "$publisher")\",\"notes\":\"$(json_escape "$notes")\"}"
+        fi
+        packages_json+="}"
+    done < <(LC_ALL=C snap list 2>/dev/null)
 
     printf '%s' "$packages_json"
 }
