@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.16"
+AGENT_VERSION="0.4.17"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/firulaiAgent.sh}"
@@ -1326,10 +1326,68 @@ select_component_version() {
     printf '%s' "$component_version"
 }
 
+collect_dpkg_command_evidence() {
+    # Optional observation only: no Python installation and no package changes.
+    command -v python3 >/dev/null 2>&1 || return 0
+    python3 - /var/lib/dpkg 2>/dev/null <<'PY_DPKG_ARTIFACTS'
+import collections, json, os, pathlib, sys, time
+root = pathlib.Path(sys.argv[1])
+try:
+    status = (root / 'status').read_text(encoding='utf-8')
+except (OSError, UnicodeError):
+    raise SystemExit(0)
+records = []
+for paragraph in status.split('\n\n'):
+    fields = dict(line.split(': ', 1) for line in paragraph.splitlines() if ': ' in line and not line.startswith(' '))
+    if fields.get('Status', '').endswith(' ok installed') and fields.get('Package') and fields.get('Version'):
+        records.append(fields)
+counts = collections.Counter((row['Package'], row['Version']) for row in records)
+observed = time.time()
+prefixes = ('/bin/', '/sbin/', '/usr/bin/', '/usr/sbin/', '/usr/libexec/')
+for row in records:
+    name, version = row['Package'], row['Version']
+    if counts[name, version] != 1:
+        continue  # Same identity/version on multiple architectures is ambiguous.
+    candidates = [root / 'info' / (name + ':' + row.get('Architecture', '') + '.list'), root / 'info' / (name + '.list')]
+    manifests = [path for path in candidates if path.is_file()]
+    if len(manifests) != 1:
+        continue
+    try:
+        paths = sorted(set(path for path in manifests[0].read_text(encoding='utf-8').splitlines() if path.startswith(prefixes)))
+    except (OSError, UnicodeError):
+        continue
+    selected = [path for path in paths if len(path) <= 256 and not any(ord(char) < 32 for char in path)]
+    files = []
+    evidence = dict(schema=1, source='dpkg_owned_commands', package=name, version=version,
+        observed_at=observed, coverage='package_owned_commands', complete=False, files=files)
+    for value in selected:
+        if len(files) >= 128:
+            break
+        path = pathlib.Path(value)
+        try:
+            present = path.is_file()
+            executable = present and not path.is_symlink() and os.access(path, os.X_OK)
+        except OSError:
+            present = executable = False
+        files.append(dict(path=value, present=present, executable=executable))
+        if len(json.dumps(evidence, separators=(',', ':'), ensure_ascii=True).encode()) > 7600:
+            files.pop()
+            break
+    # Empty manifests are still bounded observations, never an absence verdict.
+    evidence['complete'] = len(files) == len(paths)
+    print(name + '|' + version + '|' + json.dumps(evidence, separators=(',', ':'), ensure_ascii=True))
+PY_DPKG_ARTIFACTS
+}
+
 collect_packages_dpkg() {
     local components_json="" source_packages_json="" first_component=1 first_source=1
     local component_count=0 source_package_count=0
     declare -A seen_source_packages=()
+    declare -A command_evidence=()
+    local evidence_name evidence_version evidence_json
+    while IFS='|' read -r evidence_name evidence_version evidence_json; do
+        [ -n "$evidence_json" ] && command_evidence["$evidence_name|$evidence_version"]="$evidence_json"
+    done < <(collect_dpkg_command_evidence)
 
     while IFS='|' read -r name version source_package source_version upstream_version status; do
         [ -z "$name" ] && continue
@@ -1362,6 +1420,8 @@ collect_packages_dpkg() {
             [ -n "$upstream_version" ] && component_json+=",\"upstream_version\":\"$(json_escape "$upstream_version")\""
         fi
 
+        local observed_commands="${command_evidence["$name|$version"]-}"
+        [ -n "$observed_commands" ] && component_json+=",\"inventory_evidence\":$observed_commands"
         component_json+="}"
 
         [ "$first_component" = "1" ] && first_component=0 || components_json+=","
