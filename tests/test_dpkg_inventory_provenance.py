@@ -10,11 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DpkgInventoryProvenanceTests(unittest.TestCase):
-    def collect(self, rows):
+    def collect(self, rows, evidence_lines=None):
         source = (ROOT / 'firulaiAgent.sh').read_text(encoding='utf-8')
         functions = 'select_source_package_version() {' + source.split(
             'select_source_package_version() {', 1)[1].split('collect_packages_rpm() {', 1)[0]
-        script = functions + '''
+        evidence_override = ("collect_dpkg_command_evidence() { cat <<'EVIDENCE_FIXTURE'\n" + evidence_lines +
+                             "\nEVIDENCE_FIXTURE\n}\n") if evidence_lines is not None else ''
+        script = functions + evidence_override + '''
 json_escape() { printf '%s' "$1"; }
 dpkg-query() { cat <<'DPKG_FIXTURE'
 ''' + rows + '''
@@ -51,6 +53,16 @@ config|9.0-1|config|9.0-1|9.0|deinstall ok config-files''')
         inventory = self.collect('orphan|1.0-2||||install ok installed')
         self.assertEqual(inventory['components'], [{'name': 'orphan', 'version': '1.0-2', 'manager': 'dpkg'}])
         self.assertEqual(inventory['packages'], [])
+
+    def test_measurements_are_added_without_replacing_the_legacy_observation(self):
+        legacy=dict(schema=1,source='dpkg_owned_commands',package='unseen',version='1-2',
+                    observed_at=1,coverage='package_owned_commands',complete=True,files=[])
+        measured=dict(legacy,schema=2,architecture='arm64',source_package='unseen',source_version='1-2')
+        evidence='\t'.join(['unseen','1-2',json.dumps(legacy),json.dumps(measured)])
+        inventory=self.collect('unseen|1-2|unseen|1-2|1|install ok installed',evidence_lines=evidence)
+        component=inventory['components'][0]
+        self.assertEqual(component['inventory_evidence'],legacy)
+        self.assertEqual(component['installed_file_evidence'],measured)
 
 
 if __name__ == '__main__':

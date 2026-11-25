@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.17"
+AGENT_VERSION="0.4.18"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/firulaiAgent.sh}"
@@ -1330,8 +1330,50 @@ collect_dpkg_command_evidence() {
     # Optional observation only: no Python installation and no package changes.
     command -v python3 >/dev/null 2>&1 || return 0
     python3 - /var/lib/dpkg 2>/dev/null <<'PY_DPKG_ARTIFACTS'
-import collections, json, os, pathlib, sys, time
+import collections, hashlib, json, os, pathlib, re, stat, sys, time
 root = pathlib.Path(sys.argv[1])
+fingerprint_budget = dict(bytes=96 * 1024 * 1024, files=256, deadline=time.monotonic() + 2)
+
+def file_fingerprint(path):
+    """Observe regular-file bytes only; never run the discovered executable."""
+    if fingerprint_budget['files'] <= 0 or time.monotonic() >= fingerprint_budget['deadline']:
+        return None
+    descriptor = None
+    try:
+        flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_CLOEXEC', 0) | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)
+        if path.is_symlink():
+            return None
+        descriptor = os.open(str(path), flags)
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > min(8 * 1024 * 1024, fingerprint_budget['bytes']):
+            return None
+        fingerprint_budget['files'] -= 1
+        digest, length = hashlib.sha256(), 0
+        with os.fdopen(descriptor, 'rb') as stream:
+            descriptor = None
+            while True:
+                if time.monotonic() >= fingerprint_budget['deadline']:
+                    return None
+                chunk = stream.read(min(65536, before.st_size - length + 1))
+                if not chunk:
+                    break
+                length += len(chunk)
+                fingerprint_budget['bytes'] -= len(chunk)
+                if length > before.st_size or fingerprint_budget['bytes'] < 0:
+                    return None
+                digest.update(chunk)
+            after = os.fstat(stream.fileno())
+            current = path.stat()
+            identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+            if identity(before) != identity(after) or identity(after) != identity(current) or length != before.st_size:
+                return None
+            return dict(sha256=digest.hexdigest(), size_bytes=length, mtime_ns=after.st_mtime_ns,
+                        resolved_path=str(path.resolve(strict=True)))
+    except (OSError, ValueError):
+        return None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 try:
     status = (root / 'status').read_text(encoding='utf-8')
 except (OSError, UnicodeError):
@@ -1358,7 +1400,12 @@ for row in records:
         continue
     selected = [path for path in paths if len(path) <= 256 and not any(ord(char) < 32 for char in path)]
     files = []
-    evidence = dict(schema=1, source='dpkg_owned_commands', package=name, version=version,
+    source = re.fullmatch(r'([a-z0-9][a-z0-9+.-]*)(?: \(([^()\s]+)\))?', row.get('Source') or name)
+    architecture = row.get('Architecture', '')
+    if not source or not re.fullmatch(r'[a-z0-9][a-z0-9-]*', architecture):
+        continue
+    evidence = dict(schema=2, source='dpkg_owned_commands', package=name, version=version,
+        architecture=architecture, source_package=source[1], source_version=source[2] or version,
         observed_at=observed, coverage='package_owned_commands', complete=False, files=files)
     for value in selected:
         if len(files) >= 128:
@@ -1369,13 +1416,32 @@ for row in records:
             executable = present and not path.is_symlink() and os.access(path, os.X_OK)
         except OSError:
             present = executable = False
-        files.append(dict(path=value, present=present, executable=executable))
+        item = dict(path=value, present=present, executable=executable)
+        files.append(item)
         if len(json.dumps(evidence, separators=(',', ':'), ensure_ascii=True).encode()) > 7600:
             files.pop()
             break
     # Empty manifests are still bounded observations, never an absence verdict.
     evidence['complete'] = len(files) == len(paths)
-    print(name + '|' + version + '|' + json.dumps(evidence, separators=(',', ':'), ensure_ascii=True))
+    # Preserve command coverage before spending the payload budget on hashes.
+    # Omitted fingerprints never remove an already observed command.
+    for index, item in enumerate(files):
+        if not item['executable']:
+            continue
+        fingerprint = file_fingerprint(pathlib.Path(item['path']))
+        if not fingerprint or not fingerprint['resolved_path'].startswith(prefixes):
+            continue
+        files[index] = dict(item, **fingerprint)
+        if len(json.dumps(evidence, separators=(',', ':'), ensure_ascii=True).encode()) > 7600:
+            files[index] = item
+    # Keep the published schema-1 contract for receivers updated separately.
+    # The additive schema-2 field carries measurements for the new receiver.
+    legacy = {key: value for key, value in evidence.items()
+              if key not in ('architecture', 'source_package', 'source_version')}
+    legacy['schema'] = 1
+    legacy['files'] = [{key: item[key] for key in ('path', 'present', 'executable')} for item in files]
+    print('\t'.join((name, version, json.dumps(legacy, separators=(',', ':'), ensure_ascii=True),
+                    json.dumps(evidence, separators=(',', ':'), ensure_ascii=True))))
 PY_DPKG_ARTIFACTS
 }
 
@@ -1384,9 +1450,11 @@ collect_packages_dpkg() {
     local component_count=0 source_package_count=0
     declare -A seen_source_packages=()
     declare -A command_evidence=()
-    local evidence_name evidence_version evidence_json
-    while IFS='|' read -r evidence_name evidence_version evidence_json; do
+    declare -A command_measurements=()
+    local evidence_name evidence_version evidence_json measured_json
+    while IFS=$'\t' read -r evidence_name evidence_version evidence_json measured_json; do
         [ -n "$evidence_json" ] && command_evidence["$evidence_name|$evidence_version"]="$evidence_json"
+        [ -n "$measured_json" ] && command_measurements["$evidence_name|$evidence_version"]="$measured_json"
     done < <(collect_dpkg_command_evidence)
 
     while IFS='|' read -r name version source_package source_version upstream_version status; do
@@ -1422,6 +1490,8 @@ collect_packages_dpkg() {
 
         local observed_commands="${command_evidence["$name|$version"]-}"
         [ -n "$observed_commands" ] && component_json+=",\"inventory_evidence\":$observed_commands"
+        local measured_commands="${command_measurements["$name|$version"]-}"
+        [ -n "$measured_commands" ] && component_json+=",\"installed_file_evidence\":$measured_commands"
         component_json+="}"
 
         [ "$first_component" = "1" ] && first_component=0 || components_json+=","
