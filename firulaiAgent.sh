@@ -10,7 +10,7 @@ set -uo pipefail
 
 # ============ CONFIGURATION ============
 
-AGENT_VERSION="0.4.18"
+AGENT_VERSION="0.4.19"
 AGENT_CATALOG_URL="https://firulai.redsauce.net/api/agents/update-catalog"
 UPDATE_ONLY=0
 GITHUB_AGENT_URL="${RS_AGENT_GITHUB_AGENT_URL:-https://raw.githubusercontent.com/Redsauce/firulai-linux-agent/$AGENT_VERSION/firulaiAgent.sh}"
@@ -1184,6 +1184,117 @@ collect_agent_installation_info() {
     printf '{"mode":"%s","user":"%s"}' "$mode" "$(json_escape "$owner")"
 }
 
+collect_running_kernel_evidence() {
+    command -v python3 >/dev/null 2>&1 || { printf '{}'; return 0; }
+    python3 - 2>/dev/null <<'PY_RUNNING_KERNEL'
+import gzip
+import hashlib
+import json
+import os
+import platform
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import time
+
+
+def kernel_command(arguments):
+    if not shutil.which(arguments[0]):
+        return None, ''
+    try:
+        result = subprocess.run(arguments, capture_output=True, timeout=3, check=False)
+        if len(result.stdout) > 8192:
+            return None, ''
+        return result.returncode, result.stdout.decode('utf8', errors='strict').strip()
+    except (OSError, subprocess.TimeoutExpired, UnicodeError):
+        return None, ''
+
+
+def kernel_file(path, limit, compressed=False):
+    """Bound reads and reject a file changed while hashing it."""
+    try:
+        with open(path, 'rb') as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size > limit:
+                return None
+            reader = gzip.GzipFile(fileobj=stream) if compressed else stream
+            digest, size = hashlib.sha256(), 0
+            while True:
+                chunk = reader.read(min(65536, limit + 1 - size))
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > limit:
+                    return None
+                digest.update(chunk)
+            after = os.fstat(stream.fileno())
+            if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) or not size:
+                return None
+            current = os.stat(path)
+            if (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+                return None
+        return dict(path=str(path), sha256=digest.hexdigest(), size_bytes=size)
+    except (OSError, EOFError, ValueError):
+        return None
+
+
+def collect_kernel_evidence():
+    if platform.system() != 'Linux':
+        return {}
+    release, architecture = platform.release(), platform.machine()
+    if not re.fullmatch(r'[0-9]+\.[0-9]+(?:\.[0-9]+)?[-+._A-Za-z0-9]*', release):
+        return {}
+    result = dict(schema=1, source='linux_running_kernel', observed_at=time.time(),
+        release=release, architecture=architecture, uname_version=platform.version()[:512],
+        environment=dict(scope='unknown', container=''), config=None, image=None, package=None, errors=[])
+    # A guest's /boot is not evidence about its shared host kernel. Unknown
+    # isolation remains unknown, rather than silently being treated as a host.
+    code, kind = kernel_command(['systemd-detect-virt', '--container'])
+    if code == 0 and kind and kind != 'none':
+        result['environment'] = dict(scope='container', container=kind[:64])
+    elif code == 1 and kind == 'none':
+        result['environment'] = dict(scope='host', container='')
+    elif Path('/.dockerenv').exists() or Path('/run/.containerenv').exists() or Path('/run/systemd/container').exists():
+        result['environment'] = dict(scope='container', container='detected')
+    config = kernel_file('/proc/config.gz', 2*1024*1024, compressed=True)
+    if config:
+        result['config'] = dict(config, origin='running_kernel')
+    if result['environment']['scope'] == 'host':
+        if not config:
+            config = kernel_file('/boot/config-' + release, 2*1024*1024)
+            if config:
+                result['config'] = dict(config, origin='installed_boot_file')
+        image_path = '/boot/vmlinuz-' + release
+        result['image'] = kernel_file(image_path, 128*1024*1024)
+        code, owner = kernel_command(['dpkg-query', '-S', image_path])
+        if code == 0 and len(owner.splitlines()) == 1:
+            name, separator, owned = owner.rpartition(': ')
+            if separator and owned == image_path and re.fullmatch(r'[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?', name):
+                code, data = kernel_command(['dpkg-query', '-W', '-f=${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\t${db:Status-Status}', name])
+                fields = data.split('\t')
+                if code == 0 and len(fields) == 6 and fields[0] == name and fields[5] == 'installed':
+                    result['package'] = dict(manager='dpkg', name=fields[0], version=fields[1],
+                        architecture=fields[2], source_package=fields[3], source_version=fields[4], image_path=image_path)
+        if not result['image']:
+            result['errors'].append('installed_image_unavailable')
+        if not result['package']:
+            result['errors'].append('image_package_unconfirmed')
+    else:
+        result['errors'].append('host_image_not_observed')
+    if not result['config']:
+        result['errors'].append('kernel_config_unavailable')
+    if platform.release() != release:
+        return {}
+    return result
+
+
+if __name__ == '__main__':
+    print(json.dumps(collect_kernel_evidence(), separators=(',', ':')))
+PY_RUNNING_KERNEL
+}
+
 collect_system_info() {
     local timezone=""
     [ $# -gt 0 ] && timezone="$1"
@@ -1216,7 +1327,12 @@ collect_system_info() {
     local collected_at
     collected_at=$(date '+%Y-%m-%d %H:%M:%S')
 
-    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel_name":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s","agent_installation":%s}' \
+    local kernel_evidence="{}"
+    if [ "$kernel_name" = "Linux" ]; then
+        kernel_evidence=$(collect_running_kernel_evidence) || kernel_evidence="{}"
+        [ -n "$kernel_evidence" ] || kernel_evidence="{}"
+    fi
+    printf '{"hostname":"%s","fqdn":"%s","uuid":"%s","os":{"name":"%s","version":"%s","distro_id":"%s","distro_version":"%s","kernel_name":"%s","kernel":"%s","architecture":"%s"},"collected_at":"%s","timezone":"%s","agent_version":"%s","agent_installation":%s,"kernel_observation":%s}' \
         "$(json_escape "$hostname")" \
         "$(json_escape "$fqdn")" \
         "$(json_escape "$UUID_VAL")" \
@@ -1230,7 +1346,8 @@ collect_system_info() {
         "$(json_escape "$collected_at")" \
         "$(json_escape "$timezone")" \
         "$(json_escape "$AGENT_VERSION")" \
-        "$(collect_agent_installation_info)"
+        "$(collect_agent_installation_info)" \
+        "$kernel_evidence"
 }
 
 collect_timezone() {
