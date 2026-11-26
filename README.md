@@ -166,7 +166,7 @@ After confirmation, the uninstaller attempts to mark the System disconnected in 
 The agent generates a JSON inventory with:
 
 - `system`: hostname, FQDN, UUID, distribution, kernel, architecture, timezone, and agent version.
-- `hardware`: CPU model and visible disks through `lscpu`/`lsblk`, with `/proc/cpuinfo` and `/sys/block` fallbacks for minimal distributions.
+- `hardware`: CPU model and visible disks with model, vendor and firmware revision through `lscpu`/`lsblk`, with `/proc/cpuinfo` and `/sys/block` fallbacks for minimal distributions. Unavailable disk fields remain empty.
 - `components`: system packages from the detected package collector plus `pip`, `npm`, `snap`, `flatpak`, and `gem` components when available to the user.
 - `packages`: source packages derived from `dpkg-query` on Debian/Ubuntu.
 
