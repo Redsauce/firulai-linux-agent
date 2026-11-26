@@ -1377,29 +1377,35 @@ collect_hardware() {
     [ -z "$cpu_model" ] && cpu_model="Unknown"
 
     append_firmware_device() {
-        local dev="$1" model="$2"
+        local dev="$1" model="$2" revision="$3" vendor="$4"
         [ -z "$dev" ] && return
-        [ -z "$model" ] && model="Unknown"
 
         [ "$first" = "1" ] && first=0 || firmware_json+=","
-        firmware_json+="{\"device\":\"/dev/$(json_escape "$dev")\",\"model\":\"$(json_escape "$model")\"}"
+        firmware_json+="{\"device\":\"/dev/$(json_escape "$dev")\",\"model\":\"$(json_escape "$model")\",\"manufacturer\":\"$(json_escape "$vendor")\",\"version\":\"$(json_escape "$revision")\"}"
     }
 
-    # Disks: awk extracts NAME and MODEL (may contain spaces), filtering disks only.
-    while IFS=$'\t' read -r dev model; do
-        append_firmware_device "$dev" "$model"
-    done < <(lsblk -d -o NAME,TYPE,MODEL -n 2>/dev/null \
-        | awk '$2=="disk" {
-            dev=$1
-            model=""
-            for(i=3; i<=NF; i++) model=(model=="" ? $i : model" "$i)
-            if(model=="") model="Unknown"
-            print dev "\t" model
-          }')
+    # Key/value output preserves empty fields and spaces in disk descriptions.
+    local lsblk_rows row dev kind model revision vendor
+    lsblk_rows=$(lsblk -d -P -n -o NAME,TYPE,MODEL,REV,VENDOR 2>/dev/null) || lsblk_rows=""
+    while IFS= read -r row; do
+        dev=$(sed -n 's/.*NAME="\([^"]*\)".*/\1/p' <<< "$row")
+        kind=$(sed -n 's/.*TYPE="\([^"]*\)".*/\1/p' <<< "$row")
+        [ "$kind" = "disk" ] || continue
+        model=$(sed -n 's/.*MODEL="\([^"]*\)".*/\1/p' <<< "$row")
+        revision=$(sed -n 's/.*REV="\([^"]*\)".*/\1/p' <<< "$row")
+        vendor=$(sed -n 's/.*VENDOR="\([^"]*\)".*/\1/p' <<< "$row")
+        model=${model//\\x20/ }
+        revision=${revision//\\x20/ }
+        vendor=${vendor//\\x20/ }
+        model=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$model")
+        revision=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$revision")
+        vendor=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$vendor")
+        append_firmware_device "$dev" "$model" "$revision" "$vendor"
+    done <<< "$lsblk_rows"
 
     # Fallback for systems where lsblk is unavailable or outside PATH.
     if [ "$first" = "1" ]; then
-        local sys_block_device sys_device_name sys_device_model
+        local sys_block_device sys_device_name sys_device_model sys_device_revision sys_device_vendor
         for sys_block_device in /sys/block/*; do
             [ -e "$sys_block_device" ] || continue
             sys_device_name="${sys_block_device##*/}"
@@ -1407,10 +1413,18 @@ collect_hardware() {
                 loop*|ram*|zram*) continue ;;
             esac
             sys_device_model=""
+            sys_device_revision=""
+            sys_device_vendor=""
             if [ -r "$sys_block_device/device/model" ]; then
                 sys_device_model=$(tr -d '\r' < "$sys_block_device/device/model" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             fi
-            append_firmware_device "$sys_device_name" "$sys_device_model"
+            if [ -r "$sys_block_device/device/rev" ]; then
+                sys_device_revision=$(tr -d '\r' < "$sys_block_device/device/rev" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            fi
+            if [ -r "$sys_block_device/device/vendor" ]; then
+                sys_device_vendor=$(tr -d '\r' < "$sys_block_device/device/vendor" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            fi
+            append_firmware_device "$sys_device_name" "$sys_device_model" "$sys_device_revision" "$sys_device_vendor"
         done
     fi
 
